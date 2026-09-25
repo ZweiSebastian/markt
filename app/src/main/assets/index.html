@@ -143,6 +143,8 @@
   <div style="margin-top:8px">
     <b>Einstiegs-Score:</b> 0–80 kombiniert den Abstand des S&amp;P zur 200-Wochen-Linie (35 %) und das CAPE in σ zum
     20J-Ø (65 %), jeweils im Vergleich zur Historie seit 1931; 50 = normale Lage, 20 Punkte = 1 Standardabweichung.
+    Beim CAPE zählt „teurer“ linear negativ; „günstiger“ steigt zwischen 0 und −1σ steil an und ist ab etwa −1σ voll
+    (noch billiger brachte historisch keine höhere 10-Jahres-Rendite).
     Über 50 steigt der Score nur, wenn sich das CAPE vom Tief der letzten 26 Wochen erholt (+10 % = volle Punkte).
     <b>100</b> = strenge Regel, nur wenn das CAPE dabei höchstens +1σ über dem 20J-Ø liegt: Wochentief berührt die 200-Wochen-Linie (nach mind. 26 Wochen darüber, erste Berührung seit
     1 Jahr) und danach steigt das CAPE 10 % über sein Tief seit der Berührung; bleibt 13 Wochen stehen, ohne Wende verfällt
@@ -395,7 +397,9 @@ function withLive(d, q) {
     const R = g.rule;
     if (R.cSd) {
       const dist = (p / w200 - 1) * 100, z = (cur - R.m20) / R.s20;
-      const comp = -(R.wDist * (dist - R.dMu) / R.dSd + R.wCape * (z - R.zMu) / R.zSd);
+      // CAPE-Teil wie in der täglichen Berechnung: über dem Ø linear, darunter S-Kurve (ab ca. -1σ voll)
+      const zf = R.capeWidth == null || z >= 0 ? z : -1 / (1 + Math.exp(-((-z) - R.capeMid) / R.capeWidth));
+      const comp = -(R.wDist * (dist - R.dMu) / R.dSd + R.wCape * (zf - R.zMu) / R.zSd);
       const raw = 50 + R.spread * comp / R.cSd;
       const prev = (sameWeek ? R.capeLast.slice(0, -1) : R.capeLast.slice(1)).filter(x => x != null);
       const mn = Math.min(...prev, cur);
