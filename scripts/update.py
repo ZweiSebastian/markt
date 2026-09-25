@@ -98,7 +98,7 @@ def load_prices():
     errors = []
     try:
         import yfinance as yf
-        df = yf.download("^GSPC", start="1999-01-01", interval="1d", auto_adjust=False,
+        df = yf.download("^GSPC", start="1985-01-01", interval="1d", auto_adjust=False,
                          progress=False, threads=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -113,7 +113,7 @@ def load_prices():
     # Ersatz: Yahoo Chart-API direkt
     try:
         p2 = int(datetime.now(timezone.utc).timestamp()) + 86400
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?period1=915148800&period2={p2}&interval=1d"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?period1=473385600&period2={p2}&interval=1d"
         j = requests.get(url, headers=UA, timeout=60).json()["chart"]["result"][0]
         q = j["indicators"]["quote"][0]
         df = pd.DataFrame({"Open": q["open"], "High": q["high"], "Low": q["low"], "Close": q["close"]},
@@ -131,7 +131,7 @@ def load_prices():
         txt = requests.get("https://stooq.com/q/d/l/?s=%5Espx&i=d", headers=UA, timeout=60).text
         df = pd.read_csv(io.StringIO(txt), parse_dates=["Date"], index_col="Date")
         df = df[["Open", "High", "Low", "Close"]].dropna()
-        df = df[df.index >= "1999-01-01"]
+        df = df[df.index >= "1985-01-01"]
         if len(df) > 5000:
             return df, "Stooq"
         errors.append(f"stooq: nur {len(df)} Zeilen")
@@ -185,8 +185,8 @@ def main():
     cape = (close / pd.Series(e10_series, index=close.index)).dropna()
 
     last_day = cape.index[-1]
-    cape20 = cape[cape.index > last_day - pd.DateOffset(years=20)]
     cur = float(cape.iloc[-1])
+    start20 = last_day - pd.DateOffset(years=20)
 
     windows = {}
     for y in (5, 10, 20):
@@ -200,32 +200,53 @@ def main():
         }
     longrun = float(sh["cape"].mean())
 
-    # --- Kurs: 200/50-Tage-Linie (auf Tagesbasis), Wochenkerzen 5 Jahre
+    # --- rollierende Ø/σ (graue Kanäle): täglich (letzte 20 J.) und monatlich (seit 1881)
+    daily = {"t": [d.strftime("%Y-%m-%d") for d in cape.index[cape.index > start20]]}
+    daily["v"] = [r2(v) for v in cape[cape.index > start20].values]
+    for y in (5, 10, 20):
+        roll = cape.rolling(f"{int(y * 365.25)}D", min_periods=int(y * 252 * 0.95))
+        m, sd = roll.mean(), roll.std()
+        daily[f"m{y}"] = [r2(v) for v in m[m.index > start20].values]
+        daily[f"s{y}"] = [r2(v) for v in sd[sd.index > start20].values]
+
+    mon = sh.set_index("key")["cape"].astype(float).copy()
+    cur_key = last_day.year * 100 + last_day.month
+    mon.loc[cur_key] = cur          # laufender Monat = aktueller Tageswert
+    mon = mon.sort_index()
+    monthly = {"t": [f"{k // 100}-{k % 100:02d}-01" for k in mon.index], "v": [r2(v) for v in mon.values]}
+    for y in (5, 10, 20):
+        roll = mon.rolling(12 * y, min_periods=12 * y)
+        monthly[f"m{y}"] = [r2(v) for v in roll.mean().values]
+        monthly[f"s{y}"] = [r2(v) for v in roll.std().values]
+
+    # --- Kurs: 200/50-Tage-Linie, 200-Wochen-Linie, Wochenkerzen 20 Jahre
     sma200 = close.rolling(200).mean()
     sma50 = close.rolling(50).mean()
-    start5 = last_day - pd.DateOffset(years=5)
-    d5 = px[px.index > start5].copy()
-    d5["wk"] = d5.index.to_period("W-FRI")
+    wk = px.copy()
+    wk["wk"] = wk.index.to_period("W-FRI")
+    wclose = wk.groupby("wk")["Close"].last()
+    sma200w = wclose.rolling(200).mean()
     weeks = []
-    for _, g in d5.groupby("wk"):
+    for per, g in wk[wk.index > start20].groupby("wk"):
         last = g.index[-1]
         weeks.append({
             "t": g.index[0].strftime("%Y-%m-%d"),
             "o": r2(g["Open"].iloc[0]), "h": r2(g["High"].max()),
             "l": r2(g["Low"].min()), "c": r2(g["Close"].iloc[-1]),
-            "s200": r2(sma200.loc[last]), "s50": r2(sma50.loc[last]),
+            "s200": r2(sma200.loc[last]), "s50": r2(sma50.loc[last]), "w200": r2(sma200w.loc[per]),
         })
 
     last_close = float(close.iloc[-1])
+    w200_now = float(sma200w.iloc[-1])
     out = {
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "date": last_day.strftime("%Y-%m-%d"),
         "priceSource": src,
         "cape": {
             "current": r2(cur),
-            "t": [d.strftime("%Y-%m-%d") for d in cape20.index],
-            "v": [r2(v) for v in cape20.values],
             "windows": windows,
+            "daily": daily,
+            "monthly": monthly,
             "longrunMean": r2(longrun),
             "longrunSince": first_key // 100,
             "shillerMonth": f"{last_key // 100}-{last_key % 100:02d}",
@@ -234,16 +255,18 @@ def main():
         "spx": {
             "close": r2(last_close),
             "change1d": r2((last_close / float(close.iloc[-2]) - 1) * 100),
-            "sma200": r2(sma200.iloc[-1]), "sma50": r2(sma50.iloc[-1]),
+            "sma200": r2(sma200.iloc[-1]), "sma50": r2(sma50.iloc[-1]), "sma200w": r2(w200_now),
             "vs200": r2((last_close / sma200.iloc[-1] - 1) * 100),
             "vs50": r2((last_close / sma50.iloc[-1] - 1) * 100),
+            "vs200w": r2((last_close / w200_now - 1) * 100),
             "weeks": weeks,
         },
     }
+    cape20 = daily["v"]
 
     # Plausibilitätsprüfung, damit nie Unsinn in der App landet
     assert 5 < cur < 80, f"CAPE unplausibel: {cur}"
-    assert len(weeks) > 240, f"zu wenige Wochen: {len(weeks)}"
+    assert len(weeks) > 1000, f"zu wenige Wochen: {len(weeks)}"
     assert len(cape20) > 4500, f"zu wenige CAPE-Tage: {len(cape20)}"
 
     import os
@@ -252,7 +275,7 @@ def main():
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
     print(f"OK {out['date']}: CAPE {cur:.2f} | 20J-Ø {windows['20']['mean']} ({windows['20']['rating']}) | "
           f"S&P {last_close:.2f}, vs SMA200 {out['spx']['vs200']}% | Shiller bis {out['cape']['shillerMonth']} "
-          f"(CAPE {out['cape']['shillerCape']}) | Quelle {src}")
+          f"(CAPE {out['cape']['shillerCape']}) | SMA200W {w200_now:.2f} | Quelle {src}")
 
 
 if __name__ == "__main__":
