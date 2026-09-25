@@ -166,6 +166,7 @@ SIG_MAXWAIT = 104    # ohne Wende innerhalb von 2 Jahren verfällt die Berührun
 W_DIST, W_CAPE = 0.35, 0.65   # Gewichtung 200W-Abstand / CAPE (σ zum 20J-Ø)
 SPREAD = 20                   # 1 Standardabweichung der Kombination = 20 Punkte um die Mitte 50
 CAP = 80                      # Kombi-Score maximal 80; darüber nur die strenge Regel
+CAPE_MID, CAPE_WIDTH = 0.5, 0.1   # S-Kurve: CAPE-Teil steigt zwischen 0 und -1σ steil an (Mitte -0,5σ), darunter keine Extrapunkte
 Z_MAX_100 = 1.0               # 100 nur, wenn das CAPE beim Signal höchstens +1σ über dem 20J-Ø liegt
 TURN_WEEKS = 26               # Wende: CAPE-Erholung vom Tief der letzten 26 Wochen (+10 % = voll)
 
@@ -349,13 +350,18 @@ def main():
         m_, s_ = mmean.get(k), msd.get(k)
         if m_ == m_ and s_ == s_ and s_:
             zw[i] = (wcape[i] - m_) / s_
+    def cape_shape(zv):
+        # über dem Ø linear (teurer = schlechter), darunter S-Kurve: ab ca. -1σ voll, noch billiger bringt nichts extra
+        return zv if zv >= 0 else -1.0 / (1.0 + math.exp(-((-zv) - CAPE_MID) / CAPE_WIDTH))
+
+    zf = [None if v is None else cape_shape(v) for v in zw]
     distw = [(wc_[i] / weeks[i]["w200"] - 1) * 100 if weeks[i]["w200"] else None for i in range(n_)]
     ok = [i for i in range(n_) if zw[i] is not None and distw[i] is not None]
     dmu = sum(distw[i] for i in ok) / len(ok)
     dsd = (sum((distw[i] - dmu) ** 2 for i in ok) / len(ok)) ** 0.5
-    zmu = sum(zw[i] for i in ok) / len(ok)
-    zsd = (sum((zw[i] - zmu) ** 2 for i in ok) / len(ok)) ** 0.5
-    comp = {i: -(W_DIST * (distw[i] - dmu) / dsd + W_CAPE * (zw[i] - zmu) / zsd) for i in ok}
+    zmu = sum(zf[i] for i in ok) / len(ok)
+    zsd = (sum((zf[i] - zmu) ** 2 for i in ok) / len(ok)) ** 0.5
+    comp = {i: -(W_DIST * (distw[i] - dmu) / dsd + W_CAPE * (zf[i] - zmu) / zsd) for i in ok}
     csd = (sum(v * v for v in comp.values()) / len(comp)) ** 0.5
     new_score = [None] * n_
     for i in ok:
@@ -419,7 +425,7 @@ def main():
     last_k = mmean.index.max()
     sig_out = {
         "rule": {"rise": SIG_RISE, "dist": SIG_DIST, "window": SIG_WINDOW, "maxWait": SIG_MAXWAIT,
-                 "wDist": W_DIST, "wCape": W_CAPE, "spread": SPREAD, "cap": CAP, "turnWeeks": TURN_WEEKS, "zMax100": Z_MAX_100,
+                 "wDist": W_DIST, "wCape": W_CAPE, "spread": SPREAD, "cap": CAP, "turnWeeks": TURN_WEEKS, "zMax100": Z_MAX_100, "capeMid": CAPE_MID, "capeWidth": CAPE_WIDTH,
                  "dMu": round(dmu, 4), "dSd": round(dsd, 4), "zMu": round(zmu, 4), "zSd": round(zsd, 4),
                  "cSd": round(csd, 4), "m20": round(float(mmean[last_k]), 4), "s20": round(float(msd[last_k]), 4),
                  "capeLast": [None if x is None else round(x, 4) for x in wcape[-TURN_WEEKS:]]},
