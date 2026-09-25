@@ -165,7 +165,8 @@ SIG_MAXWAIT = 104    # ohne Wende innerhalb von 2 Jahren verfällt die Berührun
 # Kombinierter Score (0-90), 100 bleibt der strengen Regel vorbehalten
 W_DIST, W_CAPE = 0.35, 0.65   # Gewichtung 200W-Abstand / CAPE (σ zum 20J-Ø)
 SPREAD = 20                   # 1 Standardabweichung der Kombination = 20 Punkte um die Mitte 50
-CAP = 90                      # ohne strenges Signal maximal 90
+CAP = 80                      # Kombi-Score maximal 80; darüber nur die strenge Regel
+Z_MAX_100 = 1.0               # 100 nur, wenn das CAPE beim Signal höchstens +1σ über dem 20J-Ø liegt
 TURN_WEEKS = 26               # Wende: CAPE-Erholung vom Tief der letzten 26 Wochen (+10 % = voll)
 
 
@@ -332,8 +333,9 @@ def main():
             continue
         i = ep["signal"]
         signals.append({"touch": weeks[ep["start"]]["t"], "t": weeks[i]["t"], "c": wc_[i], "cape": r2(wcape[i]),
-                        "z": zval(i), "r1": fwd(i, 52), "r3": fwd(i, 156), "r5": fwd(i, 260), "dd": dd1(i),
+                        "z": zval(i), "r1": fwd(i, 52), "r3": fwd(i, 156), "r5": fwd(i, 260), "r10": fwd(i, 520), "dd": dd1(i),
                         "wait": i - ep["start"]})
+        signals[-1]["ok"] = signals[-1]["z"] is not None and signals[-1]["z"] <= Z_MAX_100
 
     # --- Kombinierter Score: 200W-Abstand + CAPE (Glockenform um 50), Wende-Filter, 100 = strenge Regel
     n_ = len(wc_)
@@ -362,9 +364,18 @@ def main():
         turn = min(1.0, max(0.0, (wcape[i] / mn - 1) / SIG_RISE))
         v = 50 + (raw - 50) * turn if raw > 50 else raw
         v = min(CAP, max(0.0, v))
-        if score[i] is not None and score[i] >= 100:
-            v = 100.0
         new_score[i] = v
+    for ep in episodes:
+        si = ep["signal"]
+        if si is None:
+            continue
+        zs_ = zval(si)
+        if zs_ is None or zs_ > Z_MAX_100:
+            continue
+        stop = ep["end"] if ep["end"] is not None else min(n_, si + SIG_WINDOW)
+        for i in range(si, stop):
+            if new_score[i] is not None:
+                new_score[i] = 100.0
 
     # Rückblick: Einstieg beim ersten Erreichen einer Schwelle (nach mind. 26 Wochen darunter)
     def firsts(thr):
@@ -379,38 +390,36 @@ def main():
         return ent
 
     base1 = [fwd(i, 52) for i in ok if fwd(i, 52) is not None]
-    base5 = [fwd(i, 260) for i in ok if fwd(i, 260) is not None]
-    thresholds = [{"score": "Jede Woche", "n": len(base1), "r1": r2(sum(base1) / len(base1), 1),
-                   "pos": r2(100 * sum(x > 0 for x in base1) / len(base1), 0),
-                   "r5": r2(sum(base5) / len(base5), 1)}]
-    for thr in (50, 60, 70, 80, 90, 100):
-        ent = firsts(thr)
-        r1 = [fwd(i, 52) for i in ent if fwd(i, 52) is not None]
-        r5 = [fwd(i, 260) for i in ent if fwd(i, 260) is not None]
-        dd = [dd1(i) for i in ent if dd1(i) is not None]
-        thresholds.append({"score": thr, "n": len(ent),
-                           "r1": r2(sum(r1) / len(r1), 1) if r1 else None,
-                           "pos": r2(100 * sum(x > 0 for x in r1) / len(r1), 0) if r1 else None,
-                           "r5": r2(sum(r5) / len(r5), 1) if r5 else None,
-                           "dd": r2(sum(dd) / len(dd), 1) if dd else None})
-    # Verteilung: wie viel Prozent aller Wochen in welchem Bereich lagen
-    bands = []
-    for lo, hi in ((0, 20), (20, 35), (35, 50), (50, 65), (65, 80), (80, 100), (100, 101)):
-        idx = [i for i in ok if lo <= new_score[i] < hi]
+    def agg(idx):
         r1 = [fwd(i, 52) for i in idx if fwd(i, 52) is not None]
         r5 = [fwd(i, 260) for i in idx if fwd(i, 260) is not None]
-        bands.append({"lo": lo, "hi": hi, "share": r2(100 * len(idx) / len(ok), 1),
-                      "r1": r2(sum(r1) / len(r1), 1) if r1 else None,
-                      "pos": r2(100 * sum(x > 0 for x in r1) / len(r1), 0) if r1 else None,
-                      "r5": r2(sum(r5) / len(r5), 1) if r5 else None})
+        r10 = [fwd(i, 520) for i in idx if fwd(i, 520) is not None]
+        return {"n": len(idx),
+                "r1": r2(sum(r1) / len(r1), 1) if r1 else None,
+                "pos": r2(100 * sum(x > 0 for x in r1) / len(r1), 0) if r1 else None,
+                "r5": r2(sum(r5) / len(r5), 1) if r5 else None,
+                "r10": r2(sum(r10) / len(r10), 1) if r10 else None}
+
+    thresholds = [dict(score="Jede Woche", **agg(ok))]
+    for thr in (50, 60, 70, 80, 100):
+        thresholds.append(dict(score=thr, **agg(firsts(thr))))
+    # Verteilung: wie viel Prozent aller Wochen in welchem Bereich lagen
+    bands = []
+    for lo in list(range(0, 100, 10)) + [100]:
+        hi = lo + 10 if lo < 100 else 101
+        idx = [i for i in ok if lo <= new_score[i] < hi]
+        if idx:
+            bands.append(dict(lo=lo, hi=hi, share=r2(100 * len(idx) / len(ok), 1), **agg(idx)))
     if sstate.get("active"):
         sstate["touch"] = weeks[sstate["touch"]]["t"]
-        sstate["signal"] = weeks[sstate["signal"]]["t"] if sstate["signal"] is not None else None
+        si_ = sstate["signal"]
+        sstate["signalOk"] = si_ is not None and zval(si_) is not None and zval(si_) <= Z_MAX_100
+        sstate["signal"] = weeks[si_]["t"] if si_ is not None else None
         sstate["capeMin"] = r2(sstate["capeMin"])
     last_k = mmean.index.max()
     sig_out = {
         "rule": {"rise": SIG_RISE, "dist": SIG_DIST, "window": SIG_WINDOW, "maxWait": SIG_MAXWAIT,
-                 "wDist": W_DIST, "wCape": W_CAPE, "spread": SPREAD, "cap": CAP, "turnWeeks": TURN_WEEKS,
+                 "wDist": W_DIST, "wCape": W_CAPE, "spread": SPREAD, "cap": CAP, "turnWeeks": TURN_WEEKS, "zMax100": Z_MAX_100,
                  "dMu": round(dmu, 4), "dSd": round(dsd, 4), "zMu": round(zmu, 4), "zSd": round(zsd, 4),
                  "cSd": round(csd, 4), "m20": round(float(mmean[last_k]), 4), "s20": round(float(msd[last_k]), 4),
                  "capeLast": [None if x is None else round(x, 4) for x in wcape[-TURN_WEEKS:]]},
