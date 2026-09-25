@@ -157,6 +157,62 @@ def r2(x, n=2):
     return None if x is None or (isinstance(x, float) and math.isnan(x)) else round(float(x), n)
 
 
+# ---------------------------------------------------------------- Einstiegssignal (Sebas Regel)
+SIG_RISE = 0.10      # CAPE muss 10 % über sein Tief seit der Berührung steigen -> Score 100
+SIG_DIST = 0.30      # ab 30 % Abstand über der 200-Wochen-Linie ist der Score 0
+SIG_WINDOW = 13      # nach einem Signal bleibt der Score 13 Wochen auf 100 (Einstiegsfenster)
+SIG_MAXWAIT = 104    # ohne Wende innerhalb von 2 Jahren verfällt die Berührung
+
+
+def signal_model(wc, wl, w200, wcape):
+    """Wöchentlicher Score 0-100 und Liste der Episoden.
+    wc/wl/w200/wcape: Listen (Schluss, Tief, 200W-Linie, CAPE) je Woche, chronologisch."""
+    n = len(wc)
+    score = [None] * n
+    episodes = []
+    ep = None
+    run, last_touch = 0, -10 ** 9
+    for i in range(n):
+        if w200[i] is None or wcape[i] is None:
+            continue
+        touched = wl[i] <= w200[i]
+        new_touch = touched and run >= 26 and i - last_touch > 52
+        if ep is not None and ep["signal"] is not None and new_touch:
+            ep["end"] = i          # neue Berührung während des Einstiegsfensters -> neue Episode
+            ep = None
+        if ep is not None:
+            ep["min"] = min(ep["min"], wcape[i])
+            if ep["signal"] is None:
+                rise = wcape[i] / ep["min"] - 1
+                score[i] = 50 + 50 * min(1.0, max(0.0, rise) / SIG_RISE)
+                if rise >= SIG_RISE:
+                    ep["signal"] = i
+                    score[i] = 100
+                elif i - ep["start"] >= SIG_MAXWAIT:
+                    ep["end"] = i
+                    ep = None
+            elif i - ep["signal"] < SIG_WINDOW:
+                score[i] = 100
+            else:
+                ep["end"] = i
+                ep = None
+        if ep is None and score[i] is None:
+            if new_touch:
+                ep = {"start": i, "min": wcape[i], "signal": None, "end": None}
+                episodes.append(ep)
+                score[i] = 50
+            else:
+                dist = wc[i] / w200[i] - 1
+                score[i] = 50 * min(1.0, max(0.0, 1 - dist / SIG_DIST))
+        if touched:
+            last_touch = i
+        run = run + 1 if wc[i] > w200[i] else 0
+    state = {"active": ep is not None, "run": run, "weeksSinceTouch": n - 1 - last_touch}
+    if ep is not None:
+        state.update({"touch": ep["start"], "capeMin": ep["min"], "signal": ep["signal"]})
+    return score, episodes, state
+
+
 def main():
     sh = load_shiller()
     px, src = load_prices()
@@ -242,6 +298,69 @@ def main():
             "s200": r2(sma200.loc[last]), "s50": r2(sma50.loc[last]), "w200": r2(sma200w.loc[per]),
         })
 
+    # --- Einstiegssignal
+    wcape_s = cape.groupby(cape.index.to_period("W-FRI")).last()
+    pers = list(wk.groupby("wk").groups.keys())
+    wcape = [float(wcape_s[p]) if p in wcape_s.index else None for p in pers]
+    wc_ = [w["c"] for w in weeks]
+    score, episodes, sstate = signal_model(wc_, [w["l"] for w in weeks], [w["w200"] for w in weeks], wcape)
+    mroll = mon.rolling(240, min_periods=240)
+    mmean, msd = mroll.mean(), mroll.std()
+
+    def fwd(i, n):
+        return r2(((wc_[i + n] / wc_[i]) ** (52 / n) - 1) * 100, 1) if i + n < len(wc_) else None
+
+    def dd1(i):
+        lows = [w["l"] for w in weeks[i + 1:i + 53]]
+        return r2((min(lows) / wc_[i] - 1) * 100, 1) if lows else None
+
+    def zval(i):
+        t = pd.Timestamp(weeks[i]["t"])
+        k = t.year * 100 + t.month
+        k = k if k in mmean.index else mmean.index[mmean.index <= k].max()
+        m_, s_ = mmean.get(k), msd.get(k)
+        return r2((wcape[i] - m_) / s_) if m_ == m_ and s_ else None
+
+    signals = []
+    for ep in episodes:
+        if ep["signal"] is None:
+            continue
+        i = ep["signal"]
+        signals.append({"touch": weeks[ep["start"]]["t"], "t": weeks[i]["t"], "c": wc_[i], "cape": r2(wcape[i]),
+                        "z": zval(i), "r1": fwd(i, 52), "r3": fwd(i, 156), "r5": fwd(i, 260), "dd": dd1(i),
+                        "wait": i - ep["start"]})
+
+    # Rückblick: was hätte ein Einstieg ab Score X gebracht (erste Woche je Episode mit Score >= X)
+    base1 = [fwd(i, 52) for i in range(len(wc_)) if weeks[i]["w200"] is not None and fwd(i, 52) is not None]
+    thresholds = [{"score": "Jede Woche", "n": len(base1), "r1": r2(sum(base1) / len(base1), 1),
+                   "pos": r2(100 * sum(x > 0 for x in base1) / len(base1), 0)}]
+    for thr in (50, 60, 70, 80, 90, 100):
+        ent = []
+        for ep in episodes:
+            stop = ep["end"] if ep["end"] is not None else len(wc_)
+            for i in range(ep["start"], stop):
+                if score[i] is not None and score[i] >= thr - 1e-9:
+                    ent.append(i)
+                    break
+        r1 = [fwd(i, 52) for i in ent if fwd(i, 52) is not None]
+        r5 = [fwd(i, 260) for i in ent if fwd(i, 260) is not None]
+        dd = [dd1(i) for i in ent if dd1(i) is not None]
+        thresholds.append({"score": thr, "n": len(ent),
+                           "r1": r2(sum(r1) / len(r1), 1) if r1 else None,
+                           "pos": r2(100 * sum(x > 0 for x in r1) / len(r1), 0) if r1 else None,
+                           "r5": r2(sum(r5) / len(r5), 1) if r5 else None,
+                           "dd": r2(sum(dd) / len(dd), 1) if dd else None})
+    if sstate.get("active"):
+        sstate["touch"] = weeks[sstate["touch"]]["t"]
+        sstate["signal"] = weeks[sstate["signal"]]["t"] if sstate["signal"] is not None else None
+        sstate["capeMin"] = r2(sstate["capeMin"])
+    sig_out = {
+        "rule": {"rise": SIG_RISE, "dist": SIG_DIST, "window": SIG_WINDOW, "maxWait": SIG_MAXWAIT},
+        "score": [None if x is None else round(x) for x in score],
+        "signals": signals, "thresholds": thresholds, "state": sstate,
+        "current": round(score[-1]) if score[-1] is not None else None,
+    }
+
     last_close = float(close.iloc[-1])
     w200_now = float(sma200w.iloc[-1])
     out = {
@@ -271,6 +390,7 @@ def main():
             "d199": [r2(v) for v in close.iloc[-199:].values],
             "weeks": weeks,
         },
+        "signal": sig_out,
     }
     cape20 = daily["v"]
 
@@ -285,7 +405,8 @@ def main():
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
     print(f"OK {out['date']}: CAPE {cur:.2f} | 20J-Ø {windows['20']['mean']} ({windows['20']['rating']}) | "
           f"S&P {last_close:.2f}, vs SMA200 {out['spx']['vs200']}% | Shiller bis {out['cape']['shillerMonth']} "
-          f"(CAPE {out['cape']['shillerCape']}) | SMA200W {w200_now:.2f} | Quelle {src}")
+          f"(CAPE {out['cape']['shillerCape']}) | SMA200W {w200_now:.2f} | Score {sig_out['current']} | "
+          f"Signale {len(signals)}: {', '.join(x['t'][:7] for x in signals)} | Quelle {src}")
 
 
 if __name__ == "__main__":
