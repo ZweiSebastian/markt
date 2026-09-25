@@ -83,7 +83,7 @@
     <div class="pill">vs. 50T <b id="vs50">–</b></div>
   </div>
   <div class="ctl"><span class="t">Zeitraum</span>
-    <div class="seg" id="segSpx"><button data-v="5">5 Jahre</button><button data-v="20">20 Jahre</button></div>
+    <div class="seg" id="segSpx"><button data-v="5">5 J.</button><button data-v="20">20 J.</button><button data-v="all" id="spxAllBtn">Alle</button></div>
   </div>
   <div class="hover" id="spxHover"></div>
   <div class="chartbox"><div id="spx" class="chart"></div></div>
@@ -102,7 +102,7 @@
     (Yale), täglich fortgeschrieben mit dem S&amp;P-500-Schlusskurs. Die grauen Kanäle sind der rollierende Ø ±1σ / ±2σ
     über das gewählte Fenster (bei 5–20 J. auf Tagesbasis, „Seit 1881“ auf Monatsbasis). Einstufung: innerhalb ±1σ „Fair“,
     darüber „Überbewertet“, über +2σ „Teuer“ (spiegelbildlich „Unterbewertet“ / „Günstig“).
-    200 Wochen = Ø der letzten 200 Wochenschlusskurse (wie SMA 200 im Wochenchart bei TradingView). Keine Anlageberatung.
+    200 Wochen = Ø der letzten 200 Wochenschlusskurse (wie SMA 200 im Wochenchart bei TradingView). Kurse vor 1957 zeigen den Vorgänger-Index (S&amp;P 90) und bis in die 1960er nur Schlusskurse, daher flache Kerzen. Keine Anlageberatung.
   </div>
 </div>
 
@@ -132,7 +132,7 @@ const base = (el, extra = {}) => LightweightCharts.createChart(el, Object.assign
   rightPriceScale: { borderColor: C.line },
   timeScale: { borderColor: C.line, minBarSpacing: 0.02 },
   crosshair: { mode: 0 },
-  localization: { locale: 'de-DE', dateFormat: 'dd.MM.yyyy', priceFormatter: p => nf(p, p > 1000 ? 0 : 1) },
+  localization: { locale: 'de-DE', dateFormat: 'dd.MM.yyyy', priceFormatter: p => nf(p, p >= 100 ? 0 : 1) },
   handleScale: { axisPressedMouseMove: false },
 }, extra));
 
@@ -207,17 +207,20 @@ function drawSpx() {
   segOn('segSpx', spxRange);
   const all = D.spx.weeks;
   const last = all[all.length - 1].t;
-  const from = new Date(last); from.setFullYear(from.getFullYear() - spxRange);
-  const f = from.toISOString().slice(0, 10);
-  const wk = all.filter(w => w.t > f);
+  let wk = all;
+  if (spxRange !== 'all') {
+    const from = new Date(last); from.setFullYear(from.getFullYear() - spxRange);
+    const f = from.toISOString().slice(0, 10);
+    wk = all.filter(w => w.t > f);
+  }
   candles.setData(wk.map(w => ({ time: w.t, open: w.o, high: w.h, low: w.l, close: w.c })));
   for (const k of Object.keys(ma)) {
     ma[k].setData(wk.map(w => w[k] == null ? { time: w.t } : { time: w.t, value: w[k] }));
     ma[k].applyOptions({ visible: !!lines[k] });
   }
   document.querySelectorAll('#lines .tg').forEach(b => b.classList.toggle('on', !!lines[b.dataset.k]));
-  // 20 Jahre logarithmisch (wie TradingView), 5 Jahre linear
-  spxChart.priceScale('right').applyOptions({ mode: spxRange === 20 ? 1 : 0 });
+  // lange Zeiträume logarithmisch (wie TradingView), 5 Jahre linear
+  spxChart.priceScale('right').applyOptions({ mode: spxRange === 5 ? 0 : 1 });
   spxChart.timeScale().fitContent();
 }
 
@@ -241,6 +244,7 @@ function render(d) {
   $('trend').style.color = bull ? C.green : C.red;
 
   const up = new Date(d.updated);
+  $('spxAllBtn').textContent = 'Seit ' + s.weeks[0].t.slice(0, 4);
   $('stand').innerHTML = `Schlusskurs vom ${dDE(d.date)} · berechnet ${up.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}`
     + `<br>Shiller-Daten bis ${mDE(c.shillerMonth)} · Kurse: ${d.priceSource}`;
   drawCape(); drawSpx();
