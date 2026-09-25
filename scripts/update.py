@@ -334,7 +334,7 @@ def main():
             continue
         i = ep["signal"]
         signals.append({"touch": weeks[ep["start"]]["t"], "t": weeks[i]["t"], "c": wc_[i], "cape": r2(wcape[i]),
-                        "z": zval(i), "r1": fwd(i, 52), "r3": fwd(i, 156), "r5": fwd(i, 260), "r10": fwd(i, 520), "dd": dd1(i),
+                        "z": zval(i), "r1": fwd(i, 52), "r3": fwd(i, 156), "r5": fwd(i, 260), "r10": fwd(i, 520), "r20": fwd(i, 1040), "dd": dd1(i),
                         "wait": i - ep["start"]})
         signals[-1]["ok"] = signals[-1]["z"] is not None and signals[-1]["z"] <= Z_MAX_100
 
@@ -400,11 +400,13 @@ def main():
         r1 = [fwd(i, 52) for i in idx if fwd(i, 52) is not None]
         r5 = [fwd(i, 260) for i in idx if fwd(i, 260) is not None]
         r10 = [fwd(i, 520) for i in idx if fwd(i, 520) is not None]
+        r20 = [fwd(i, 1040) for i in idx if fwd(i, 1040) is not None]
         return {"n": len(idx),
                 "r1": r2(sum(r1) / len(r1), 1) if r1 else None,
                 "pos": r2(100 * sum(x > 0 for x in r1) / len(r1), 0) if r1 else None,
                 "r5": r2(sum(r5) / len(r5), 1) if r5 else None,
-                "r10": r2(sum(r10) / len(r10), 1) if r10 else None}
+                "r10": r2(sum(r10) / len(r10), 1) if r10 else None,
+                "r20": r2(sum(r20) / len(r20), 1) if r20 else None}
 
     thresholds = [dict(score="Jede Woche", **agg(ok))]
     for thr in (50, 60, 70, 80, 100):
