@@ -79,15 +79,16 @@
   <div class="hover" id="sigHover"></div>
   <div class="chartbox"><div id="sig" class="chart"></div></div>
   <details open>
-    <summary>Rückblick: Was kam nach welchem Score?</summary>
-    <div class="sub" style="font-size:12.5px;margin-bottom:4px"><b style="color:#fff">Lesart:</b> ab 70 = Kaufzone, 100 = sicherste Stufe (bestätigte Wende). Unter 30 lagen die Renditen danach über 10 und 20 Jahre klar unter dem Schnitt.</div>
+    <summary>Wenn der Score in diesem Bereich lag</summary>
+    <div class="sub" style="font-size:12.5px;margin-bottom:4px"><b style="color:#fff">Lesart:</b> ab 70 = Kaufzone, 100 = sicherste Stufe (bestätigte Wende). Unter 30 lagen die Renditen danach über 10–30 Jahre klar unter dem Schnitt.</div>
     <table class="mini" id="bandTbl"></table>
-    <div class="sub" style="font-size:12px">Alle Wochen seit 1931 nach Score in Zehnerschritten. Anteil = wie viel Prozent aller Wochen dort lagen. Ø Rendite nach 1, 10 und 20 Jahren (10 und 20 J. pro Jahr; 20 J. nur für Einstiege bis 2006), pos. = Anteil nach 1 Jahr im Plus. Nur Kursrendite ohne Dividenden.</div>
+    <div class="sub" style="font-size:12px">Alle Wochen seit 1931, in denen der Score in diesem Bereich lag. Anteil = wie viel Prozent aller Wochen dort lagen.</div>
   </details>
   <details open>
-    <summary>Einstieg beim ersten Erreichen eines Scores</summary>
+    <summary>Wenn du beim Erreichen der Schwelle kaufst</summary>
     <table class="mini" id="thrTbl"></table>
-    <div class="sub" style="font-size:12px">Einstieg in der ersten Woche, in der der Score die Schwelle erreicht (nachdem er mind. 26 Wochen darunter lag). Fälle = so oft kam das seit 1931 vor.</div>
+    <div class="sub" style="font-size:12px">Kauf in der ersten Woche, in der der Score die Schwelle erreicht (nachdem er mind. 26 Wochen darunter lag). Fälle = so oft kam das seit 1931 vor.</div>
+    <div class="sub" style="font-size:12px" id="horizonNote"></div>
   </details>
   <details>
     <summary id="sigListSum">Alle Signale (Score 100)</summary>
@@ -331,15 +332,19 @@ function drawSignal(keep) {
   sigArea.setData(all);
   // Tabellen
   const pc = x => x == null ? '–' : sg(x, 1);
-  $('thrTbl').innerHTML = '<tr><th>Einstieg</th><th>Fälle</th><th>1 J. %</th><th>pos. %</th><th>10 J. p.a.</th><th>20 J. p.a.</th></tr>'
-    + g.thresholds.map(t => `<tr class="${t.score === 100 ? 'hl' : ''}"><td>${typeof t.score === 'number' ? 'ab ' + t.score : 'jederzeit'}</td><td>${typeof t.score === 'number' ? t.n : '–'}</td>`
-      + `<td>${pc(t.r1)}</td><td>${nf(t.pos, 0)}</td><td>${pc(t.r10)}</td><td>${pc(t.r20)}</td></tr>`).join('');
-  if (g.bands) $('bandTbl').innerHTML = '<tr><th>Score</th><th>Anteil %</th><th>1 J. %</th><th>pos. %</th><th>10 J. p.a.</th><th>20 J. p.a.</th></tr>'
-    + g.bands.map(b => `<tr class="${b.lo === 100 ? 'hl' : ''}"${v != null && ((v >= b.lo && v < b.hi) || (b.lo === 100 && v >= 100)) ? ' style="background:#2A2E38"' : ''}><td>${b.lo === 100 ? '100' : b.lo + '–' + (b.hi - 1)}</td><td>${nf(b.share, 1)}</td><td>${pc(b.r1)}</td><td>${nf(b.pos, 0)}</td><td>${pc(b.r10)}</td><td>${pc(b.r20)}</td></tr>`).join('');
+  const H = g.horizon || {};
+  const head = first => `<tr><th>${first}</th><th>${first === 'Score' ? 'Anteil %' : 'Fälle'}</th><th>1 J.</th><th>10 J.</th><th>20 J.</th><th>30 J.</th><th>min 10 J.</th></tr>`;
+  const cells = t => `<td>${pc(t.r1)}</td><td>${pc(t.r10)}</td><td>${pc(t.r20)}</td><td>${pc(t.r30)}</td><td class="${t.w10 == null ? '' : t.w10 >= 0 ? 'up' : 'down'}">${pc(t.w10)}</td>`;
+  $('thrTbl').innerHTML = head('Einstieg')
+    + g.thresholds.map(t => `<tr class="${t.score === 100 ? 'hl' : ''}"><td>${typeof t.score === 'number' ? 'ab ' + t.score : 'jederzeit'}</td><td>${typeof t.score === 'number' ? t.n : '–'}</td>${cells(t)}</tr>`).join('');
+  if (g.bands) $('bandTbl').innerHTML = head('Score')
+    + g.bands.map(b => `<tr class="${b.lo === 100 ? 'hl' : ''}"${v != null && ((v >= b.lo && v < b.hi) || (b.lo === 100 && v >= 100)) ? ' style="background:#2A2E38"' : ''}><td>${b.lo === 100 ? '100' : b.lo + '–' + (b.hi - 1)}</td><td>${nf(b.share, 1)}</td>${cells(b)}</tr>`).join('');
+  const yr = k => H[k] ? H[k].slice(0, 4) : '';
+  $('horizonNote').textContent = `1 J. = Rendite im ersten Jahr, 10/20/30 J. = Ø Rendite pro Jahr, min 10 J. = schlechtester Fall über 10 Jahre pro Jahr. Lange Zeiträume gibt es nur für Einstiege, die weit genug zurückliegen: 10 J. bis ${yr('10')}, 20 J. bis ${yr('20')}, 30 J. bis ${yr('30')}. Jüngere Fälle (z. B. 2020, 2022) zählen dort noch nicht mit. Nur Kursrendite ohne Dividenden.`;
   $('sigListSum').textContent = `Strenge Regel – ${g.signals.filter(x => x.ok !== false).length} × Score 100, ${g.signals.filter(x => x.ok === false).length} × zu teuer, seit ${W.find((w, i) => g.score[i] != null).t.slice(0, 4)}`;
-  $('sigTbl').innerHTML = '<tr><th>Signal</th><th>CAPE σ</th><th>1 J. %</th><th>5 J. p.a.</th><th>10 J. p.a.</th><th>20 J. p.a.</th></tr>'
+  $('sigTbl').innerHTML = '<tr><th>Signal</th><th>CAPE σ</th><th>1 J.</th><th>10 J.</th><th>20 J.</th><th>30 J.</th></tr>'
     + g.signals.slice().reverse().map(x => `<tr style="${x.ok === false ? 'opacity:.45' : ''}"><td>${dDE(x.t)}</td><td style="color:${x.ok === false ? C.orange : '#fff'}">${x.z == null ? '–' : sg(x.z, 1)}</td>`
-      + ['r1', 'r5', 'r10', 'r20'].map(k => `<td class="${x[k] == null ? '' : x[k] >= 0 ? 'up' : 'down'}">${x[k] == null ? '–' : sg(x[k], 1)}</td>`).join('') + '</tr>').join('')
+      + ['r1', 'r10', 'r20', 'r30'].map(k => `<td class="${x[k] == null ? '' : x[k] >= 0 ? 'up' : 'down'}">${x[k] == null ? '–' : sg(x[k], 1)}</td>`).join('') + '</tr>').join('')
     + '<tr><td colspan="6" style="color:#8A90A0;white-space:normal;border-top:0;padding-top:8px">Blass = Regel erfüllt, aber CAPE über +1σ zum 20J-Ø → zählt nicht als 100 (z. B. 2001).</td></tr>';
   if (keep) return;
   const ts = sigChart.timeScale();
