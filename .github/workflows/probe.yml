@@ -1,0 +1,13 @@
+name: probe
+on: push
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for ua in "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36" "Dalvik/2.1.0 (Linux; U; Android 14)"; do
+            curl -sS -A "$ua" -w "\nHTTP %{http_code}\n" "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=1d&interval=5m" -o r.json | tail -1 | sed 's/^/::notice::/'
+            python3 -c "
+          import json;m=json.load(open('r.json'))['chart']['result'][0]['meta']
+          print('::notice::'+json.dumps({k:m.get(k) for k in ['regularMarketPrice','regularMarketTime','chartPreviousClose','previousClose','regularMarketDayHigh','regularMarketDayLow','exchangeTimezoneName','currentTradingPeriod']})[:900])" || head -c 300 r.json
+          done
