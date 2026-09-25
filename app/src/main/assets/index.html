@@ -175,7 +175,7 @@ spxChart.subscribeCrosshairMove(p => {
 
 function segOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('on', b.dataset.v === String(v))); }
 
-function drawCape() {
+function drawCape(keep) {
   if (!D) return;
   const c = D.cape, w = c.windows[String(win)];
   segOn('segWin', win); segOn('segRange', range);
@@ -193,6 +193,7 @@ function drawCape() {
   bUp2.setData(band(2)); bUp1.setData(band(1)); bLo1.setData(band(-1)); bLo2.setData(band(-2));
   meanLine.setData(band(0));
   capeLine.setData(src.t.map((t, i) => ({ time: t, value: src.v[i] })));
+  if (keep) return; // Live-Update: Ansicht (Zoom) nicht zurücksetzen
   const ts = capeChart.timeScale();
   if (range === 'all') { ts.fitContent(); }
   else {
@@ -202,7 +203,7 @@ function drawCape() {
   }
 }
 
-function drawSpx() {
+function drawSpx(keep) {
   if (!D) return;
   segOn('segSpx', spxRange);
   const all = D.spx.weeks;
@@ -219,6 +220,7 @@ function drawSpx() {
     ma[k].applyOptions({ visible: !!lines[k] });
   }
   document.querySelectorAll('#lines .tg').forEach(b => b.classList.toggle('on', !!lines[b.dataset.k]));
+  if (keep) return;
   // lange Zeiträume logarithmisch (wie TradingView), 5 Jahre linear
   spxChart.priceScale('right').applyOptions({ mode: spxRange === 5 ? 0 : 1 });
   spxChart.timeScale().fitContent();
@@ -226,17 +228,57 @@ function drawSpx() {
 
 function pct(id, v) { $(id).textContent = sg(v) + ' %'; $(id).className = v >= 0 ? 'up' : 'down'; }
 
-function render(d) {
+// ---------- Live: aktuellen Kurs in die Tagesdaten einrechnen
+const monday = s => { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+const rd = (x, n = 2) => Math.round(x * 10 ** n) / 10 ** n;
+
+function withLive(d, q) {
+  if (!q || !(q.price > 0) || !(q.date > d.date) || !d.cape.e10 || !d.spx.d199) return null;
+  const s = d.spx, c = d.cape, p = q.price;
+  const prevClose = s.close;
+  // Kurs & gleitende Durchschnitte
+  const s200 = avg([...s.d199, p]), s50 = avg([...s.d199.slice(-49), p]);
+  const W = s.weeks, lastW = W[W.length - 1];
+  const sameWeek = monday(q.date) === monday(lastW.t);
+  const prevWC = (sameWeek ? W.slice(-200, -1) : W.slice(-199)).map(w => w.c);
+  const w200 = prevWC.length === 199 ? avg([...prevWC, p]) : null;
+  if (sameWeek) Object.assign(lastW, { h: Math.max(lastW.h, q.high, p), l: Math.min(lastW.l, q.low, p), c: p, s200, s50, w200 });
+  else W.push({ t: q.date, o: q.open || p, h: Math.max(q.high, p), l: Math.min(q.low, p), c: p, s200, s50, w200 });
+  Object.assign(s, { close: p, change1d: (p / prevClose - 1) * 100, sma200: s200, sma50: s50, sma200w: w200,
+    vs200: (p / s200 - 1) * 100, vs50: (p / s50 - 1) * 100, vs200w: w200 ? (p / w200 - 1) * 100 : s.vs200w });
+  // CAPE
+  const cur = rd(p / c.e10);
+  const dl = c.daily, n = dl.t.length - 1;
+  dl.t.push(q.date); dl.v.push(cur);
+  for (const y of [5, 10, 20]) { dl['m' + y].push(dl['m' + y][n]); dl['s' + y].push(dl['s' + y][n]); }
+  const mo = c.monthly, mk = q.date.slice(0, 7) + '-01', k = mo.t.length - 1;
+  if (mo.t[k] === mk) mo.v[k] = cur;
+  else { mo.t.push(mk); mo.v.push(cur); for (const y of [5, 10, 20]) { mo['m' + y].push(mo['m' + y][k]); mo['s' + y].push(mo['s' + y][k]); } }
+  c.current = cur;
+  for (const y of [5, 10, 20]) {
+    const w = c.windows[y]; w.z = rd((cur - w.mean) / w.sd);
+    w.rating = w.z > 2 ? 'Teuer' : w.z > 1 ? 'Überbewertet' : w.z < -2 ? 'Günstig' : w.z < -1 ? 'Unterbewertet' : 'Fair';
+    const from = new Date(q.date); from.setFullYear(from.getFullYear() - y); const f = from.toISOString().slice(0, 10);
+    const vals = dl.v.filter((v, i) => dl.t[i] > f && v != null);
+    w.percentile = Math.round(100 * vals.filter(v => v < cur).length / vals.length);
+  }
+  d.live = q;
+  return d;
+}
+
+function render(d, keep) {
   if (!d.cape || !d.cape.daily) throw new Error('altes Datenformat');
   D = d;
-  const c = d.cape, s = d.spx;
-  $('capeNow').textContent = nf(c.current);
+  const c = d.cape, s = d.spx, q = d.live;
+  $('capeNow').innerHTML = nf(c.current) + (q ? ' <span class="chip" style="font-size:12px;vertical-align:middle;background:#3DDC8426;color:#3DDC84">live</span>' : '');
   $('tbl').innerHTML = '<tr><th>Zeitraum</th><th>Ø</th><th>σ</th><th>Abstand</th><th>Einstufung</th></tr>' +
     ['5', '10', '20'].map(k => { const w = c.windows[k];
       return `<tr><td>${k} Jahre</td><td>${nf(w.mean)}</td><td>${nf(w.sd)}</td><td>${sg(w.z)}σ</td><td style="color:${RC[w.rating]}">${w.rating}</td></tr>`; }).join('');
 
   $('spxNow').textContent = nf(s.close);
-  $('spxChg').innerHTML = `<span class="${s.change1d >= 0 ? 'up' : 'down'}">${sg(s.change1d)} %</span> <span style="color:#8A90A0">am ${dDE(d.date)}</span>`;
+  const when = q ? (q.state === 'REG_MKT' || q.state === '' ? `live · ${q.hm} Uhr NY` : `Schluss ${dDE(q.date)} (vorläufig)`) : `am ${dDE(d.date)}`;
+  $('spxChg').innerHTML = `<span class="${s.change1d >= 0 ? 'up' : 'down'}">${sg(s.change1d)} %</span> <span style="color:#8A90A0">${when}</span>`;
   pct('vs200w', s.vs200w); pct('vs200', s.vs200); pct('vs50', s.vs50);
   const bull = s.vs200 >= 0;
   $('trend').textContent = bull ? 'Über 200T-Linie' : 'Unter 200T-Linie';
@@ -246,15 +288,27 @@ function render(d) {
   const up = new Date(d.updated);
   $('spxAllBtn').textContent = 'Seit ' + s.weeks[0].t.slice(0, 4);
   $('stand').innerHTML = `Schlusskurs vom ${dDE(d.date)} · berechnet ${up.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}`
+    + (q ? `<br>Live-Kurs: ${q.src}, ${q.hm} Uhr New York (CAPE mit aktuellem Kurs hochgerechnet)` : '')
     + `<br>Shiller-Daten bis ${mDE(c.shillerMonth)} · Kurse: ${d.priceSource}`;
-  drawCape(); drawSpx();
+  drawCape(keep); drawSpx(keep);
 }
 
-let loading = false;
-window.onData = txt => { loading = false; $('msg').style.display = 'none'; try { render(JSON.parse(txt)); } catch (e) { window.onError(e.message); } };
+// ---------- Laden
+let raw = null, quote = null, loading = false;
+function show(keep) {
+  if (!raw) return;
+  const d = JSON.parse(raw);
+  render(withLive(d, quote) || d, keep);
+}
+window.onData = txt => { loading = false; $('msg').style.display = 'none'; raw = txt; try { show(!!D); } catch (e) { window.onError(e.message); } };
 window.onError = e => { loading = false; $('msg').style.display = 'block';
   $('msg').textContent = D ? `Offline – zeige gespeicherte Daten (${e})` : `Keine Daten: ${e}`; };
-window.refresh = () => { if (!loading) { loading = true; Android.load(); } };
+window.onLive = txt => { try { quote = JSON.parse(txt); show(!!D); } catch (e) {} };
+window.onLiveError = () => {};
+const pollLive = () => { if (window.Live) Live.live(); };
+window.refresh = () => { if (!loading) { loading = true; Android.load(); } pollLive(); };
+// Live-Kurs jede Minute aktualisieren, solange die App offen ist
+setInterval(() => { if (!document.hidden) pollLive(); }, 60000);
 
 const num = v => v === 'all' ? v : +v;
 document.querySelectorAll('#segWin button').forEach(b => b.onclick = () => { win = num(b.dataset.v); store.set('win', win); drawCape(); });
@@ -263,7 +317,7 @@ document.querySelectorAll('#segSpx button').forEach(b => b.onclick = () => { spx
 document.querySelectorAll('#lines .tg').forEach(b => b.onclick = () => { lines[b.dataset.k] = !lines[b.dataset.k]; store.set('lines', lines); drawSpx(); });
 
 const cached = Android.cached();
-if (cached) { try { render(JSON.parse(cached)); } catch (e) {} }
+if (cached) { raw = cached; try { show(false); } catch (e) { raw = null; } }
 refresh();
 </script>
 </body>
