@@ -250,6 +250,8 @@ def main():
         "priceSource": src,
         "cape": {
             "current": r2(cur),
+            # E10 in heutigen Dollar: Live-CAPE = Live-Kurs / e10
+            "e10": round(last_close / cur, 4),
             "windows": windows,
             "daily": daily,
             "monthly": monthly,
@@ -265,6 +267,8 @@ def main():
             "vs200": r2((last_close / sma200.iloc[-1] - 1) * 100),
             "vs50": r2((last_close / sma50.iloc[-1] - 1) * 100),
             "vs200w": r2((last_close / w200_now - 1) * 100),
+            # für die Live-Berechnung in der App: letzte 199 Tagesschlusskurse
+            "d199": [r2(v) for v in close.iloc[-199:].values],
             "weeks": weeks,
         },
     }
