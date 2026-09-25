@@ -162,6 +162,10 @@ def main():
     px, src = load_prices()
     px = px.sort_index()
     px = px[~px.index.duplicated(keep="last")]
+    # Laufenden Handelstag weglassen (nur fertige Schlusskurse verwenden)
+    ny = pd.Timestamp.now(tz="America/New_York")
+    if px.index[-1].date() >= ny.date() and (ny.hour, ny.minute) < (16, 20):
+        px = px.iloc[:-1]
 
     # --- täglicher CAPE
     e10 = dict(zip(sh["key"], sh["e10"]))
