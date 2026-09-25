@@ -33,6 +33,7 @@ jobs:
 
       - name: Daten berechnen
         run: |
+          set -o pipefail
           python scripts/update.py | tee run.log
           grep '^OK' run.log | while IFS= read -r l; do echo "::notice::$l"; done
 

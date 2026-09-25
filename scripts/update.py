@@ -23,16 +23,34 @@ import requests
 
 UA = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"}
 OUT = "data/markt.json"
+# bekannter Link (Stand 09/2026), falls die Seite anders aufgebaut ist
+FALLBACK_XLS = ("https://img1.wsimg.com/blobby/go/e5e77e0b-59d1-44d9-ab25-4763ac982e53/downloads/"
+                "70fec4f5-727f-4e53-b5f1-179af109c5fa/ie_data.xls")
 
 
 # ---------------------------------------------------------------- Shiller
 def load_shiller():
     page = requests.get("https://shillerdata.com/", headers=UA, timeout=60).text
-    m = re.search(r'https://[^"\'\s]+ie_data\.xls[^"\'\s]*', page)
-    if not m:
-        raise RuntimeError("Link zu ie_data.xls auf shillerdata.com nicht gefunden")
-    url = m.group(0).replace("&amp;", "&")
-    raw = requests.get(url, headers=UA, timeout=120).content
+    page = page.replace("\\u002F", "/").replace("\\/", "/").replace("&amp;", "&")
+    urls = [("https:" + u if u.startswith("//") else u)
+            for u in re.findall(r'(?:https?:)?//[^"\'\s<>()]+?ie_data\.xls(?:\?[^"\'\s<>()]*)?', page)]
+    urls.append(FALLBACK_XLS)
+    raw, last_err = None, None
+    for url in dict.fromkeys(urls):
+        try:
+            r = requests.get(url, headers=UA, timeout=120)
+            r.raise_for_status()
+            if r.content[:4] == b"\xd0\xcf\x11\xe0":  # xls-Signatur
+                raw = r.content
+                print("Shiller-Datei:", url)
+                break
+            last_err = f"{url}: keine xls-Datei"
+        except Exception as e:  # noqa
+            last_err = f"{url}: {e}"
+    if raw is None:
+        i = page.find("ie_data")
+        print("Seitenlänge", len(page), "Ausschnitt:", page[max(0, i - 300):i + 100] if i >= 0 else "-")
+        raise RuntimeError(f"ie_data.xls nicht ladbar ({last_err})")
     df = pd.read_excel(io.BytesIO(raw), sheet_name="Data", header=None, engine="xlrd")
 
     # Kopfzeile suchen (erste Spalte "Date")
