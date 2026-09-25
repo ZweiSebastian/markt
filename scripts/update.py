@@ -98,11 +98,11 @@ def load_prices():
     errors = []
     try:
         import yfinance as yf
-        df = yf.download("^GSPC", start="1985-01-01", interval="1d", auto_adjust=False,
+        df = yf.download("^GSPC", start="1927-12-01", interval="1d", auto_adjust=False,
                          progress=False, threads=False)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-        df = df[["Open", "High", "Low", "Close"]].dropna()
+        df = df[["Open", "High", "Low", "Close"]].dropna(subset=["Close"])
         if len(df) > 5000:
             df.index = pd.to_datetime(df.index).tz_localize(None).normalize()
             return df, "Yahoo Finance"
@@ -113,11 +113,11 @@ def load_prices():
     # Ersatz: Yahoo Chart-API direkt
     try:
         p2 = int(datetime.now(timezone.utc).timestamp()) + 86400
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?period1=473385600&period2={p2}&interval=1d"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?period1=-1328054400&period2={p2}&interval=1d"
         j = requests.get(url, headers=UA, timeout=60).json()["chart"]["result"][0]
         q = j["indicators"]["quote"][0]
         df = pd.DataFrame({"Open": q["open"], "High": q["high"], "Low": q["low"], "Close": q["close"]},
-                          index=pd.to_datetime(j["timestamp"], unit="s")).dropna()
+                          index=pd.to_datetime(j["timestamp"], unit="s")).dropna(subset=["Close"])
         df.index = df.index.normalize()
         df = df[~df.index.duplicated(keep="last")]
         if len(df) > 5000:
@@ -130,8 +130,8 @@ def load_prices():
     try:
         txt = requests.get("https://stooq.com/q/d/l/?s=%5Espx&i=d", headers=UA, timeout=60).text
         df = pd.read_csv(io.StringIO(txt), parse_dates=["Date"], index_col="Date")
-        df = df[["Open", "High", "Low", "Close"]].dropna()
-        df = df[df.index >= "1985-01-01"]
+        df = df[["Open", "High", "Low", "Close"]].dropna(subset=["Close"])
+        df = df[df.index >= "1927-12-01"]
         if len(df) > 5000:
             return df, "Stooq"
         errors.append(f"stooq: nur {len(df)} Zeilen")
@@ -223,11 +223,17 @@ def main():
     sma200 = close.rolling(200).mean()
     sma50 = close.rolling(50).mean()
     wk = px.copy()
+    # Alte Yahoo-Daten (vor ~1962) haben nur Schlusskurse: fehlende/Null-Werte mit dem Schlusskurs auffüllen
+    for col in ("Open", "High", "Low"):
+        bad = wk[col].isna() | (wk[col] <= 0)
+        wk.loc[bad, col] = wk.loc[bad, "Close"]
+    wk["High"] = wk[["Open", "High", "Close"]].max(axis=1)
+    wk["Low"] = wk[["Open", "Low", "Close"]].min(axis=1)
     wk["wk"] = wk.index.to_period("W-FRI")
     wclose = wk.groupby("wk")["Close"].last()
     sma200w = wclose.rolling(200).mean()
     weeks = []
-    for per, g in wk[wk.index > start20].groupby("wk"):
+    for per, g in wk.groupby("wk"):
         last = g.index[-1]
         weeks.append({
             "t": g.index[0].strftime("%Y-%m-%d"),
@@ -266,7 +272,7 @@ def main():
 
     # Plausibilitätsprüfung, damit nie Unsinn in der App landet
     assert 5 < cur < 80, f"CAPE unplausibel: {cur}"
-    assert len(weeks) > 1000, f"zu wenige Wochen: {len(weeks)}"
+    assert len(weeks) > 2000, f"zu wenige Wochen: {len(weeks)}"
     assert len(cape20) > 4500, f"zu wenige CAPE-Tage: {len(cape20)}"
 
     import os
