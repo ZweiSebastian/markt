@@ -69,8 +69,8 @@
   <div class="row" style="justify-content:flex-start;align-items:baseline;gap:6px">
     <div class="big" id="sigNow">–</div><div style="color:#8A90A0;font-size:18px">/ 100</div>
   </div>
-  <div class="bar"><div id="sigBar"></div><i style="left:50%"></i><i style="left:80%"></i></div>
-  <div class="scale"><span>0 · weit über 200W</span><span>50 · Berührung</span><span>100 · Signal</span></div>
+  <div class="bar"><div id="sigBar"></div><i style="left:50%"></i><i style="left:70%"></i><i style="left:90%"></i></div>
+  <div class="scale"><span>0 · ungünstig</span><span>50 · normal</span><span>100 · Signal</span></div>
   <div class="sub" id="sigSub"></div>
   <div class="warn" id="sigWarn"></div>
   <div class="ctl"><span class="t">Verlauf</span>
@@ -81,7 +81,12 @@
   <details open>
     <summary>Rückblick: Was hätte ein Einstieg ab welchem Score gebracht?</summary>
     <table class="mini" id="thrTbl"></table>
-    <div class="sub" style="font-size:12px">Je Berührung die erste Woche, in der der Score die Schwelle erreicht. 1 J. = Ø Rendite im ersten Jahr, pos. = Anteil im Plus, tiefer = Ø weiterer Rückgang im Jahr danach. Nur Kursrendite ohne Dividenden.</div>
+    <div class="sub" style="font-size:12px">Einstieg in der ersten Woche, in der der Score die Schwelle erreicht (nachdem er mind. 26 Wochen darunter lag). Fälle = so oft kam das seit 1931 vor. 1 J. = Ø Rendite im ersten Jahr, pos. = Anteil im Plus, tiefer = Ø weiterer Rückgang im Jahr danach. Nur Kursrendite ohne Dividenden.</div>
+  </details>
+  <details>
+    <summary>Wie oft lag der Score wo – und was kam danach?</summary>
+    <table class="mini" id="bandTbl"></table>
+    <div class="sub" style="font-size:12px">Alle Wochen seit 1931 nach Score-Bereich. Anteil = wie viel Prozent aller Wochen in diesem Bereich lagen.</div>
   </details>
   <details>
     <summary id="sigListSum">Alle Signale (Score 100)</summary>
@@ -136,10 +141,12 @@
   <button onclick="refresh()">Aktualisieren</button>
   <div id="stand"></div>
   <div style="margin-top:8px">
-    <b>Einstiegs-Score:</b> 0–50 = Abstand des S&amp;P zur 200-Wochen-Linie (≥ 30 % darüber = 0, Berührung = 50).
-    Berührt das Wochentief die Linie (nach mind. 26 Wochen darüber, erste Berührung seit 1 Jahr), steigt der Score mit der
-    Erholung des CAPE von seinem Tief seit der Berührung: +10 % = 100 = Signal. Das Signal bleibt 13 Wochen stehen; ohne
-    Wende verfällt die Berührung nach 2 Jahren. Rückblick-Werte sind Vergangenheit, keine Prognose.<br><br>
+    <b>Einstiegs-Score:</b> 0–90 kombiniert den Abstand des S&amp;P zur 200-Wochen-Linie (35 %) und das CAPE in σ zum
+    20J-Ø (65 %), jeweils im Vergleich zur Historie seit 1931; 50 = normale Lage, 20 Punkte = 1 Standardabweichung.
+    Über 50 steigt der Score nur, wenn sich das CAPE vom Tief der letzten 26 Wochen erholt (+10 % = volle Punkte).
+    <b>100</b> = strenge Regel: Wochentief berührt die 200-Wochen-Linie (nach mind. 26 Wochen darüber, erste Berührung seit
+    1 Jahr) und danach steigt das CAPE 10 % über sein Tief seit der Berührung; bleibt 13 Wochen stehen, ohne Wende verfällt
+    die Berührung nach 2 Jahren. Rückblick-Werte sind Vergangenheit, keine Prognose.<br><br>
     CAPE = Kurs ÷ Ø der inflationsbereinigten Gewinne der letzten 10 Jahre. Grundlage: monatliche Daten von Robert Shiller
     (Yale), täglich fortgeschrieben mit dem S&amp;P-500-Schlusskurs. Die grauen Kanäle sind der rollierende Ø ±1σ / ±2σ
     über das gewählte Fenster (bei 5–20 J. auf Tagesbasis, „Seit 1881“ auf Monatsbasis). Einstufung: innerhalb ±1σ „Fair“,
@@ -207,13 +214,13 @@ const sigChart = base($('sig'), { localization: { locale: 'de-DE', dateFormat: '
 const sigArea = sigChart.addAreaSeries({ lineColor: C.green, lineWidth: 2, topColor: 'rgba(61,220,132,.35)', bottomColor: 'rgba(61,220,132,.02)',
   priceLineVisible: false, lastValueVisible: true, priceFormat: { type: 'custom', formatter: v => Math.round(v) },
   autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) });
-[[50, C.grey, 'Berührung'], [80, C.orange, ''], [100, C.green, 'Signal']].forEach(([price, color, title]) =>
+[[50, C.grey, 'normal'], [70, C.orange, ''], [100, C.green, 'Signal']].forEach(([price, color, title]) =>
   sigArea.createPriceLine({ price, color, lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title }));
 sigChart.subscribeCrosshairMove(p => {
   const v = p && p.time && p.seriesData.get(sigArea);
   $('sigHover').textContent = v ? `Woche ab ${dDE(p.time)}: Score ${Math.round(v.value)}` : '';
 });
-const scoreColor = v => v >= 100 ? C.green : v >= 80 ? '#8BE3B0' : v >= 50 ? C.orange : C.grey;
+const scoreColor = v => v >= 100 ? C.green : v >= 80 ? '#8BE3B0' : v >= 65 ? C.orange : v >= 35 ? C.grey : C.red;
 
 let capeSrc = null; // aktuell dargestellte Reihe (täglich oder monatlich)
 capeChart.subscribeCrosshairMove(p => {
@@ -297,33 +304,34 @@ function drawSignal(keep) {
   $('sigNow').style.color = scoreColor(v);
   $('sigBar').style.width = (v || 0) + '%';
   $('sigBar').style.background = scoreColor(v);
-  const phase = v >= 100 ? 'Signal' : v >= 50 ? 'Berührt – warte auf Wende' : 'Kein Signal';
+  const phase = v >= 100 ? 'Signal' : v >= 80 ? 'Attraktiv' : v >= 65 ? 'Interessant' : v >= 35 ? 'Neutral' : 'Ungünstig';
   $('sigChip').textContent = phase;
   $('sigChip').style.background = scoreColor(v) + '26'; $('sigChip').style.color = scoreColor(v);
-  const s = D.spx;
-  let txt;
+  const s = D.spx, pt = g.parts || {};
+  let txt = `S&amp;P <b style="color:#fff">${sg(pt.dist, 1)} %</b> zur 200-Wochen-Linie (${nf(s.sma200w, 0)}) · CAPE <b style="color:#fff">${sg(pt.z, 1)}σ</b> zum 20J-Ø.<br>`;
   if (st.active && st.signal) {
     const wks = Math.round((Date.parse(W[W.length - 1].t) - Date.parse(st.signal)) / 6048e5);
-    txt = `Signal seit ${dDE(st.signal)} (200W berührt am ${dDE(st.touch)}). Einstiegsfenster noch etwa ${Math.max(0, g.rule.window - wks)} Wochen.`;
+    txt += `Strenge Regel erfüllt: Signal seit ${dDE(st.signal)} (200W berührt am ${dDE(st.touch)}). Einstiegsfenster noch etwa ${Math.max(0, g.rule.window - wks)} Wochen.`;
   } else if (st.active) {
     const mn = Math.min(st.capeMin, cur), goal = mn * (1 + g.rule.rise);
-    txt = `200W berührt am ${dDE(st.touch)}. CAPE-Tief seit Berührung <b style="color:#fff">${nf(mn)}</b>, jetzt ${nf(cur)} `
-      + `(${sg((cur / mn - 1) * 100, 1)} %). Signal bei CAPE <b style="color:#fff">${nf(goal)}</b> (+${g.rule.rise * 100} %).`;
+    txt += `200W berührt am ${dDE(st.touch)}. CAPE-Tief seit Berührung <b style="color:#fff">${nf(mn)}</b>, jetzt ${nf(cur)} `
+      + `(${sg((cur / mn - 1) * 100, 1)} %). 100 bei CAPE <b style="color:#fff">${nf(goal)}</b> (+${g.rule.rise * 100} %).`;
   } else {
-    txt = `S&amp;P ${sg(s.vs200w, 1)} % über der 200-Wochen-Linie (${nf(s.sma200w, 0)}). `
-      + `Score 50 bei Berührung der Linie, Score 0 ab ${g.rule.dist * 100} % Abstand.`;
+    txt += v >= 50 ? 'Über 50 nur, weil sich das CAPE vom Tief der letzten 6 Monate erholt.' : 'Unter 50: teurer als üblich und/oder weit über der 200-Wochen-Linie.';
   }
   $('sigSub').innerHTML = txt;
   const z = D.cape.windows['20'].z;
-  $('sigWarn').textContent = v >= 50 && z > 1 ? `⚠ CAPE ${sg(z)}σ über dem 20J-Ø – Signale bei teurem CAPE waren historisch schwächer (z. B. 2001).` : '';
+  $('sigWarn').textContent = v >= 100 && z > 1 ? `⚠ CAPE ${sg(z)}σ über dem 20J-Ø – Signale bei teurem CAPE waren historisch schwächer (z. B. 2001).` : '';
 
   // Verlauf
   const all = W.map((w, i) => g.score[i] == null ? { time: w.t } : { time: w.t, value: g.score[i] });
   sigArea.setData(all);
   // Tabellen
-  $('thrTbl').innerHTML = '<tr><th>Einstieg</th><th>n</th><th>1 J. %</th><th>pos. %</th><th>5 J. p.a.</th><th>tiefer %</th></tr>'
+  $('thrTbl').innerHTML = '<tr><th>Einstieg</th><th>Fälle</th><th>1 J. %</th><th>pos. %</th><th>5 J. p.a.</th><th>tiefer %</th></tr>'
     + g.thresholds.map(t => `<tr class="${t.score === 100 ? 'hl' : ''}"><td>${typeof t.score === 'number' ? 'ab ' + t.score : 'jederzeit'}</td><td>${t.n}</td>`
       + `<td>${sg(t.r1, 1)}</td><td>${nf(t.pos, 0)}</td><td>${t.r5 == null ? '–' : sg(t.r5, 1)}</td><td>${t.dd == null ? '–' : nf(t.dd, 1)}</td></tr>`).join('');
+  if (g.bands) $('bandTbl').innerHTML = '<tr><th>Score</th><th>Anteil %</th><th>1 J. %</th><th>pos. %</th><th>5 J. p.a.</th></tr>'
+    + g.bands.map(b => `<tr><td>${b.lo === 100 ? '100' : b.lo + '–' + b.hi}</td><td>${nf(b.share, 1)}</td><td>${sg(b.r1, 1)}</td><td>${nf(b.pos, 0)}</td><td>${sg(b.r5, 1)}</td></tr>`).join('');
   $('sigListSum').textContent = `Alle Signale (Score 100) – ${g.signals.length} seit ${W.find((w, i) => g.score[i] != null).t.slice(0, 4)}`;
   $('sigTbl').innerHTML = '<tr><th>Signal</th><th>CAPE</th><th>1 J. %</th><th>3 J. p.a.</th><th>5 J. p.a.</th><th>tiefer %</th></tr>'
     + g.signals.slice().reverse().map(x => `<tr><td>${dDE(x.t)}</td><td style="color:${x.z > 1 ? C.orange : '#fff'}">${nf(x.cape, 1)}</td>`
@@ -382,6 +390,21 @@ function withLive(d, q) {
     else if (st.active) { st.capeMin = Math.min(st.capeMin, cur); sc = 50 + 50 * Math.min(1, Math.max(0, cur / st.capeMin - 1) / g.rule.rise); if (sc >= 100) { sc = 100; st.signal = q.date; } }
     else if (st.run >= 26 && st.weeksSinceTouch > 52 && Math.min(q.low, p) <= w200) { sc = 50; Object.assign(st, { active: true, touch: q.date, capeMin: cur, signal: null }); }
     else sc = 50 * Math.min(1, Math.max(0, 1 - (p / w200 - 1) / g.rule.dist));
+    // kombinierter Score (wie in der täglichen Berechnung)
+    const R = g.rule;
+    if (R.cSd) {
+      const dist = (p / w200 - 1) * 100, z = (cur - R.m20) / R.s20;
+      const comp = -(R.wDist * (dist - R.dMu) / R.dSd + R.wCape * (z - R.zMu) / R.zSd);
+      const raw = 50 + R.spread * comp / R.cSd;
+      const prev = (sameWeek ? R.capeLast.slice(0, -1) : R.capeLast.slice(1)).filter(x => x != null);
+      const mn = Math.min(...prev, cur);
+      const turn = Math.min(1, Math.max(0, (cur / mn - 1) / R.rise));
+      let v = raw > 50 ? 50 + (raw - 50) * turn : raw;
+      v = Math.min(R.cap, Math.max(0, v));
+      if (sc >= 100) v = 100;
+      g.parts = { dist, z };
+      sc = v;
+    }
     sc = Math.round(sc); g.current = sc;
     if (sameWeek) g.score[g.score.length - 1] = sc; else g.score.push(sc);
   }
