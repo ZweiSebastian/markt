@@ -1,0 +1,47 @@
+name: Daten aktualisieren
+
+on:
+  schedule:
+    # Mo–Fr nach US-Börsenschluss (UTC) + Nachlauf am Morgen danach
+    - cron: '37 21 * * 1-5'
+    - cron: '17 11 * * 2-6'
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/update-data.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daten
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Pakete
+        run: pip install -q pandas xlrd requests yfinance
+
+      - name: Daten berechnen
+        run: |
+          python scripts/update.py | tee run.log
+          grep '^OK' run.log | while IFS= read -r l; do echo "::notice::$l"; done
+
+      - name: Speichern
+        run: |
+          git config user.name "markt-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/markt.json
+          if git diff --cached --quiet; then echo "keine Änderung"; exit 0; fi
+          git commit -m "Daten $(date -u +%Y-%m-%d)"
+          git pull --rebase -q
+          git push
