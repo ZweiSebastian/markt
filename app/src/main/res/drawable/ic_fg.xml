@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Kerzen + Linie -->
+    <path android:fillColor="#3DDC84" android:pathData="M36,50 h6 v16 h-6 Z M38,44 h2 v28 h-2 Z" />
+    <path android:fillColor="#FF6B6B" android:pathData="M51,44 h6 v12 h-6 Z M53,38 h2 v24 h-2 Z" />
+    <path android:fillColor="#3DDC84" android:pathData="M66,34 h6 v18 h-6 Z M68,30 h2 v26 h-2 Z" />
+    <path android:strokeColor="#FFB454" android:strokeWidth="3" android:strokeLineCap="round"
+        android:pathData="M32,72 C48,66 60,58 76,46" />
+</vector>
