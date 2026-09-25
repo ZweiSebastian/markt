@@ -1,0 +1,11 @@
+name: probe
+on: push
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          UA="Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36"
+          curl -sS -A "$UA" "https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=.SPX&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json" | head -c 1500 | tr '\n' ' ' | sed 's/^/::notice::CNBC /'; echo
+          curl -sS -A "$UA" "https://stooq.com/q/l/?s=%5Espx&f=sd2t2ohlcv&h&e=csv" | tr '\n' ' ' | sed 's/^/::notice::STOOQ /'; echo
+          curl -sS -A "$UA" -w " HTTP %{http_code}" "https://query2.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=1d&interval=5m" | tail -c 200 | sed 's/^/::notice::Y2 /'; echo
