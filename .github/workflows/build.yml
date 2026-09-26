@@ -7,6 +7,8 @@ on:
       - 'scripts/**'
       - '.github/workflows/update-data.yml'
       - 'README.md'
+      - 'research/**'
+      - '.github/workflows/research.yml'
   workflow_dispatch:
 
 permissions:
