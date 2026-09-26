@@ -2,16 +2,18 @@ name: research
 on:
   push:
     paths: ['scripts/research_export.py', '.github/workflows/research.yml']
+concurrency: { group: research, cancel-in-progress: true }
 permissions:
   contents: write
 jobs:
   r:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      - run: pip install -q pandas xlrd requests yfinance && python scripts/research_export.py
+      - run: pip install -q pandas xlrd openpyxl requests yfinance && python scripts/research_export.py
       - run: |
           git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
           git add research/*.csv && git commit -m "Forschungsdaten" && git pull --rebase -q && git push
