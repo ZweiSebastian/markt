@@ -6,6 +6,11 @@ Quellen:
   wtisplc_fred.csv WTI-Rohöl Spotpreis, Monatsdurchschnitt (FRED WTISPLC), ab 1946-01; Jun-Aug 2026 aus Alpha Vantage
   ../research/shiller_monthly.csv  CPI, CAPE, TR-CAPE (Shiller)
   ../research/weekly.csv           S&P-500-Wochenschlusskurse (Yahoo ^GSPC), realer Total-Return-Index
+  ext_freddie_raw.csv   Freddie Mac PMMS 30J-Hypothekenzins wöchentlich ab 1971
+  ext_eia_*.csv         EIA: Diesel wöchentlich ab 1994, Erdgasspeicher ab 2010, Henry Hub, Gaspreis Haushalte
+  ext_yahoo_monthly.csv SPY, RSP (gleichgewichtet), ^SPXEW, Futures Öl/Gas/Heizöl, XHB/ITB (Hausbau)
+  raw/caseshiller_national.csv  S&P/Case-Shiller US National ab 1975 (github.com/datasets/house-prices-us)
+  raw/usitc_tariff_ratio.csv    USITC: Zölle in % aller Importe, jährlich ab 1891 (2025 vorläufig)
 """
 import pandas as pd, numpy as np, os
 
@@ -26,6 +31,31 @@ def year_lines(fn, name):
     return pd.Series(rows, name=name)
 
 
+def monthly(fn, col=1, date="Date", how="mean", fmt=None):
+    d = pd.read_csv(os.path.join(HERE, fn))
+    t = pd.to_datetime(d[date], format=fmt)
+    s = pd.to_numeric(d.iloc[:, col], errors="coerce")
+    s.index = t.dt.to_period("M")
+    return getattr(s.groupby(level=0), how)()
+
+
+def extra():
+    """Zusatzreihen (Export per GitHub Actions bzw. research/raw)."""
+    x = {}
+    x["mortgage30"] = monthly("ext_freddie_raw.csv", 1, "date", fmt="%m/%d/%Y")
+    x["diesel"] = monthly("ext_eia_diesel_weekly.csv")
+    x["gas_storage"] = monthly("ext_eia_gas_storage_weekly.csv", how="last")
+    x["henryhub"] = monthly("ext_eia_henryhub_monthly.csv")
+    x["gas_resid"] = monthly("ext_eia_resid_gas_monthly.csv")
+    x["caseshiller"] = monthly("raw/caseshiller_national.csv")
+    y = pd.read_csv(os.path.join(HERE, "ext_yahoo_monthly.csv"), index_col=0)
+    y.index = pd.PeriodIndex(y.index, freq="M")
+    x["spy"], x["rsp"], x["spx_ew"], x["xhb"], x["heatingoil"] = y.SPY, y.RSP, y["^SPXEW"], y.XHB, y["HO=F"]
+    t = pd.read_csv(os.path.join(RAW, "usitc_tariff_ratio.csv"))
+    x["tariff_pct"] = pd.Series(t.duties_pct_total_imports.values, index=pd.PeriodIndex([f"{v}-12" for v in t.year], freq="M"))
+    return pd.DataFrame(x)
+
+
 def build():
     ff = year_lines("fedfunds_y.txt", "fedfunds")
     g10 = year_lines("gs10_y.txt", "gs10")
@@ -42,6 +72,7 @@ def build():
 
     df = pd.concat([ff, g10, wti, cpi, sh.CAPE.rename("cape"), sh.TRCAPE.rename("trcape"), mon], axis=1).sort_index()
     df = df[df.index >= pd.Period("1946-01", "M")]
+    df = df.join(extra(), how="left")
     last_cpi = df.cpi.dropna().iloc[-1]
     df["wti_real"] = df.wti * last_cpi / df.cpi
     df.index.name = "month"
