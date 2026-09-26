@@ -97,6 +97,16 @@
 </div>
 
 <div class="card">
+  <div class="row"><div class="lbl">Warten oder kaufen?</div><span id="waitChip" class="chip" style="background:#2A2E38;color:#8A90A0">–</span></div>
+  <div class="sub" id="waitIntro"></div>
+  <div class="ctl"><span class="t">Horizont</span>
+    <div class="seg" id="segWait"><button data-v="10">10 Jahre</button><button data-v="20">20 Jahre</button></div>
+  </div>
+  <table class="mini" id="waitTbl"></table>
+  <div class="sub" id="waitNote" style="font-size:12px"></div>
+</div>
+
+<div class="card">
   <div class="row"><div class="lbl">S&amp;P 500 · Shiller-KGV (CAPE)</div><span id="rating" class="chip">–</span></div>
   <div class="big" id="capeNow">–</div>
   <div class="sub" id="capeSub">Lade Daten …</div>
@@ -183,6 +193,7 @@ let win = store.get('win', 20), range = store.get('range', 20), spxRange = store
 let lines = store.get('lines', { w200: true, s200: true, s50: true });
 let sigRange = store.get('sigRange', 'all');
 let spxView = store.get('spxView', 'nom');
+let waitH = store.get('waitH', 10);
 
 const base = (el, extra = {}) => LightweightCharts.createChart(el, Object.assign({
   autoSize: true,
@@ -305,6 +316,7 @@ function drawSpx(keep) {
     ma[k].applyOptions({ visible: !real && !!lines[k] });
   }
   document.querySelectorAll('#segView button').forEach(b => b.onclick = () => { spxView = b.dataset.v; store.set('spxView', spxView); drawSpx(); });
+document.querySelectorAll('#segWait button').forEach(b => b.onclick = () => { waitH = num(b.dataset.v); store.set('waitH', waitH); drawWait(); });
 document.querySelectorAll('#segSig button').forEach(b => b.onclick = () => { sigRange = num(b.dataset.v); store.set('sigRange', sigRange); drawSignal(); });
 document.querySelectorAll('#lines .tg').forEach(b => b.classList.toggle('on', !!lines[b.dataset.k]));
   // Einstiegssignale (Score 100) als Pfeile
@@ -352,13 +364,14 @@ function drawSignal(keep) {
   const pc = x => x == null ? '–' : sg(x, 1);
   const H = g.horizon || {};
   const head = first => `<tr><th>${first}</th><th>${first === 'Score' ? 'Anteil %' : 'Fälle'}</th><th>1 J.</th><th>10 J.</th><th>20 J.</th><th>30 J.</th><th>min 10 J.</th></tr>`;
+  const isMed = g.thresholds && g.thresholds[0] && g.thresholds[0].stat === 'median';
   const cells = t => `<td>${pc(t.r1)}</td><td>${pc(t.r10)}</td><td>${pc(t.r20)}</td><td>${pc(t.r30)}</td><td class="${t.w10 == null ? '' : t.w10 >= 0 ? 'up' : 'down'}">${pc(t.w10)}</td>`;
   $('thrTbl').innerHTML = head('Einstieg')
     + g.thresholds.map(t => `<tr class="${t.score === 100 ? 'hl' : ''}"><td>${typeof t.score === 'number' ? 'ab ' + t.score : 'jederzeit'}</td><td>${typeof t.score === 'number' ? t.n : '–'}</td>${cells(t)}</tr>`).join('');
   if (g.bands) $('bandTbl').innerHTML = head('Score')
     + g.bands.map(b => `<tr class="${b.lo === 100 ? 'hl' : ''}"${v != null && ((v >= b.lo && v < b.hi) || (b.lo === 100 && v >= 100)) ? ' style="background:#2A2E38"' : ''}><td>${b.lo === 100 ? '100' : b.lo + '–' + (b.hi - 1)}</td><td>${nf(b.share, 1)}</td>${cells(b)}</tr>`).join('');
   const yr = k => H[k] ? H[k].slice(0, 4) : '';
-  $('horizonNote').textContent = `1 J. = Rendite im ersten Jahr, 10/20/30 J. = Ø Rendite pro Jahr, min 10 J. = schlechtester Fall über 10 Jahre pro Jahr. Lange Zeiträume gibt es nur für Einstiege, die weit genug zurückliegen: 10 J. bis ${yr('10')}, 20 J. bis ${yr('20')}, 30 J. bis ${yr('30')}. Jüngere Fälle (z. B. 2020, 2022) zählen dort noch nicht mit. Alle Renditen real (nach US-Inflation) inkl. reinvestierter Dividenden.`;
+  $('horizonNote').textContent = `${isMed ? 'Werte = Median (typischer Fall). ' : ''}1 J. = Rendite im ersten Jahr, 10/20/30 J. = Rendite pro Jahr, min 10 J. = schlechtester Fall über 10 Jahre pro Jahr. Lange Zeiträume gibt es nur für Einstiege, die weit genug zurückliegen: 10 J. bis ${yr('10')}, 20 J. bis ${yr('20')}, 30 J. bis ${yr('30')}. Jüngere Fälle (z. B. 2020, 2022) zählen dort noch nicht mit. Alle Renditen real (nach US-Inflation) inkl. reinvestierter Dividenden.`;
   $('sigListSum').textContent = `Strenge Regel – ${g.signals.filter(x => x.ok !== false).length} × Score 100, ${g.signals.filter(x => x.ok === false).length} × zu teuer, seit ${W.find((w, i) => g.score[i] != null).t.slice(0, 4)}`;
   $('sigTbl').innerHTML = '<tr><th>Signal</th><th>TR-CAPE σ</th><th>1 J.</th><th>10 J.</th><th>20 J.</th><th>30 J.</th></tr>'
     + g.signals.slice().reverse().map(x => `<tr style="${x.ok === false ? 'opacity:.45' : ''}"><td>${dDE(x.t)}</td><td style="color:${x.ok === false ? C.orange : '#fff'}">${x.z == null ? '–' : sg(x.z, 1)}</td>`
@@ -369,6 +382,71 @@ function drawSignal(keep) {
   if (sigRange === 'all') ts.fitContent();
   else { const last = W[W.length - 1].t, from = new Date(last); from.setFullYear(from.getFullYear() - 20);
     ts.setVisibleRange({ from: from.toISOString().slice(0, 10), to: last }); }
+}
+
+// ---------- Warten oder kaufen? (historische Starts mit ähnlichem Score, Cash real 0 %)
+const CASH_REAL = 0.0;
+function simulate(sc, tr, i, H, strat) {
+  const end = i + H, cw = Math.pow(1 + CASH_REAL, 1 / 52);
+  if (strat === 'now') return tr[end] / tr[i];
+  if (strat === 'wait70') {
+    for (let k = i; k < end; k++) if (sc[k] != null && sc[k] >= 70) return Math.pow(cw, k - i) * tr[end] / tr[k];
+    return Math.pow(cw, H);
+  }
+  if (strat === 'stagger') {
+    let v = 0; const n = 104;
+    for (let k = 0; k < n; k++) v += (1 / n) * Math.pow(cw, k) * tr[end] / tr[i + k];
+    return v;
+  }
+  // Score-Regel: alle 4 Wochen; <30 nichts, 30–49: 2 % des Startkapitals, 50–69: 5 %, ab 70: alles
+  let cash = 1, units = 0;
+  for (let k = i; k < end; k++) {
+    if (k > i) cash *= cw;
+    if ((k - i) % 4 === 0 && cash > 1e-9) {
+      const s = sc[k] != null ? sc[k] : 50;
+      const amt = s >= 70 ? cash : Math.min(cash, s >= 50 ? 0.05 : s >= 30 ? 0.02 : 0);
+      units += amt / tr[k]; cash -= amt;
+    }
+  }
+  return units * tr[end] + cash;
+}
+function waitStats(sc, tr, s0, Hy, band = 5) {
+  const H = 52 * Hy, N = tr.length, starts = []; let last = -1e9;
+  for (let i = 0; i + H < N; i++) if (sc[i] != null && tr[i] != null && Math.abs(sc[i] - s0) <= band && i - last >= 26) { starts.push(i); last = i; }
+  const med = a => { const b = [...a].sort((x, y) => x - y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+  const res = {};
+  for (const st of ['now', 'wait70', 'stagger', 'rule']) res[st] = starts.map(i => (Math.pow(simulate(sc, tr, i, H, st), 1 / Hy) - 1) * 100);
+  const out = { n: starts.length, starts };
+  for (const st in res) {
+    const r = res[st];
+    out[st] = r.length ? { med: med(r), min: Math.min(...r), max: Math.max(...r), better: st === 'now' ? null : r.filter((x, k) => x > res.now[k]).length } : null;
+  }
+  const waits = []; let never = 0;
+  for (const i of starts) { let j = -1; for (let k = i; k < i + H; k++) if (sc[k] != null && sc[k] >= 70) { j = k; break; } if (j < 0) never++; else waits.push((j - i) / 52); }
+  out.waitMed = waits.length ? med(waits) : null; out.waitMax = waits.length ? Math.max(...waits) : null; out.never = never;
+  return out;
+}
+function drawWait() {
+  const g = D && D.signal; if (!g) return;
+  segOn('segWait', waitH);
+  const W = D.spx.weeks, tr = W.map(w => w.tr), sc = g.score.slice(0, W.length), s0 = g.current;
+  if (s0 == null || tr.some(x => x == null)) { $('waitIntro').textContent = 'Keine Daten.'; return; }
+  const r = waitStats(sc, tr, s0, waitH);
+  const lo = Math.max(0, s0 - 5), hi = Math.min(100, s0 + 5);
+  if (!r.n) { $('waitIntro').textContent = `Für Score ${lo}–${hi} gibt es keine historischen Starts mit ${waitH} Jahren Daten.`; $('waitTbl').innerHTML = ''; $('waitNote').textContent = ''; return; }
+  const yrs = [...new Set(r.starts.map(i => W[i].t.slice(0, 4)))];
+  $('waitIntro').innerHTML = `Alle historischen Zeitpunkte mit Score <b style="color:#fff">${lo}–${hi}</b> (heute ${s0}), im Abstand von mind. 6 Monaten: `
+    + `<b style="color:#fff">${r.n} Starts</b> (${yrs.join(', ')}). Rendite real inkl. Dividenden pro Jahr über ${waitH} Jahre (min/max = schlechtester/bester Fall, „> sofort“ = wie oft besser als sofort kaufen). Cash in der Wartezeit: real 0 %.`;
+  const best = ['wait70', 'stagger', 'rule'].reduce((a, k) => r[k].med > r[a].med ? k : a, 'now');
+  $('waitChip').textContent = best === 'now' ? 'Median: sofort' : best === 'wait70' ? 'Median: warten' : best === 'stagger' ? 'Median: gestaffelt' : 'Median: Score-Regel';
+  const row = (k, lab) => { const x = r[k];
+    return `<tr class="${k === best ? 'hl' : ''}"><td style="white-space:normal">${lab}</td><td>${sg(x.med, 1)}</td><td class="${x.min >= 0 ? 'up' : 'down'}">${sg(x.min, 1)}</td><td>${sg(x.max, 1)}</td><td>${x.better == null ? '–' : x.better + '/' + r.n}</td></tr>`; };
+  $('waitTbl').innerHTML = '<tr><th>Weg</th><th>Median</th><th>min</th><th>max</th><th>> sofort</th></tr>'
+    + row('now', 'Sofort alles') + row('wait70', 'Warten bis Score 70') + row('stagger', 'Gestaffelt, 24 Monate') + row('rule', 'Score-Regel');
+  $('waitNote').innerHTML = `Wartezeit bis Score 70: Median ${r.waitMed == null ? '–' : nf(r.waitMed, 1) + ' J.'}, längste ${r.waitMax == null ? '–' : nf(r.waitMax, 1) + ' J.'}`
+    + (r.never ? `; in ${r.never} Fällen kam die 70 innerhalb von ${waitH} Jahren gar nicht (Geld blieb in Cash).` : '.')
+    + `<br><b>Score-Regel:</b> alle 4 Wochen – Score unter 30: nichts investieren, 30–49: 2 % des Startkapitals, 50–69: 5 %, ab 70: Rest sofort. `
+    + `<b>Gestaffelt:</b> jede Woche 1/104 über 2 Jahre.<br>Viele Starts liegen in denselben Marktphasen (z. B. 1995–2000) und sind nicht unabhängig – Richtwert, keine Prognose.`;
 }
 
 function pct(id, v) { $(id).textContent = sg(v) + ' %'; $(id).className = v >= 0 ? 'up' : 'down'; }
@@ -468,7 +546,7 @@ function render(d, keep) {
   $('stand').innerHTML = `Schlusskurs vom ${dDE(d.date)} · berechnet ${up.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}`
     + (q ? `<br>Live-Kurs: ${q.src}, ${q.hm} Uhr New York (CAPE mit aktuellem Kurs hochgerechnet)` : '')
     + `<br>Shiller-Daten bis ${mDE(c.shillerMonth)} · Kurse: ${d.priceSource}`;
-  drawSignal(keep); drawCape(keep); drawSpx(keep);
+  drawSignal(keep); drawWait(); drawCape(keep); drawSpx(keep);
 }
 
 // ---------- Laden
