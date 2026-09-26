@@ -64,6 +64,16 @@ def load_shiller():
     heads = [str(x).strip() for x in df.iloc[hdr]]
     cape_col = next(i for i, h in enumerate(heads) if h.upper() == "CAPE")
     p_col = next(i for i, h in enumerate(heads) if h == "P")
+    tr_col = next((i for i, h in enumerate(heads) if h.upper().replace(" ", "") == "TRCAPE"), 14)
+    d_col = next((i for i, h in enumerate(heads) if h == "D"), 2)
+    cpi_col = next((i for i, h in enumerate(heads) if h.upper() == "CPI"), 4)
+
+    def num(v):
+        try:
+            v = float(v)
+            return v if v == v else float("nan")
+        except (TypeError, ValueError):
+            return float("nan")
 
     rows = []
     for i in range(hdr + 1, len(df)):
@@ -79,15 +89,13 @@ def load_shiller():
         month = int(round((d - year) * 100))
         if not 1 <= month <= 12:
             continue
-        try:
-            c = float(c)
-        except (TypeError, ValueError):
-            c = float("nan")
-        rows.append((year, month, p, c))
-    sh = pd.DataFrame(rows, columns=["year", "month", "price", "cape"])
+        rows.append((year, month, p, num(c), num(df.iat[i, tr_col]), num(df.iat[i, d_col]), num(df.iat[i, cpi_col])))
+    sh = pd.DataFrame(rows, columns=["year", "month", "price", "cape", "trcape", "div", "cpi"])
+    sh[["div", "cpi"]] = sh[["div", "cpi"]].ffill()   # Dividende/Inflation kommen mit Verzögerung
     sh = sh[sh["cape"].notna() & (sh["cape"] > 0)]
     sh["key"] = sh["year"] * 100 + sh["month"]
     sh["e10"] = sh["price"] / sh["cape"]
+    sh["e10tr"] = sh["price"] / sh["trcape"]
     if len(sh) < 1000:
         raise RuntimeError(f"Zu wenige Shiller-Monate ({len(sh)})")
     return sh
@@ -247,6 +255,17 @@ def main():
             e10_series.append(float("nan"))
     cape = (close / pd.Series(e10_series, index=close.index)).dropna()
 
+    # --- täglicher TR-CAPE (rückkaufbereinigt, Shiller) – Grundlage für den Einstiegs-Score
+    shtr = sh[sh["trcape"].notna() & (sh["trcape"] > 0)]
+    e10tr = dict(zip(shtr["key"], shtr["e10tr"]))
+    last_key_tr = int(shtr["key"].max())
+    trc = []
+    for k in keys:
+        k = int(k)
+        trc.append(e10tr[last_key_tr] if k > last_key_tr else e10tr.get(k, float("nan")))
+    trcape = (close / pd.Series(trc, index=close.index)).dropna()
+    cur_tr = float(trcape.iloc[-1])
+
     last_day = cape.index[-1]
     cur = float(cape.iloc[-1])
     start20 = last_day - pd.DateOffset(years=20)
@@ -306,16 +325,39 @@ def main():
         })
 
     # --- Einstiegssignal
-    wcape_s = cape.groupby(cape.index.to_period("W-FRI")).last()
+    wcape_s = trcape.groupby(trcape.index.to_period("W-FRI")).last()
     pers = list(wk.groupby("wk").groups.keys())
     wcape = [float(wcape_s[p]) if p in wcape_s.index else None for p in pers]
     wc_ = [w["c"] for w in weeks]
     score, episodes, sstate = signal_model(wc_, [w["l"] for w in weeks], [w["w200"] for w in weeks], wcape)
-    mroll = mon.rolling(240, min_periods=240)
+    mon_tr = shtr.set_index("key")["trcape"].astype(float).copy()
+    mon_tr.loc[last_day.year * 100 + last_day.month] = cur_tr
+    mon_tr = mon_tr.sort_index()
+    mroll = mon_tr.rolling(240, min_periods=240)
     mmean, msd = mroll.mean(), mroll.std()
 
+    sh_k = sh.set_index("key")
+    div_m, cpi_m = sh_k["div"], sh_k["cpi"]
+
+    def mval(series, k):
+        if k in series.index:
+            return float(series[k])
+        return float(series[series.index <= k].iloc[-1])
+
+    wkeys = [pd.Timestamp(w_["t"]).year * 100 + pd.Timestamp(w_["t"]).month for w_ in weeks]
+    trn = [1.0]
+    for i in range(1, len(wc_)):
+        trn.append(trn[-1] * (wc_[i] + mval(div_m, wkeys[i]) / 52) / wc_[i - 1])
+    cpis = [mval(cpi_m, k) for k in wkeys]
+    trr = [trn[i] / cpis[i] for i in range(len(trn))]
+    scale = wc_[-1] / trr[-1]
+    trr = [x * scale for x in trr]          # in heutiger Kaufkraft, letzter Wert = aktueller Kurs
+    for i, w_ in enumerate(weeks):
+        w_["tr"] = r2(trr[i])
+
     def fwd(i, n):
-        return r2(((wc_[i + n] / wc_[i]) ** (52 / n) - 1) * 100, 1) if i + n < len(wc_) else None
+        # reale Gesamtrendite p.a. (inkl. reinvestierter Dividenden, nach US-Inflation)
+        return r2(((trr[i + n] / trr[i]) ** (52 / n) - 1) * 100, 1) if i + n < len(trr) else None
 
     def dd1(i):
         lows = [w["l"] for w in weeks[i + 1:i + 53]]
@@ -431,7 +473,7 @@ def main():
     last_k = mmean.index.max()
     sig_out = {
         "rule": {"rise": SIG_RISE, "dist": SIG_DIST, "window": SIG_WINDOW, "maxWait": SIG_MAXWAIT,
-                 "wDist": W_DIST, "wCape": W_CAPE, "spread": SPREAD, "cap": CAP, "turnWeeks": TURN_WEEKS, "zMax100": Z_MAX_100, "capeMid": CAPE_MID, "capeWidth": CAPE_WIDTH,
+                 "wDist": W_DIST, "wCape": W_CAPE, "spread": SPREAD, "cap": CAP, "turnWeeks": TURN_WEEKS, "zMax100": Z_MAX_100, "e10tr": round(float(close.iloc[-1]) / cur_tr, 4), "base": "TR-CAPE", "capeMid": CAPE_MID, "capeWidth": CAPE_WIDTH,
                  "dMu": round(dmu, 4), "dSd": round(dsd, 4), "zMu": round(zmu, 4), "zSd": round(zsd, 4),
                  "cSd": round(csd, 4), "m20": round(float(mmean[last_k]), 4), "s20": round(float(msd[last_k]), 4),
                  "capeLast": [None if x is None else round(x, 4) for x in wcape[-TURN_WEEKS:]]},
@@ -440,7 +482,7 @@ def main():
         "signals": signals, "thresholds": thresholds, "bands": bands, "state": sstate,
         "horizon": {str(y): weeks[len(weeks) - 1 - 52 * y]["t"] for y in (10, 20, 30)},
         "current": round(new_score[-1]) if new_score[-1] is not None else None,
-        "parts": {"dist": r2(distw[-1], 1), "z": r2(zw[-1])},
+        "parts": {"dist": r2(distw[-1], 1), "z": r2(zw[-1]), "tr": r2(cur_tr)},
     }
 
     last_close = float(close.iloc[-1])
@@ -453,6 +495,9 @@ def main():
             "current": r2(cur),
             # E10 in heutigen Dollar: Live-CAPE = Live-Kurs / e10
             "e10": round(last_close / cur, 4),
+            "tr": {"current": r2(cur_tr), "m20": r2(float(mmean.iloc[-1])), "s20": r2(float(msd.iloc[-1])),
+                   "z": r2((cur_tr - float(mmean.iloc[-1])) / float(msd.iloc[-1])), "longrun": r2(float(mon_tr.mean())),
+                   "e10": round(last_close / cur_tr, 4)},
             "windows": windows,
             "daily": daily,
             "monthly": monthly,
