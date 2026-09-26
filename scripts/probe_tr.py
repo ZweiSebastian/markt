@@ -19,7 +19,7 @@ def col(pat):
         if re.search(pat, h, re.I): return i
     return None
 ci = {"date": 0, "P": col(r"^P$"), "D": col(r"^D$"), "CPI": col(r"^CPI$"), "cape": col(r"^CAPE$"),
-      "trcape": col(r"TR\s*CAPE"), "trp": col(r"Real\s*Total\s*Return\s*Price"), "rp": col(r"^Real\s*Price$")}
+      "trcape": col(r"TR\s*CAPE"), "trp": 9, "rp": 7}
 print("::notice::Indizes " + json.dumps(ci))
 rows = []
 for i in range(hdr + 1, len(df)):
