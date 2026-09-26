@@ -1,0 +1,79 @@
+Aktueller Stand: {'Öl': True, 'Fed': True, '10J': True, 'Bew': True}
+Rohwerte jetzt: {'oil12': 0.44, 'ff3': 0.25, 'ff12': -0.34, 'y_hi10': 1.0, 'y_hi15': 1.0, 'cape': 40.6, 'trz': 2.01}
+
+Häufigkeit (Anteil der Monate 1955-07..2026-08):
+  Öl    32.6 %
+  Fed   53.4 %
+  10J   14.6 %
+  Bew   36.8 %
+
+Basisrate (alle Monate): Anteil mit ≥20 % Drawdown in 3 J. = 44 %, Median maxDD -18 %, Median 1J 10.2 %
+
+Reihenfolge nach Seltenheit: ['10J', 'Öl', 'Bew', 'Fed']
+
+=== 10J: 14.6 % der Monate, 4 Episoden, jetzt=True
+  1966-02  Vorlauf    +3%  bis 1966-04-18  maxDD   -21%  Tief 1966-10-03 (7.1 M)  Tief vs Einstieg  -18%  erholt 1967-04-17  1J    -1%  3J   +10%  5J    +8%
+  1974-08  Vorlauf    +0%  bis 1974-08-26  maxDD   -14%  Tief 1974-09-30 (1.2 M)  Tief vs Einstieg  -14%  erholt 1974-10-14  1J   +20%  3J   +33%  5J   +50%
+  1978-06  Vorlauf   +24%  bis 1980-02-04  maxDD   -15%  Tief 1980-04-14 (21.6 M)  Tief vs Einstieg   -1%  erholt 1980-07-14  1J    +8%  3J   +39%  5J   +78%
+  2022-09  Vorlauf   +70%  bis 2025-02-10  maxDD   -17%  Tief 2025-03-31 (30.2 M)  Tief vs Einstieg   -0%  erholt 2025-06-23  1J   +20%  3J   +85%  5J  +nan%
+
+=== 10J + Öl: 5.2 % der Monate, 3 Episoden, jetzt=True
+  1974-08  Vorlauf    +0%  bis 1974-08-26  maxDD   -14%  Tief 1974-09-30 (1.2 M)  Tief vs Einstieg  -14%  erholt 1974-10-14  1J   +20%  3J   +33%  5J   +50%
+  1979-07  Vorlauf   +35%  bis 1980-11-24  maxDD   -24%  Tief 1982-07-26 (35.9 M)  Tief vs Einstieg   -3%  erholt 1982-11-01  1J   +16%  3J    +3%  5J   +45%
+  2022-09  Vorlauf   +70%  bis 2025-02-10  maxDD   -17%  Tief 2025-03-31 (30.2 M)  Tief vs Einstieg   -0%  erholt 2025-06-23  1J   +20%  3J   +85%  5J  +nan%
+
+=== 10J + Öl + Bew: 0.0 % der Monate, 0 Episoden, jetzt=True
+
+=== 10J + Öl + Bew + Fed: 0.0 % der Monate, 0 Episoden, jetzt=True
+
+Alle Kombinationen (Monatsanteil / Episoden):
+  Öl+Fed            18.4 %   9 Ep.  jetzt=True  med maxDD   -18%  ≥20%-Crash   44%
+  Öl+10J             5.2 %   3 Ep.  jetzt=True  med maxDD   -17%  ≥20%-Crash   33%
+  Öl+Bew             9.6 %   6 Ep.  jetzt=True  med maxDD   -22%  ≥20%-Crash   50%
+  Fed+10J           12.9 %   4 Ep.  jetzt=True  med maxDD   -16%  ≥20%-Crash   25%
+  Fed+Bew           16.3 %  10 Ep.  jetzt=True  med maxDD   -18%  ≥20%-Crash   40%
+  10J+Bew            2.0 %   3 Ep.  jetzt=True  med maxDD   -21%  ≥20%-Crash   67%
+  Öl+Fed+10J         4.7 %   3 Ep.  jetzt=True  med maxDD   -17%  ≥20%-Crash   33%
+  Öl+Fed+Bew         4.0 %   5 Ep.  jetzt=True  med maxDD   -18%  ≥20%-Crash   40%
+  Öl+10J+Bew         0.0 %   0 Ep.  jetzt=True  med maxDD   nan%  ≥20%-Crash  nan%
+  Fed+10J+Bew        1.6 %   3 Ep.  jetzt=True  med maxDD   -21%  ≥20%-Crash   67%
+  start   wti0  wti_pk  oil_max_yoy  ff_start  ff_vor12 fed_hike  y10 y10hi10 y10hi5  cape   trz
+1948-01  1.620   2.570           59       NaN       NaN        –  NaN       –      –  10.4   NaN
+1974-01  3.560  11.160          184      9.65      3.71       -6 6.99      +7     +7  13.5 -2.08
+1979-08 14.850  39.500          149     10.94      2.90       -6 9.03      -6     -6   9.1 -1.60
+1990-09 19.594  35.922           79      8.20     -0.82        – 8.89       –      –  15.3  0.86
+1999-12 11.280  34.400          144      5.30      0.62       -5 6.28       –      –  44.2  2.70
+2003-02 20.740  35.870           73      1.26     -0.48        – 3.90       –      –  21.2 -0.27
+2007-11 59.370 133.930           98      4.49     -0.76        – 4.15       –      –  25.7 -0.12
+2018-07 46.630  70.980           52      1.91      0.76       -6 2.89       –     -2  31.9  0.78
+2021-06 38.310 114.840          273      0.08      0.00      +10 1.52       –      –  36.7  2.68
+2026-04 63.540 102.130           64      3.64     -0.69       +5 4.32      +5     +5  38.1  1.75
+
+Einstieg = Schockbeginn + 0 Monate
+  1974-01  Vorlauf   +4% bis 1974-03-11  maxDD  -37%  Tief 1974-09-30 (8.1M)  Tief vs Einstieg  -35%  erholt 1976-01-26  6M  -18% 1J  -19% 2J   +6% 3J   +7% 5J   +7%
+  1979-08  Vorlauf  +28% bis 1980-11-24  maxDD  -26%  Tief 1982-08-02 (35.2M)  Tief vs Einstieg   -8%  erholt 1982-11-01  6M   +4% 1J  +12% 2J  +14% 3J   +7% 5J  +53%
+  1990-09  Vorlauf  +29% bis 1991-08-26  maxDD   -5%  Tief 1991-11-25 (14.0M)  Tief vs Einstieg   -2%  erholt 1991-12-23  6M  +23% 1J  +26% 2J  +35% 3J  +50% 5J  +90%
+  1999-12  Vorlauf   +4% bis 2000-03-20  maxDD  -48%  Tief 2002-09-30 (33.2M)  Tief vs Einstieg  -46%  erholt –  6M   -1% 1J  -10% 2J  -21% 3J  -40% 5J  -18%
+  2003-02  Vorlauf  +38% bis 2004-03-01  maxDD   -8%  Tief 2004-08-02 (17.3M)  Tief vs Einstieg   -2%  erholt 2004-11-01  6M  +20% 1J  +36% 2J  +44% 3J  +53% 5J  +61%
+  2007-11  Vorlauf   +2% bis 2007-12-03  maxDD  -55%  Tief 2009-03-02 (15.2M)  Tief vs Einstieg  -54%  erholt –  6M   -7% 1J  -40% 2J  -26% 3J  -20% 5J   -5%
+  2018-07  Vorlauf  +19% bis 2020-02-10  maxDD  -32%  Tief 2020-03-16 (19.6M)  Tief vs Einstieg  -19%  erholt 2020-08-17  6M   -5% 1J   +3% 2J  +15% 3J  +55% 5J  +61%
+  2021-06  Vorlauf  +10% bis 2021-12-27  maxDD  -25%  Tief 2022-10-10 (15.4M)  Tief vs Einstieg  -18%  erholt 2023-12-26  6M  +10% 1J  -12% 2J   +2% 3J  +26% 5J  +69%
+Einstieg = Schockbeginn + 5 Monate
+  1974-06  Vorlauf   +0% bis 1974-06-24  maxDD  -28%  Tief 1974-09-30 (3.2M)  Tief vs Einstieg  -28%  erholt 1975-04-14  6M  -22% 1J  +10% 2J  +21% 3J  +18% 5J  +19%
+  1980-01  Vorlauf  +22% bis 1980-11-24  maxDD  -26%  Tief 1982-08-02 (30.2M)  Tief vs Einstieg  -13%  erholt 1982-11-01  6M   +5% 1J  +12% 2J   +5% 3J  +26% 5J  +54%
+  1991-02  Vorlauf   +7% bis 1991-08-26  maxDD   -5%  Tief 1991-11-25 (9.0M)  Tief vs Einstieg   -1%  erholt 1991-12-23  6M   +7% 1J  +11% 2J  +20% 3J  +26% 5J  +78%
+  2000-05  Vorlauf   +3% bis 2000-08-28  maxDD  -47%  Tief 2002-09-30 (28.1M)  Tief vs Einstieg  -46%  erholt –  6M  -11% 1J  -15% 2J  -28% 3J  -35% 5J  -19%
+  2003-07  Vorlauf  +18% bis 2004-03-01  maxDD   -8%  Tief 2004-08-02 (12.2M)  Tief vs Einstieg   -0%  erholt 2004-11-01  6M  +15% 1J  +12% 2J  +26% 3J  +30% 5J  +28%
+  2008-04  Vorlauf   +1% bis 2008-05-12  maxDD  -52%  Tief 2009-03-02 (10.1M)  Tief vs Einstieg  -52%  erholt 2012-09-04  6M  -32% 1J  -38% 2J  -16% 3J   -4% 5J  +12%
+  2018-12  Vorlauf  +34% bis 2020-02-10  maxDD  -32%  Tief 2020-03-16 (14.5M)  Tief vs Einstieg   -9%  erholt 2020-08-17  6M  +18% 1J  +28% 2J  +48% 3J  +88% 5J  +88%
+  2021-11  Vorlauf   +5% bis 2021-12-27  maxDD  -25%  Tief 2022-10-10 (10.4M)  Tief vs Einstieg  -21%  erholt 2023-12-26  6M   -8% 1J  -10% 2J   +1% 3J  +33% 5J +nan%
+
+real inkl. Div. p.a. ab Schock+5M:
+  1974-06 3J +3.4% 5J +1.1% 10J +3.5%
+  1980-01 3J +5.3% 5J +7.8% 10J +10.1%
+  1991-02 3J +8.1% 5J +12.2% 10J +12.3%
+  2000-05 3J -14.0% 5J -5.0% 10J -3.6%
+  2003-07 3J +7.5% 5J +3.2% 10J +5.2%
+  2008-04 3J -0.4% 5J +2.9% 10J +7.2%
+  2018-12 3J +21.3% 5J +10.9% 10J +nan%
+  2021-11 3J +7.0% 5J +nan% 10J +nan%
