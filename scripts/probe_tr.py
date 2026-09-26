@@ -29,6 +29,7 @@ try:
             d = float(df.iat[i, 0])
         except Exception:
             continue
+        if d != d: continue
         y = int(d); m = int(round((d - y) * 100))
         if not 1 <= m <= 12: continue
         rec = {"t": pd.Timestamp(y, m, 1)}
