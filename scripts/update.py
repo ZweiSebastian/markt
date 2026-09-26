@@ -438,6 +438,11 @@ def main():
         return ent
 
     base1 = [fwd(i, 52) for i in ok if fwd(i, 52) is not None]
+    def med(a):
+        a = sorted(a)
+        k = len(a)
+        return None if k == 0 else (a[k // 2] if k % 2 else (a[k // 2 - 1] + a[k // 2]) / 2)
+
     def agg(idx):
         r1 = [fwd(i, 52) for i in idx if fwd(i, 52) is not None]
         r5 = [fwd(i, 260) for i in idx if fwd(i, 260) is not None]
@@ -445,13 +450,14 @@ def main():
         r20 = [fwd(i, 1040) for i in idx if fwd(i, 1040) is not None]
         r30 = [fwd(i, 1560) for i in idx if fwd(i, 1560) is not None]
         return {"n": len(idx),
-                "r1": r2(sum(r1) / len(r1), 1) if r1 else None,
+                "r1": r2(med(r1), 1) if r1 else None,
                 "pos": r2(100 * sum(x > 0 for x in r1) / len(r1), 0) if r1 else None,
-                "r5": r2(sum(r5) / len(r5), 1) if r5 else None,
-                "r10": r2(sum(r10) / len(r10), 1) if r10 else None,
-                "r20": r2(sum(r20) / len(r20), 1) if r20 else None,
-                "r30": r2(sum(r30) / len(r30), 1) if r30 else None,
+                "r5": r2(med(r5), 1) if r5 else None,
+                "r10": r2(med(r10), 1) if r10 else None,
+                "r20": r2(med(r20), 1) if r20 else None,
+                "r30": r2(med(r30), 1) if r30 else None,
                 "w10": r2(min(r10), 1) if r10 else None,
+                "stat": "median",
                 "n10": len(r10), "n20": len(r20), "n30": len(r30)}
 
     thresholds = [dict(score="Jede Woche", **agg(ok))]
