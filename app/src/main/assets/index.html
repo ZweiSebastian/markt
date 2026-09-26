@@ -130,8 +130,12 @@
   <div class="ctl"><span class="t">Zeitraum</span>
     <div class="seg" id="segSpx"><button data-v="5">5 J.</button><button data-v="20">20 J.</button><button data-v="all" id="spxAllBtn">Alle</button></div>
   </div>
+  <div class="ctl"><span class="t">Ansicht</span>
+    <div class="seg" id="segView"><button data-v="nom">Kurs</button><button data-v="real">Real inkl. Dividenden</button></div>
+  </div>
   <div class="hover" id="spxHover"></div>
   <div class="chartbox"><div id="spx" class="chart"></div></div>
+  <div class="sub" id="realNote" style="display:none;font-size:12px">S&amp;P 500 inkl. reinvestierter Dividenden, bereinigt um die US-Inflation, in heutiger Kaufkraft (letzter Wert = heutiger Kurs). Die Inflation wird monatlich und mit Verzögerung veröffentlicht; die letzten Wochen sind daher vorläufig.</div>
   <div class="toggles" id="lines">
     <button class="tg" data-k="w200"><i style="border-color:#B98CFF"></i>200 Wochen</button>
     <button class="tg" data-k="s200"><i style="border-color:#FFB454"></i>200 Tage</button>
@@ -143,14 +147,14 @@
   <button onclick="refresh()">Aktualisieren</button>
   <div id="stand"></div>
   <div style="margin-top:8px">
-    <b>Einstiegs-Score:</b> 0–80 kombiniert den Abstand des S&amp;P zur 200-Wochen-Linie (35 %) und das CAPE in σ zum
+    <b>Einstiegs-Score:</b> 0–80 kombiniert den Abstand des S&amp;P zur 200-Wochen-Linie (35 %) und das TR-CAPE (Shillers um Aktienrückkäufe bereinigtes CAPE) in σ zum
     20J-Ø (65 %), jeweils im Vergleich zur Historie seit 1931; 50 = normale Lage, 20 Punkte = 1 Standardabweichung.
-    Beim CAPE zählt „teurer“ linear negativ; „günstiger“ steigt zwischen 0 und −1σ steil an und ist ab etwa −1σ voll
+    Beim TR-CAPE zählt „teurer“ linear negativ; „günstiger“ steigt zwischen 0 und −1σ steil an und ist ab etwa −1σ voll
     (noch billiger brachte historisch keine höhere 10-Jahres-Rendite).
-    Über 50 steigt der Score nur, wenn sich das CAPE vom Tief der letzten 26 Wochen erholt (+10 % = volle Punkte).
-    <b>100</b> = strenge Regel, nur wenn das CAPE dabei höchstens +1σ über dem 20J-Ø liegt: Wochentief berührt die 200-Wochen-Linie (nach mind. 26 Wochen darüber, erste Berührung seit
-    1 Jahr) und danach steigt das CAPE 10 % über sein Tief seit der Berührung; bleibt 13 Wochen stehen, ohne Wende verfällt
-    die Berührung nach 2 Jahren. Rückblick-Werte sind Vergangenheit, keine Prognose.<br><br>
+    Über 50 steigt der Score nur, wenn sich das TR-CAPE vom Tief der letzten 26 Wochen erholt (+10 % = volle Punkte).
+    <b>100</b> = strenge Regel, nur wenn das TR-CAPE dabei höchstens +1σ über dem 20J-Ø liegt: Wochentief berührt die 200-Wochen-Linie (nach mind. 26 Wochen darüber, erste Berührung seit
+    1 Jahr) und danach steigt das TR-CAPE 10 % über sein Tief seit der Berührung; bleibt 13 Wochen stehen, ohne Wende verfällt
+    die Berührung nach 2 Jahren. Rückblick-Renditen sind real (nach US-Inflation) inkl. reinvestierter Dividenden. Vergangenheit, keine Prognose.<br><br>
     CAPE = Kurs ÷ Ø der inflationsbereinigten Gewinne der letzten 10 Jahre. Grundlage: monatliche Daten von Robert Shiller
     (Yale), täglich fortgeschrieben mit dem S&amp;P-500-Schlusskurs. Die grauen Kanäle sind der rollierende Ø ±1σ / ±2σ
     über das gewählte Fenster (bei 5–20 J. auf Tagesbasis, „Seit 1881“ auf Monatsbasis). Einstufung: innerhalb ±1σ „Fair“,
@@ -178,6 +182,7 @@ let D = null;
 let win = store.get('win', 20), range = store.get('range', 20), spxRange = store.get('spxRange', 5);
 let lines = store.get('lines', { w200: true, s200: true, s50: true });
 let sigRange = store.get('sigRange', 'all');
+let spxView = store.get('spxView', 'nom');
 
 const base = (el, extra = {}) => LightweightCharts.createChart(el, Object.assign({
   autoSize: true,
@@ -212,6 +217,8 @@ const ma = {
 };
 Object.values(ma).forEach(s => s.applyOptions({ priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }));
 
+const trLine = spxChart.addLineSeries({ color: '#E6E8EE', lineWidth: 2, priceLineVisible: false, lastValueVisible: true, visible: false });
+
 // ---------- Signal-Chart (Score 0–100)
 const sigChart = base($('sig'), { localization: { locale: 'de-DE', dateFormat: 'dd.MM.yyyy', priceFormatter: v => Math.round(v) },
   rightPriceScale: { borderColor: C.line, scaleMargins: { top: 0.06, bottom: 0.04 } } });
@@ -234,6 +241,8 @@ capeChart.subscribeCrosshairMove(p => {
   $('capeHover').textContent = v ? `${t}: CAPE ${nf(v.value)}` + (m && m.value != null ? ` · Ø ${nf(m.value)} · ±1σ ${nf(l.value)}–${nf(u.value)}` : '') : '';
 });
 spxChart.subscribeCrosshairMove(p => {
+  if (spxView === 'real') { const r = p && p.time && p.seriesData.get(trLine);
+    $('spxHover').textContent = r ? `Woche ab ${dDE(p.time)}: ${nf(r.value, 0)} (real inkl. Dividenden, heutige Kaufkraft)` : ''; return; }
   const v = p && p.time && p.seriesData.get(candles);
   if (!v) { $('spxHover').textContent = ''; return; }
   const extra = ['w200', 's200', 's50'].filter(k => lines[k]).map(k => { const x = p.seriesData.get(ma[k]);
@@ -252,7 +261,8 @@ function drawCape(keep) {
   $('rating').style.color = RC[w.rating];
   $('capeSub').innerHTML = `${win}J-Ø <b style="color:#fff">${nf(w.mean)}</b> · σ ${nf(w.sd)} · aktuell <b style="color:${RC[w.rating]}">${sg(w.z)}σ</b>`
     + `<br>Höher als an ${nf(w.percentile,0)} % der Handelstage der letzten ${win} Jahre`
-    + `<br>Langfristiger Ø seit ${c.longrunSince}: ${nf(c.longrunMean)}`;
+    + `<br>Langfristiger Ø seit ${c.longrunSince}: ${nf(c.longrunMean)}`
+    + (c.tr ? `<br>TR-CAPE (rückkaufbereinigt, Basis des Scores): <b style="color:#fff">${nf(c.tr.current)}</b> · 20J-Ø ${nf(c.tr.m20)} · ${sg(c.tr.z)}σ · langfr. Ø ${nf(c.tr.longrun)}` : '');
 
   const src = range === 'all' ? c.monthly : c.daily;
   capeSrc = src;
@@ -282,12 +292,20 @@ function drawSpx(keep) {
     const f = from.toISOString().slice(0, 10);
     wk = all.filter(w => w.t > f);
   }
+  const real = spxView === 'real';
+  segOn('segView', spxView);
   candles.setData(wk.map(w => ({ time: w.t, open: w.o, high: w.h, low: w.l, close: w.c })));
+  trLine.setData(wk.map(w => w.tr == null ? { time: w.t } : { time: w.t, value: w.tr }));
+  trLine.applyOptions({ visible: real });
+  candles.applyOptions({ visible: !real });
+  $('lines').style.display = real ? 'none' : '';
+  $('realNote').style.display = real ? '' : 'none';
   for (const k of Object.keys(ma)) {
     ma[k].setData(wk.map(w => w[k] == null ? { time: w.t } : { time: w.t, value: w[k] }));
-    ma[k].applyOptions({ visible: !!lines[k] });
+    ma[k].applyOptions({ visible: !real && !!lines[k] });
   }
-  document.querySelectorAll('#segSig button').forEach(b => b.onclick = () => { sigRange = num(b.dataset.v); store.set('sigRange', sigRange); drawSignal(); });
+  document.querySelectorAll('#segView button').forEach(b => b.onclick = () => { spxView = b.dataset.v; store.set('spxView', spxView); drawSpx(); });
+document.querySelectorAll('#segSig button').forEach(b => b.onclick = () => { sigRange = num(b.dataset.v); store.set('sigRange', sigRange); drawSignal(); });
 document.querySelectorAll('#lines .tg').forEach(b => b.classList.toggle('on', !!lines[b.dataset.k]));
   // Einstiegssignale (Score 100) als Pfeile
   const f0 = wk.length ? wk[0].t : '';
@@ -295,7 +313,7 @@ document.querySelectorAll('#lines .tg').forEach(b => b.classList.toggle('on', !!
   candles.setMarkers(sigs.map(x => ({ time: x.t, position: 'belowBar', color: x.ok === false ? '#6B7180' : C.green, shape: 'arrowUp', text: spxRange === 5 ? (x.ok === false ? 'teuer' : 'Signal') : '' })));
   if (keep) return;
   // lange Zeiträume logarithmisch (wie TradingView), 5 Jahre linear
-  spxChart.priceScale('right').applyOptions({ mode: spxRange === 5 ? 0 : 1 });
+  spxChart.priceScale('right').applyOptions({ mode: spxRange === 5 && !real ? 0 : 1 });
   spxChart.timeScale().fitContent();
 }
 
@@ -303,7 +321,7 @@ function drawSignal(keep) {
   const g = D && D.signal;
   if (!g) return;
   segOn('segSig', sigRange);
-  const v = g.current, st = g.state, W = D.spx.weeks, cur = D.cape.current;
+  const v = g.current, st = g.state, W = D.spx.weeks, cur = (g.parts && g.parts.tr) || D.cape.current;
   $('sigNow').textContent = v == null ? '–' : v;
   $('sigNow').style.color = scoreColor(v);
   $('sigBar').style.width = (v || 0) + '%';
@@ -312,20 +330,20 @@ function drawSignal(keep) {
   $('sigChip').textContent = phase;
   $('sigChip').style.background = scoreColor(v) + '26'; $('sigChip').style.color = scoreColor(v);
   const s = D.spx, pt = g.parts || {};
-  let txt = `S&amp;P <b style="color:#fff">${sg(pt.dist, 1)} %</b> zur 200-Wochen-Linie (${nf(s.sma200w, 0)}) · CAPE <b style="color:#fff">${sg(pt.z, 1)}σ</b> zum 20J-Ø.<br>`;
+  let txt = `S&amp;P <b style="color:#fff">${sg(pt.dist, 1)} %</b> zur 200-Wochen-Linie (${nf(s.sma200w, 0)}) · TR-CAPE <b style="color:#fff">${sg(pt.z, 1)}σ</b> zum 20J-Ø.<br>`;
   if (st.active && st.signal && st.signalOk !== false) {
     const wks = Math.round((Date.parse(W[W.length - 1].t) - Date.parse(st.signal)) / 6048e5);
     txt += `Strenge Regel erfüllt: Signal seit ${dDE(st.signal)} (200W berührt am ${dDE(st.touch)}). Einstiegsfenster noch etwa ${Math.max(0, g.rule.window - wks)} Wochen.`;
   } else if (st.active) {
     const mn = Math.min(st.capeMin, cur), goal = mn * (1 + g.rule.rise);
-    txt += `200W berührt am ${dDE(st.touch)}. CAPE-Tief seit Berührung <b style="color:#fff">${nf(mn)}</b>, jetzt ${nf(cur)} `
-      + `(${sg((cur / mn - 1) * 100, 1)} %). 100 bei CAPE <b style="color:#fff">${nf(goal)}</b> (+${g.rule.rise * 100} %).`;
+    txt += `200W berührt am ${dDE(st.touch)}. TR-CAPE-Tief seit Berührung <b style="color:#fff">${nf(mn)}</b>, jetzt ${nf(cur)} `
+      + `(${sg((cur / mn - 1) * 100, 1)} %). 100 bei TR-CAPE <b style="color:#fff">${nf(goal)}</b> (+${g.rule.rise * 100} %).`;
   } else {
-    txt += v >= 50 ? 'Über 50 nur, weil sich das CAPE vom Tief der letzten 6 Monate erholt.' : 'Unter 50: teurer als üblich und/oder weit über der 200-Wochen-Linie.';
+    txt += v >= 50 ? 'Über 50 nur, weil sich das TR-CAPE vom Tief der letzten 6 Monate erholt.' : 'Unter 50: teurer als üblich und/oder weit über der 200-Wochen-Linie.';
   }
   $('sigSub').innerHTML = txt;
-  const z = D.cape.windows['20'].z;
-  $('sigWarn').textContent = st.active && st.signal && st.signalOk === false ? `Strenge Regel erfüllt, aber CAPE ${sg(z)}σ über dem 20J-Ø – daher kein 100er-Signal.` : v >= 100 && z > 1 ? `⚠ CAPE ${sg(z)}σ über dem 20J-Ø – Signale bei teurem CAPE waren historisch schwächer (z. B. 2001).` : '';
+  const z = pt.z != null ? pt.z : D.cape.windows['20'].z;
+  $('sigWarn').textContent = st.active && st.signal && st.signalOk === false ? `Strenge Regel erfüllt, aber TR-CAPE ${sg(z)}σ über dem 20J-Ø – daher kein 100er-Signal.` : v >= 100 && z > 1 ? `⚠ TR-CAPE ${sg(z)}σ über dem 20J-Ø – Signale bei teurem CAPE waren historisch schwächer (z. B. 2001).` : '';
 
   // Verlauf
   const all = W.map((w, i) => g.score[i] == null ? { time: w.t } : { time: w.t, value: g.score[i] });
@@ -340,12 +358,12 @@ function drawSignal(keep) {
   if (g.bands) $('bandTbl').innerHTML = head('Score')
     + g.bands.map(b => `<tr class="${b.lo === 100 ? 'hl' : ''}"${v != null && ((v >= b.lo && v < b.hi) || (b.lo === 100 && v >= 100)) ? ' style="background:#2A2E38"' : ''}><td>${b.lo === 100 ? '100' : b.lo + '–' + (b.hi - 1)}</td><td>${nf(b.share, 1)}</td>${cells(b)}</tr>`).join('');
   const yr = k => H[k] ? H[k].slice(0, 4) : '';
-  $('horizonNote').textContent = `1 J. = Rendite im ersten Jahr, 10/20/30 J. = Ø Rendite pro Jahr, min 10 J. = schlechtester Fall über 10 Jahre pro Jahr. Lange Zeiträume gibt es nur für Einstiege, die weit genug zurückliegen: 10 J. bis ${yr('10')}, 20 J. bis ${yr('20')}, 30 J. bis ${yr('30')}. Jüngere Fälle (z. B. 2020, 2022) zählen dort noch nicht mit. Nur Kursrendite ohne Dividenden.`;
+  $('horizonNote').textContent = `1 J. = Rendite im ersten Jahr, 10/20/30 J. = Ø Rendite pro Jahr, min 10 J. = schlechtester Fall über 10 Jahre pro Jahr. Lange Zeiträume gibt es nur für Einstiege, die weit genug zurückliegen: 10 J. bis ${yr('10')}, 20 J. bis ${yr('20')}, 30 J. bis ${yr('30')}. Jüngere Fälle (z. B. 2020, 2022) zählen dort noch nicht mit. Alle Renditen real (nach US-Inflation) inkl. reinvestierter Dividenden.`;
   $('sigListSum').textContent = `Strenge Regel – ${g.signals.filter(x => x.ok !== false).length} × Score 100, ${g.signals.filter(x => x.ok === false).length} × zu teuer, seit ${W.find((w, i) => g.score[i] != null).t.slice(0, 4)}`;
-  $('sigTbl').innerHTML = '<tr><th>Signal</th><th>CAPE σ</th><th>1 J.</th><th>10 J.</th><th>20 J.</th><th>30 J.</th></tr>'
+  $('sigTbl').innerHTML = '<tr><th>Signal</th><th>TR-CAPE σ</th><th>1 J.</th><th>10 J.</th><th>20 J.</th><th>30 J.</th></tr>'
     + g.signals.slice().reverse().map(x => `<tr style="${x.ok === false ? 'opacity:.45' : ''}"><td>${dDE(x.t)}</td><td style="color:${x.ok === false ? C.orange : '#fff'}">${x.z == null ? '–' : sg(x.z, 1)}</td>`
       + ['r1', 'r10', 'r20', 'r30'].map(k => `<td class="${x[k] == null ? '' : x[k] >= 0 ? 'up' : 'down'}">${x[k] == null ? '–' : sg(x[k], 1)}</td>`).join('') + '</tr>').join('')
-    + '<tr><td colspan="6" style="color:#8A90A0;white-space:normal;border-top:0;padding-top:8px">Blass = Regel erfüllt, aber CAPE über +1σ zum 20J-Ø → zählt nicht als 100 (z. B. 2001).</td></tr>';
+    + '<tr><td colspan="6" style="color:#8A90A0;white-space:normal;border-top:0;padding-top:8px">Blass = Regel erfüllt, aber TR-CAPE über +1σ zum 20J-Ø → zählt nicht als 100 (z. B. 2001).</td></tr>';
   if (keep) return;
   const ts = sigChart.timeScale();
   if (sigRange === 'all') ts.fitContent();
@@ -370,12 +388,16 @@ function withLive(d, q) {
   const sameWeek = monday(q.date) === monday(lastW.t);
   const prevWC = (sameWeek ? W.slice(-200, -1) : W.slice(-199)).map(w => w.c);
   const w200 = prevWC.length === 199 ? avg([...prevWC, p]) : null;
-  if (sameWeek) Object.assign(lastW, { h: Math.max(lastW.h, q.high, p), l: Math.min(lastW.l, q.low, p), c: p, s200, s50, w200 });
-  else W.push({ t: q.date, o: q.open || p, h: Math.max(q.high, p), l: Math.min(q.low, p), c: p, s200, s50, w200 });
+  const trNew = lastW.tr != null ? (sameWeek ? lastW.tr * p / lastW.c : lastW.tr * p / lastW.c) : null;
+  if (sameWeek) Object.assign(lastW, { tr: trNew, h: Math.max(lastW.h, q.high, p), l: Math.min(lastW.l, q.low, p), c: p, s200, s50, w200 });
+  else W.push({ tr: trNew, t: q.date, o: q.open || p, h: Math.max(q.high, p), l: Math.min(q.low, p), c: p, s200, s50, w200 });
   Object.assign(s, { close: p, change1d: (p / prevClose - 1) * 100, sma200: s200, sma50: s50, sma200w: w200,
     vs200: (p / s200 - 1) * 100, vs50: (p / s50 - 1) * 100, vs200w: w200 ? (p / w200 - 1) * 100 : s.vs200w });
   // CAPE
   const cur = rd(p / c.e10);
+  const curTR = g0 => g0 && g0.rule && g0.rule.e10tr ? p / g0.rule.e10tr : cur;
+  const ctr = curTR(d.signal);
+  if (c.tr) { c.tr.current = rd(ctr); c.tr.z = rd((ctr - c.tr.m20) / c.tr.s20); }
   const dl = c.daily, n = dl.t.length - 1;
   dl.t.push(q.date); dl.v.push(cur);
   for (const y of [5, 10, 20]) { dl['m' + y].push(dl['m' + y][n]); dl['s' + y].push(dl['s' + y][n]); }
@@ -394,26 +416,26 @@ function withLive(d, q) {
   const g = d.signal;
   if (g && w200) {
     const st = g.state; let sc;
-    const zNow = (cur - g.rule.m20) / g.rule.s20;
+    const zNow = (ctr - g.rule.m20) / g.rule.s20;
     if (st.active && st.signal) sc = st.signalOk === false ? 0 : 100;
-    else if (st.active) { st.capeMin = Math.min(st.capeMin, cur); sc = 50 + 50 * Math.min(1, Math.max(0, cur / st.capeMin - 1) / g.rule.rise); if (sc >= 100) { sc = 100; st.signal = q.date; st.signalOk = zNow <= (g.rule.zMax100 ?? 99); } }
-    else if (st.run >= 26 && st.weeksSinceTouch > 52 && Math.min(q.low, p) <= w200) { sc = 50; Object.assign(st, { active: true, touch: q.date, capeMin: cur, signal: null }); }
+    else if (st.active) { st.capeMin = Math.min(st.capeMin, ctr); sc = 50 + 50 * Math.min(1, Math.max(0, ctr / st.capeMin - 1) / g.rule.rise); if (sc >= 100) { sc = 100; st.signal = q.date; st.signalOk = zNow <= (g.rule.zMax100 ?? 99); } }
+    else if (st.run >= 26 && st.weeksSinceTouch > 52 && Math.min(q.low, p) <= w200) { sc = 50; Object.assign(st, { active: true, touch: q.date, capeMin: ctr, signal: null }); }
     else sc = 50 * Math.min(1, Math.max(0, 1 - (p / w200 - 1) / g.rule.dist));
     // kombinierter Score (wie in der täglichen Berechnung)
     const R = g.rule;
     if (R.cSd) {
-      const dist = (p / w200 - 1) * 100, z = (cur - R.m20) / R.s20;
+      const dist = (p / w200 - 1) * 100, z = (ctr - R.m20) / R.s20;
       // CAPE-Teil wie in der täglichen Berechnung: über dem Ø linear, darunter S-Kurve (ab ca. -1σ voll)
       const zf = R.capeWidth == null || z >= 0 ? z : -1 / (1 + Math.exp(-((-z) - R.capeMid) / R.capeWidth));
       const comp = -(R.wDist * (dist - R.dMu) / R.dSd + R.wCape * (zf - R.zMu) / R.zSd);
       const raw = 50 + R.spread * comp / R.cSd;
       const prev = (sameWeek ? R.capeLast.slice(0, -1) : R.capeLast.slice(1)).filter(x => x != null);
-      const mn = Math.min(...prev, cur);
-      const turn = Math.min(1, Math.max(0, (cur / mn - 1) / R.rise));
+      const mn = Math.min(...prev, ctr);
+      const turn = Math.min(1, Math.max(0, (ctr / mn - 1) / R.rise));
       let v = raw > 50 ? 50 + (raw - 50) * turn : raw;
       v = Math.min(R.cap, Math.max(0, v));
       if (sc >= 100 && st.signalOk !== false) v = 100;
-      g.parts = { dist, z };
+      g.parts = { dist, z, tr: rd(ctr) };
       sc = v;
     }
     sc = Math.round(sc); g.current = sc;
