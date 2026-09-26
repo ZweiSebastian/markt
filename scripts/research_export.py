@@ -5,7 +5,8 @@ import numpy as np, pandas as pd, requests
 sys.path.insert(0, "scripts")
 import update as u
 
-import traceback
+import os, traceback
+os.makedirs("research", exist_ok=True)
 try:
     page = requests.get("https://shillerdata.com/", headers=u.UA, timeout=60).text.replace("&amp;", "&")
     urls = [("https:" + x if x.startswith("//") else x) for x in re.findall(r'(?:https?:)?//[^"\'\s<>()]+?ie_data\.xls(?:\?[^"\'\s<>()]*)?', page)] + [u.FALLBACK_XLS]
