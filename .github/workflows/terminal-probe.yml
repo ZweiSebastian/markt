@@ -1,0 +1,11 @@
+name: terminal-probe
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['terminal/probe.py', '.github/workflows/terminal-probe.yml']
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q requests && python terminal/probe.py
