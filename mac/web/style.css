@@ -221,3 +221,10 @@ table.pil td:first-child, table.comp td:first-child { white-space: normal; }
 .pbar b { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
 .pbar i { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--mut); }
 table.t tr.hl td { background: var(--panel2); color: var(--txt); font-weight: 600; }
+.riskline { margin-top: 14px; font-size: 12px; }
+.riskline .rk { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 4px; font-size: 13px; color: var(--sec); }
+.riskline .rk b { color: var(--txt); font-family: var(--mono); }
+.anasum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 0 4px; }
+.anasum > div { background: var(--panel2); border-radius: 10px; padding: 10px 12px; }
+table.ana td, table.ana th { padding: 5px 6px; }
+i.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
