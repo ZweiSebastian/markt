@@ -129,7 +129,10 @@ td canvas.sp { width: 90px; height: 22px; vertical-align: middle; }
 .mx { overflow: auto; }
 .mx table { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
 .mx th { color: var(--sec); font-weight: 500; white-space: nowrap; padding: 2px 6px; }
-.mx th.c { writing-mode: vertical-rl; transform: rotate(180deg); text-align: left; height: 112px; padding: 4px 0; }
+.mx th.c { padding: 0; vertical-align: bottom; }
+/* Spaltenköpfe gedreht – per transform statt writing-mode, damit es in Safari/WKWebView gleich aussieht */
+.mx th.c .vh { position: relative; width: 30px; height: 116px; }
+.mx th.c .vh span { position: absolute; left: 50%; bottom: 4px; transform-origin: left bottom; transform: rotate(-90deg) translateY(50%); white-space: nowrap; text-align: left; }
 .mx th.r { text-align: right; }
 .mx td { width: 30px; height: 26px; text-align: center; border-radius: 4px; font-family: var(--mono); font-size: 10.5px; cursor: pointer; color: var(--txt); }
 .mx td:hover { outline: 2px solid var(--txt); }
