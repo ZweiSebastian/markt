@@ -9,6 +9,9 @@ on:
       - 'README.md'
       - 'research/**'
       - '.github/workflows/research.yml'
+      - 'terminal/**'
+      - 'mac/**'
+      - '.github/workflows/terminal-*.yml'
   workflow_dispatch:
 
 permissions:
