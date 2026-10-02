@@ -255,15 +255,30 @@ def yahoo():
         except Exception as e:  # noqa
             note("yahoo " + t, False, e)
         time.sleep(1)
+    # Reihen ohne brauchbare Historie (neu oder zu kurz) einzeln komplett laden – Krypto u. a. mögen kein Startdatum 1970
+    for sid, t, name, g, u, k in YAHOO:
+        o = prev_series(sid)
+        if t in got and (full or o is None or len(o) < 300) and len(got[t]) < 300:
+            try:
+                h = yf.Ticker(t).history(period="max", interval="1d", auto_adjust=True)
+                if len(h) > len(got[t]):
+                    got[t] = h["Close"]
+                    if not full:
+                        note("yahoo " + t, True, f"Historie nachgeladen ({len(h)})")
+            except Exception as e:  # noqa
+                note("yahoo max " + t, False, e)
+            time.sleep(0.8)
     for sid, t, name, g, u, k in YAHOO:
         old = prev_series(sid)
+        if old is not None and len(old) < 300:
+            old = None
         if t in got:
             s = got[t]
             s.index = pd.to_datetime(s.index)
             if s.index.tz is not None:
                 s.index = s.index.tz_localize(None)
             s.index = s.index.normalize()
-            if not full and old is not None:
+            if not full and old is not None and len(s) < 300:
                 # Kursanpassungen (Dividenden/Splits) an der Nahtstelle ausgleichen
                 ov = s.index.intersection(old.index)
                 if len(ov):
