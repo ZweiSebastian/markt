@@ -29,7 +29,19 @@ import pandas as pd
 WEIGHTS = {"bewertung": 0.20, "trend": 0.20, "breite": 0.10, "konjunktur": 0.20, "finanzen": 0.15, "stimmung": 0.15}
 PILLAR_NAMES = {"bewertung": "Bewertung", "trend": "Trend", "breite": "Marktbreite", "konjunktur": "Konjunktur",
                 "finanzen": "Finanzbedingungen", "stimmung": "Stimmung (konträr)"}
-TARGETS = {"world": ("msci", "MSCI World"), "spx": ("spx", "S&P 500")}
+# Zielindizes: (Reihe, Name, Region). Makro-Säulen sind US-lastig und für alle gleich; Trend, Überdehnung und
+# Abstand vom Hoch werden je Index berechnet.
+TARGETS = {
+    "world": ("msci", "MSCI World", "Welt"),
+    "world_eur": ("msci_eur", "MSCI World in Euro", "Welt"),
+    "spx": ("spx", "S&P 500", "USA"),
+    "ndx": ("ndx", "Nasdaq 100", "USA"),
+    "rut": ("rut", "Russell 2000", "USA"),
+    "sx5e": ("sx5e", "Euro Stoxx 50", "Europa"),
+    "dax": ("dax", "DAX", "Europa"),
+    "nikkei": ("nikkei", "Nikkei 225", "Japan"),
+    "em": ("em", "Schwellenländer-ETF", "Schwellenländer"),
+}
 BANDS = [(0, 35, "unter 35"), (35, 45, "35–45"), (45, 55, "45–55"), (55, 65, "55–65"), (65, 101, "ab 65")]
 CRASH = 0.15          # „größerer Rückgang“ für Wahrscheinlichkeiten: −15 % innerhalb von 12 Monaten
 EPISODE = 0.20        # „großer Einbruch“ für die Liste: −20 % vom Hoch (Monatsschluss)
@@ -193,7 +205,7 @@ def run(ser, markt, now):
     add("aaii", "stimmung", "Anlegerumfrage AAII (Bullen − Bären)", interp(aaii, [-20, 7, 35], [0.8, 0.0, -0.6]), aaii, lambda v: f"{v:+.0f} Pp.")
 
     targets = {}
-    for key, (sid, tname) in TARGETS.items():
+    for key, (sid, tname, region) in TARGETS.items():
         P = R(monthly(sid), 0)
         if key == "spx":   # vor den Tageskursen: Shiller-Monatsdurchschnitte (skaliert)
             sm = R(monthly("spx_m"), 0)
@@ -201,7 +213,7 @@ def run(ser, markt, now):
             if f0 is not None and pd.notna(sm.get(f0)):
                 sm = sm * (P[f0] / sm[f0])
                 P = P.where(P.notna() | (P.index > f0), sm)
-        if P.notna().sum() < 120:
+        if P.notna().sum() < 96:
             continue
         comp, m2 = dict(comp_common), dict(meta)
         sma10 = P.rolling(10, min_periods=10).mean()
@@ -451,7 +463,7 @@ def run(ser, markt, now):
         risk = {"band": None if not cb_now else cb_now["crash12"], "analog": ana["crash12"], "base": ana["crash_base"]}
         hist_idx = score.dropna().index
         targets[key] = {
-            "name": tname,
+            "name": tname, "region": region, "sid": sid,
             "now": {"score": None if now_score is None else round(now_score), "month": str(last_i), "label": lab[0],
                     "cls": lab[1], "action": lab[2], "pillars": pil_now, "text": sent, "risk": risk},
             "hist": {"months": [str(p) for p in hist_idx], "score": score[hist_idx].tolist(),
@@ -464,7 +476,7 @@ def run(ser, markt, now):
 
     # ---------- Sebas eigene Regel (200-Wochen-Linie + CAPE-Wende)
     rule = {}
-    for key, sid in (("spx", "spx"), ("world", "msci")):
+    for key, (sid, _n, _r) in TARGETS.items():
         s = ser(sid)
         if s is None:
             continue
