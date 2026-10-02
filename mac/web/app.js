@@ -684,16 +684,26 @@ function compBar(v) { // -1..+1
 function secEinschaetzung(m) {
   const M = DATA.model;
   head(m, 'Einschätzung', 'Alle Daten zusammen gelesen: ein Regelmodell aus sechs Säulen mit 25 Komponenten, die ähnlichsten Momente der Vergangenheit und was danach kam.');
+  if (M && M.targets && !M.targets[TGT]) TGT = 'world';
   if (!M || !M.targets || !M.targets[TGT]) { m.insertAdjacentHTML('beforeend', '<div class="card"><div class="note">Das Modell ist noch nicht berechnet – die nächste Datenaktualisierung liefert es.</div></div>'); return; }
   const T = M.targets[TGT], N = T.now;
-  const ctl = document.createElement('div'); ctl.className = 'ctl';
-  ctl.innerHTML = `<span class="seg" id="tgt">${Object.entries(M.targets).map(([k, t]) => `<button data-t="${k}" class="${k === TGT ? 'on' : ''}">${esc(t.name)}</button>`).join('')}</span>
-    <span class="mut" style="font-size:12px">Stand ${N.month} · Score monatlich, aktueller Monat mit den neuesten Werten</span>`;
-  ctl.querySelector('#tgt').onclick = e => { const b = e.target.closest('button'); if (!b) return; TGT = b.dataset.t; store('tgt', TGT); renderSection(); };
-  m.appendChild(ctl);
+  // Übersicht aller Indizes – zugleich Auswahl
+  const ov = document.createElement('div'); ov.className = 'card full';
+  const yrs = t => { const a = +t.since.slice(0, 4), b = +t.now.month.slice(0, 4); return b - a; };
+  ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes im Überblick</div><div class="sub">Klick auf eine Zeile zeigt die Einschätzung im Detail. Stand ${N.month} – monatliches Modell mit den neuesten Tageswerten.</div></div></div>
+    <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Region</th><th>Score</th><th>Lage</th><th>Risiko*<br>ähnl. Score</th><th>Risiko*<br>Analogien</th><th>Risiko*<br>normal</th><th>Trend</th><th>Daten</th></tr>
+    ${Object.entries(M.targets).map(([k, t]) => { const tr = (t.now.pillars.find(p => p.id === 'trend') || {}).score; const y = yrs(t);
+      return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b>${t.now.score}</b></td>
+      <td style="font-family:inherit"><span class="badge ${t.now.cls === 'crit' ? 'crit' : t.now.cls}">${esc(t.now.label)}</span></td>
+      <td>${riskCell(t.now.risk ? t.now.risk.band : null)}</td><td>${riskCell(t.now.risk ? t.now.risk.analog : null)}</td><td class="mut">${t.now.risk ? t.now.risk.base + ' %' : '–'}</td>
+      <td>${pillarBar(tr)}</td><td style="font-family:inherit" class="${y < 25 ? '' : 'mut'}">seit ${t.since.slice(0, 4)}${y < 25 ? ' <span style="color:var(--warn)" title="Kurzer Rückblick – Prozentwerte beruhen auf wenigen Fällen">⚠</span>' : ''}</td></tr>`; }).join('')}</table>
+    <div class="note">Konjunktur, Zinsen, Kredit, Bewertung (Shiller-CAPE) und Stimmung sind US-Daten und für alle Indizes gleich – die USA prägen die Weltbörsen am stärksten. Trend, Überdehnung und Abstand vom Hoch werden je Index berechnet. ⚠ = weniger als 25 Jahre Daten, die Prozentwerte beruhen dann auf wenigen Fällen. * Risiko = wie oft es historisch innerhalb von 12 Monaten um mindestens 15 % nach unten ging: bei ähnlichem Score, in den ähnlichsten Momenten und im Schnitt aller Monate. Der MSCI World in Euro enthält Dividenden (Nettoindex) – so, wie ihn ein Euro-Anleger mit einem thesaurierenden ETF erlebt.</div>`;
+  ov.querySelectorAll('tr.row').forEach(r => r.onclick = () => { TGT = r.dataset.t; store('tgt', TGT); renderSection(); setTimeout(() => { const h = document.getElementById('hero'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); });
+  m.appendChild(ov);
+  sect(m, esc(T.name) + ' im Detail');
 
   // Kopf: Score, Ampel, Handlung, Säulen, Klartext
-  const hero = document.createElement('div'); hero.className = 'card hero';
+  const hero = document.createElement('div'); hero.className = 'card hero'; hero.id = 'hero';
   hero.innerHTML = `<div class="hgrid">
     <div>
       <div class="lbl">Gesamtscore ${esc(T.name)}</div>

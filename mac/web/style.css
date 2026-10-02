@@ -228,3 +228,6 @@ table.t tr.hl td { background: var(--panel2); color: var(--txt); font-weight: 60
 .anasum > div { background: var(--panel2); border-radius: 10px; padding: 10px 12px; }
 table.ana td, table.ana th { padding: 5px 6px; }
 i.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+
+table.ov .pbar { width: 80px; }
+table.ov th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
