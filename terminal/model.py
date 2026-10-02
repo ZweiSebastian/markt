@@ -208,7 +208,7 @@ def run(ser, markt, now):
             })
         def sp(a, b):
             x = pd.concat([a, b], axis=1).dropna()
-            return None if len(x) < 60 else round(float(x.iloc[:, 0].corr(x.iloc[:, 1], method="spearman")), 2)
+            return None if len(x) < 60 else round(float(x.iloc[:, 0].rank().corr(x.iloc[:, 1].rank())), 2)   # Spearman ohne scipy
         rank = {"score_f12": sp(df.s, df.f12), "score_f36": sp(df.s, df.f36), "score_f60": sp(df.s, df.f60),
                 "pillars": {p: {"f12": sp(Pl[p].reindex(df.index), df.f12), "f36": sp(Pl[p].reindex(df.index), df.f36)} for p in WEIGHTS}}
         base = {"f12": round(float(df.f12.dropna().median() * 100), 1), "pos12": round(float((df.f12.dropna() > 0).mean() * 100), 0),

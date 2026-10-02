@@ -170,7 +170,7 @@ def ser(sid):
 
 
 # ------------------------------------------------------------------ vorheriger Lauf (Cache)
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 cache_meta = {}
 prev = {}
 try:
@@ -475,10 +475,13 @@ slow("claims", claims, ["claims"])
 def aaii():
     r = get("https://www.aaii.com/files/surveys/sentiment.xls", 60)
     x = pd.read_excel(io.BytesIO(r.content), sheet_name=0, header=None, engine="xlrd")
-    hdr = next(i for i in range(20) if any("bull" in str(v).lower() for v in x.iloc[i]) and any("bear" in str(v).lower() for v in x.iloc[i]))
+    rows = [i for i in range(min(60, len(x))) if any("bull" in str(v).lower() for v in x.iloc[i]) and any("bear" in str(v).lower() for v in x.iloc[i])]
+    if not rows:
+        raise RuntimeError("Kopf nicht gefunden: " + " | ".join(" ".join(str(v)[:12] for v in x.iloc[i, :8]) for i in range(8)))
+    hdr = rows[0]
     cols = [str(v).strip().lower() for v in x.iloc[hdr]]
-    ib = next(i for i, c in enumerate(cols) if c.startswith("bull"))
-    ir = next(i for i, c in enumerate(cols) if c.startswith("bear"))
+    ib = next(i for i, c in enumerate(cols) if "bull" in c)
+    ir = next(i for i, c in enumerate(cols) if "bear" in c)
     d = x.iloc[hdr + 1:]
     dt = pd.to_datetime(d.iloc[:, 0], errors="coerce")
     bull = pd.to_numeric(d.iloc[:, ib], errors="coerce")
