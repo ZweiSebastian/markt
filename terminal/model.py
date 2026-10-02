@@ -38,17 +38,17 @@ def interp(x, xs, ys):
 
 
 def label(score):
+    """Grenzen und Texte folgen dem Rückblick: Unter 35 kamen die großen Verluste, darüber
+    unterschieden sich die Renditen kaum – der Score taugt vor allem als Risiko-Ampel."""
     if score is None or (isinstance(score, float) and math.isnan(score)):
         return ("–", "neutral", "Zu wenig Daten")
     if score >= 65:
-        return ("Günstige Lage", "good", "Kaufen – auch größere Beträge")
-    if score >= 55:
-        return ("Eher günstig", "good", "Kaufen")
+        return ("Rückenwind", "good", "Kaufen – auch größere Beträge")
     if score >= 45:
-        return ("Neutral", "neutral", "Normal investieren (z. B. Sparplan)")
+        return ("Neutral", "neutral", "Normal investieren (Sparplan oder in Raten)")
     if score >= 35:
-        return ("Eher ungünstig", "warn", "Gestaffelt investieren, keine großen Einmalbeträge")
-    return ("Ungünstige Lage", "crit", "Abwarten oder nur kleine Raten")
+        return ("Gegenwind", "warn", "Nur in Raten investieren, keine großen Einmalbeträge")
+    return ("Gefahrenzone", "crit", "Abwarten – historisch folgten hier meist Verluste")
 
 
 def run(ser, markt, now):
@@ -75,7 +75,8 @@ def run(ser, markt, now):
         if not isinstance(s.index, pd.PeriodIndex):
             s.index = pd.PeriodIndex(s.index, freq="M")
         s = s[~s.index.duplicated(keep="last")]
-        return s.reindex(idx).ffill(limit=ffill)
+        s = s.reindex(idx)
+        return s.ffill(limit=ffill) if ffill else s
 
     # ---------- gemeinsame Eingänge (monatlich)
     cape = R(mlast("cape_long"), 2)

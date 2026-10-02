@@ -199,3 +199,23 @@ svg text { font-family: -apple-system, system-ui, sans-serif; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--line2); border-radius: 5px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- Einschätzung */
+.hero .hgrid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.1fr); gap: 28px; align-items: start; }
+.lbl { color: var(--sec); font-size: 12px; }
+.hscore { display: flex; align-items: baseline; gap: 8px; margin: 2px 0 10px; }
+.hscore .big { font-size: 46px; line-height: 1; }
+.hscore .badge { align-self: center; margin-left: 6px; }
+.gauge { position: relative; height: 10px; border-radius: 5px; overflow: hidden; background: var(--bg); }
+.gauge div { position: absolute; top: 0; bottom: 0; opacity: .85; }
+.gauge div + div { border-left: 2px solid var(--panel); }
+.gauge i { position: absolute; top: -4px; width: 4px; height: 18px; background: var(--txt); border-radius: 2px; box-shadow: 0 0 0 2px var(--panel); }
+.gscale { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--mut); margin-top: 3px; font-family: var(--mono); }
+.action { margin-top: 14px; font-size: 14px; }
+.action b { color: var(--txt); }
+table.pil td, table.comp td { padding: 6px 6px; }
+table.pil td:first-child, table.comp td:first-child { white-space: normal; }
+.pbar { position: relative; display: inline-block; width: 150px; height: 8px; background: var(--bg); border-radius: 4px; vertical-align: middle; }
+.pbar b { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.pbar i { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--mut); }
+table.t tr.hl td { background: var(--panel2); color: var(--txt); font-weight: 600; }

@@ -389,7 +389,12 @@ slow("fedfunds", fedfunds, ["effr"])
 def ecb_csv(key, start="1990-01-01"):
     url = f"https://data-api.ecb.europa.eu/service/data/{key}?startPeriod={start}&format=csvdata"
     d = pd.read_csv(io.StringIO(get(url, 60).text))
-    return pd.Series(d["OBS_VALUE"].values, index=pd.to_datetime(d["TIME_PERIOD"]))
+    tp = d["TIME_PERIOD"].astype(str)
+    if tp.str.contains("-W").any():   # Wochenangaben wie 1999-W01 -> Freitag der Woche
+        dt = pd.to_datetime(tp + "-5", format="%G-W%V-%u")
+    else:
+        dt = pd.to_datetime(tp)
+    return pd.Series(d["OBS_VALUE"].values, index=dt)
 
 
 def ecb():
@@ -470,13 +475,17 @@ slow("claims", claims, ["claims"])
 def aaii():
     r = get("https://www.aaii.com/files/surveys/sentiment.xls", 60)
     x = pd.read_excel(io.BytesIO(r.content), sheet_name=0, header=None, engine="xlrd")
-    hdr = next(i for i in range(15) if any(str(v).strip().lower() == "bullish" for v in x.iloc[i]))
+    hdr = next(i for i in range(20) if any("bull" in str(v).lower() for v in x.iloc[i]) and any("bear" in str(v).lower() for v in x.iloc[i]))
     cols = [str(v).strip().lower() for v in x.iloc[hdr]]
+    ib = next(i for i, c in enumerate(cols) if c.startswith("bull"))
+    ir = next(i for i, c in enumerate(cols) if c.startswith("bear"))
     d = x.iloc[hdr + 1:]
     dt = pd.to_datetime(d.iloc[:, 0], errors="coerce")
-    bull = pd.to_numeric(d.iloc[:, cols.index("bullish")], errors="coerce")
-    bear = pd.to_numeric(d.iloc[:, cols.index("bearish")], errors="coerce")
-    s = pd.Series(((bull - bear) * 100).values, index=dt).dropna()
+    bull = pd.to_numeric(d.iloc[:, ib], errors="coerce")
+    bear = pd.to_numeric(d.iloc[:, ir], errors="coerce")
+    if bull.dropna().median() < 1.5:   # Anteile 0..1 -> Prozent
+        bull, bear = bull * 100, bear * 100
+    s = pd.Series((bull - bear).values, index=dt).dropna()
     s = s[s.index.notna()]
     put("aaii", s.rolling(4).mean(), "Anlegerstimmung AAII (Bullen − Bären, 4-W.-Ø)", "risiko", "Pp.", "rate", "AAII", "w", 1)
 
