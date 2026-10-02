@@ -10,8 +10,6 @@ on:
       - 'research/**'
       - '.github/workflows/research.yml'
       - 'terminal/**'
-      - '.gitignore'
-      - '.github/workflows/cleanup-releases.yml'
       - 'mac/**'
       - '.github/workflows/terminal-*.yml'
   workflow_dispatch:
