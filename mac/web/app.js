@@ -605,7 +605,8 @@ function secRisiko(m) {
   g.appendChild(chartCard({ ids: ['skew'], title: 'SKEW – Nachfrage nach Crash-Absicherung' }));
   g.appendChild(chartCard({ ids: ['kre', 'xlf'], title: 'Regionalbanken vs. Finanzsektor', norm: true, sub: 'Start = 100 · Regionalbanken reagieren früh auf Kreditstress' }));
   g.appendChild(chartCard({ ids: ['hyg_ief'], title: 'Kreditappetit (HYG/IEF)', sma: 200, sub: 'Steigt, wenn Anleger riskante Unternehmensanleihen Staatsanleihen vorziehen' }));
-  g.appendChild(chartCard({ ids: ['baa_spread'], title: 'Kreditaufschlag Baa − 10J (seit 1953)', sub: 'Was mittelgute Unternehmen mehr zahlen müssen als der Staat. Steigt vor und in Krisen.', minDays: 3653 }));
+  g.appendChild(chartCard({ ids: ['vwehx'], title: 'Hochzinsanleihen (Fonds seit 1978)', sma: 200, sub: 'Fallen riskante Unternehmensanleihen unter ihren Trend, zogen sich Anleger oft schon vor Aktiencrashs aus Risiken zurück' }));
+  if (S.baa_spread) g.appendChild(chartCard({ ids: ['baa_spread'], title: 'Kreditaufschlag Baa − 10J (seit 1953)', sub: 'Was mittelgute Unternehmen mehr zahlen müssen als der Staat. Steigt vor und in Krisen.', minDays: 3653 }));
   g.appendChild(chartCard({ ids: ['breadth'], title: 'Marktbreite (RSP/SPY)', sub: 'Fällt, wenn nur wenige große Aktien den Index tragen' }));
   g.appendChild(chartCard({ ids: ['sect_part'], title: 'US-Sektoren im Aufwärtstrend', ref: 50, refLabel: '50 %', sub: 'Anteil der 11 Sektoren über ihrer 200-Tage-Linie – steigt der Index, während dieser Anteil fällt, tragen immer weniger den Markt' }));
   g.appendChild(chartCard({ ids: ['world_part'], title: 'Weltbörsen im Aufwärtstrend', ref: 50, refLabel: '50 %', sub: 'Anteil von 9 großen Indizes (USA, Europa, Japan, Hongkong, Schwellenländer) über ihrer 200-Tage-Linie' }));
