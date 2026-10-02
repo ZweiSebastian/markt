@@ -377,20 +377,37 @@ def rates():
     put("tbill_m", dbn("FED/H15/RIFSGFSM03_N.M", "1934-01-01"), "US-T-Bill 3M (monatlich)", "intern", "%", "rate", "Fed H.15", "m", 2)
     # Fed Funds täglich (lange Historie)
     put("ff_long", dbn("FED/H15/RIFSPFF_N.B", "1954-07-01"), "Fed Funds (H.15)", "intern", "%", "rate", "Fed H.15", dec=2)
-    # Unternehmensanleihen (Moody's) seit 1919, 10J-Zins monatlich seit 1953
-    baa = dbn("FED/H15/RIMLPBAAR_N.M", "1919-01-01")
-    aaa = dbn("FED/H15/RIMLPAAAR_N.M", "1919-01-01")
-    y10m = dbn("FED/H15/RIFLGFCY10_N.M", "1953-01-01")
-    put("baa", baa, "Unternehmensanleihen Baa (Moody's)", "zinsen", "%", "rate", "Fed H.15 / Moody's", "m", 2)
-    put("y10_m", y10m, "US-Zins 10J (monatlich)", "intern", "%", "rate", "Fed H.15", "m", 2)
-    j = pd.concat([baa, y10m], axis=1, join="inner").dropna()
-    put("baa_spread", j.iloc[:, 0] - j.iloc[:, 1], "Kreditaufschlag Baa − 10J", "risiko", "Pp.", "rate", "Fed H.15 (berechnet)", "m", 2)
-    j = pd.concat([baa, aaa], axis=1, join="inner").dropna()
-    put("baa_aaa", j.iloc[:, 0] - j.iloc[:, 1], "Kreditaufschlag Baa − Aaa", "risiko", "Pp.", "rate", "Fed H.15 (berechnet)", "m", 2)
     note("zinsen", True, ", ".join(f"{k}:{len(v)}" for k, v in hist.items()))
 
 
-slow("zinsen", rates, ["y3m", "y2", "y10", "y30", "real10", "tbill_m", "ff_long", "baa", "y10_m", "baa_spread", "baa_aaa"])
+slow("zinsen", rates, ["y3m", "y2", "y10", "y30", "real10", "tbill_m", "ff_long"])
+
+
+def fred(sid, start="1919-01-01"):
+    last = None
+    for t in (90, 150):
+        try:
+            d = pd.read_csv(io.StringIO(get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={start}", t).text))
+            return pd.Series(pd.to_numeric(d.iloc[:, 1], errors="coerce").values, index=pd.to_datetime(d.iloc[:, 0])).dropna()
+        except Exception as e:  # noqa
+            last = e
+    raise last
+
+
+def credit():
+    # Moody's Baa/Aaa (FRED; die Fed führt sie seit 2016 nicht mehr in H.15) und 10J monatlich
+    baa = fred("BAA")
+    aaa = fred("AAA")
+    y10m = dbn("FED/H15/RIFLGFCY10_N.M", "1953-01-01")
+    put("baa", baa, "Unternehmensanleihen Baa (Moody's)", "zinsen", "%", "rate", "FRED / Moody's", "m", 2)
+    put("y10_m", y10m, "US-Zins 10J (monatlich)", "intern", "%", "rate", "Fed H.15", "m", 2)
+    j = pd.concat([baa, y10m], axis=1, join="inner").dropna()
+    put("baa_spread", j.iloc[:, 0] - j.iloc[:, 1], "Kreditaufschlag Baa − 10J", "risiko", "Pp.", "rate", "FRED/Fed H.15 (berechnet)", "m", 2)
+    j = pd.concat([baa, aaa], axis=1, join="inner").dropna()
+    put("baa_aaa", j.iloc[:, 0] - j.iloc[:, 1], "Kreditaufschlag Baa − Aaa", "risiko", "Pp.", "rate", "FRED (berechnet)", "m", 2)
+
+
+slow("credit", credit, ["baa", "y10_m", "baa_spread", "baa_aaa"])
 if cache_meta.get("zinsen", {}).get("at") != NOW.strftime("%Y-%m-%dT%H:%M:%SZ"):
     try:   # im Cache-Fall die letzten Tage frisch nachziehen
         tr = treasury_year(NOW.year)

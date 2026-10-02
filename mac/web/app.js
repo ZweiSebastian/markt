@@ -682,7 +682,7 @@ function compBar(v) { // -1..+1
 }
 function secEinschaetzung(m) {
   const M = DATA.model;
-  head(m, 'Einschätzung', 'Alle Daten zusammen gelesen: ein Regelmodell aus sechs Säulen mit 26 Komponenten, die ähnlichsten Momente der Vergangenheit und was danach kam.');
+  head(m, 'Einschätzung', 'Alle Daten zusammen gelesen: ein Regelmodell aus sechs Säulen mit 25 Komponenten, die ähnlichsten Momente der Vergangenheit und was danach kam.');
   if (!M || !M.targets || !M.targets[TGT]) { m.insertAdjacentHTML('beforeend', '<div class="card"><div class="note">Das Modell ist noch nicht berechnet – die nächste Datenaktualisierung liefert es.</div></div>'); return; }
   const T = M.targets[TGT], N = T.now;
   const ctl = document.createElement('div'); ctl.className = 'ctl';
