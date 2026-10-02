@@ -10,7 +10,7 @@ Säulen und Gewichte
 - Trend 20 %: Kurs vs. 10-Monats-Linie, 12-Monats-Momentum, Abstand zur 200-Wochen-Linie (je Zielindex)
 - Marktbreite 10 %: Sektoren und Weltbörsen im Aufwärtstrend, gleich- vs. kapitalgewichtet, Nebenwerte vs. Standardwerte
 - Konjunktur 20 %: Sahm-Regel, Zinskurve, OECD-Frühindikator, Erstanträge, Stellenaufbau, Inflationstrend, Ölschock
-- Finanzbedingungen 15 %: Kreditaufschlag Baa (seit 1953), NFCI, HYG/IEF, Fed-Kurs, Hypothekenzins, Dollar
+- Finanzbedingungen 15 %: Kreditaufschlag Baa (wenn FRED erreichbar), Hochzinsfonds seit 1978, NFCI, HYG/IEF, Fed-Kurs, Hypothekenzins, Dollar
 - Stimmung 15 % (konträr): Abstand vom 12-M.-Hoch, VIX, AAII-Umfrage
 
 Zusätzlich:
@@ -113,6 +113,7 @@ def run(ser, markt, now):
     nfci = R(monthly("nfci", "mean"), 2)
     baa_s = R(monthly("baa_spread"), 2)
     hygief = R(monthly("hyg_ief"), 1)
+    hyfund = R(monthly("vwehx"), 1)
     mort = R(monthly("mort30", "mean"), 2)
     vix = R(monthly("vix", "mean"), 1)
     aaii = R(monthly("aaii", "mean"), 2)
@@ -176,6 +177,8 @@ def run(ser, markt, now):
     add("baa", "finanzen", "Kreditaufschlag Baa − 10J", bsc, baa_s, lambda v: f"{v:.2f} Pp. (10-J.-Median {bmed.dropna().iloc[-1]:.2f})")
     add("nfci", "finanzen", "Finanzbedingungen (NFCI)", 0.5 * clip(-nfci / 0.5) + 0.5 * clip(-(nfci - nfci.shift(3)) / 0.2), nfci,
         lambda v: f"{v:+.2f} (unter 0 = lockerer als üblich)")
+    hf = hyfund / hyfund.rolling(10, min_periods=10).mean() - 1
+    add("hyfund", "finanzen", "Hochzinsanleihen im Trend (Fonds seit 1978)", clip(hf / 0.015), hf * 100, lambda v: f"{v:+.1f} % ggü. 10-Monats-Linie")
     hd = hygief / hygief.rolling(10, min_periods=8).mean() - 1
     add("credit", "finanzen", "Kreditappetit (HYG/IEF ggü. 10-M.-Linie)", clip(hd / 0.02), hd * 100, lambda v: f"{v:+.1f} %")
     ffc = ff - ff.shift(12)

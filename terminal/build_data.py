@@ -99,6 +99,7 @@ YAHOO = [
     ("ief", "IEF", "US-Anleihen 7–10J (ETF)", "anleihen", "$", "price"),
     ("hyg", "HYG", "Hochzins-Anleihen (ETF)", "anleihen", "$", "price"),
     ("lqd", "LQD", "Unternehmensanleihen IG (ETF)", "anleihen", "$", "price"),
+    ("vwehx", "VWEHX", "Hochzins-Anleihefonds (Vanguard, seit 1978)", "anleihen", "$", "price"),
     ("tip", "TIP", "Inflationsgeschützte (ETF)", "anleihen", "$", "price"),
     ("wti", "CL=F", "Öl WTI", "rohstoffe", "$/bbl", "price"),
     ("brent", "BZ=F", "Öl Brent", "rohstoffe", "$/bbl", "price"),
@@ -385,7 +386,7 @@ slow("zinsen", rates, ["y3m", "y2", "y10", "y30", "real10", "tbill_m", "ff_long"
 
 def fred(sid, start="1919-01-01"):
     last = None
-    for t in (90, 150):
+    for t in (40,):
         try:
             d = pd.read_csv(io.StringIO(get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={start}", t).text))
             return pd.Series(pd.to_numeric(d.iloc[:, 1], errors="coerce").values, index=pd.to_datetime(d.iloc[:, 0])).dropna()
