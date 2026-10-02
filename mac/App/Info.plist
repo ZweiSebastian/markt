@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Markt Terminal</string>
+  <key>CFBundleDisplayName</key><string>Markt Terminal</string>
+  <key>CFBundleIdentifier</key><string>de.seba.markt.terminal</string>
+  <key>CFBundleExecutable</key><string>MarktTerminal</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0.__BUILD__</string>
+  <key>CFBundleVersion</key><string>__BUILD__</string>
+  <key>CFBundleDevelopmentRegion</key><string>de</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.finance</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSHumanReadableCopyright</key><string>Daten: Yahoo Finance, Federal Reserve, US Treasury, NY Fed, EZB, BLS, Freddie Mac, EIA, R. Shiller</string>
+  <key>NSAppTransportSecurity</key><dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+</dict>
+</plist>

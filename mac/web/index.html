@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markt Terminal</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand"><span class="dot"></span>MARKT TERMINAL</div>
+  <button id="cmdBtn" class="cmd" title="Suchen (⌘K)">
+    <span>Reihe oder Bereich suchen …</span><kbd>⌘K</kbd>
+  </button>
+  <div class="ranges" id="ranges"></div>
+  <div class="status" id="status">lädt …</div>
+  <button class="iconbtn" id="newsToggle" title="Newsspalte ein/aus (⌘N)">News</button>
+</header>
+
+<div id="strip"></div>
+
+<div id="body">
+  <nav id="nav"></nav>
+  <main id="main"></main>
+  <aside id="news">
+    <div class="newshead">
+      <div class="seg" id="newsSeg"></div>
+      <button class="iconbtn small" id="newsReload" title="Neu laden">↻</button>
+    </div>
+    <div class="tags" id="newsTags"></div>
+    <div id="newsList"></div>
+  </aside>
+</div>
+
+<div id="palette" hidden>
+  <div class="pbox">
+    <input id="pin" placeholder="z. B. Gold, 10J, Kupfer, Zusammenhänge …" autocomplete="off" spellcheck="false">
+    <div id="plist"></div>
+    <div class="phint">↑↓ wählen · ⏎ öffnen · Reihen öffnen sich im Vergleich · Esc schließen</div>
+  </div>
+</div>
+
+<div id="tip" hidden></div>
+
+<script src="lwc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
