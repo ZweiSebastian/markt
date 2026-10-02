@@ -25,6 +25,9 @@ function openURL(u) {
   else window.open(u, '_blank');
 }
 function store(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* egal */ } }
+// große Daten (Datenbasis) in der App als Datei, im Browser in localStorage
+async function bigSave(k, v) { if (NATIVE) { try { await window.webkit.messageHandlers.native.postMessage({ op: 'save', key: k, text: v }); } catch (e) { /* */ } } else store(k, v); }
+async function bigLoad(k) { if (NATIVE) { try { return await window.webkit.messageHandlers.native.postMessage({ op: 'load', key: k }); } catch (e) { return null; } } return load(k); }
 function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 
 // ------------------------------------------------------------------ Konfiguration
@@ -104,14 +107,14 @@ function decode(d) {
 
 async function loadData(first) {
   if (first) {
-    const c = load('data');
+    const c = await bigLoad('data');
     if (c) { try { DATA = JSON.parse(c); decode(DATA); } catch (e) { DATA = null; } }
   }
   try {
     const txt = await nfetch(DATA_URL + '?t=' + Date.now(), 40);
     const d = JSON.parse(txt);
     if (!DATA || d.updated !== DATA.updated) {
-      DATA = d; decode(d); store('data', txt);
+      DATA = d; decode(d); bigSave('data', txt);
       return true;
     }
   } catch (e) {
@@ -862,9 +865,10 @@ async function loadNews() {
   let items = [];
   if (feeds.length) {
     const res = await Promise.allSettled(feeds.map(f => nfetch(f.u, 20).then(x => parseFeed(x, f.s, f.c))));
-    res.forEach(r => { if (r.status === 'fulfilled') items = items.concat(r.value); });
+    // je Quelle begrenzen, damit kein Ticker-Dienst die Liste flutet
+    res.forEach((r, i) => { if (r.status === 'fulfilled') items = items.concat(r.value.slice(0, /investing/i.test(feeds[i].s) ? 8 : 20)); });
   }
-  if (!items.length && DATA && DATA.news) items = DATA.news.slice();
+  if (!items.length && DATA && DATA.news) { const per = {}; items = DATA.news.filter(n => (per[n.s] = (per[n.s] || 0) + 1) <= (/investing/i.test(n.s) ? 8 : 20)); }
   const seen = new Set(); items = items.filter(n => { const k = n.t.toLowerCase().slice(0, 80); if (seen.has(k)) return false; seen.add(k); return true; });
   items.sort((x, y) => (y.d || '').localeCompare(x.d || ''));
   items.forEach(n => n.tags = tagsOf(n.t));
