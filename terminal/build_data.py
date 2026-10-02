@@ -117,15 +117,18 @@ def put(sid, s, name, group, unit, kind, src, freq="d", dec=None):
         m = float(s.abs().median()) or 1.0
         dec = max(0, min(6, 4 - int(math.floor(math.log10(m)))))
     days = ((s.index - pd.Timestamp("1970-01-01")) // pd.Timedelta(days=1)).astype(int).tolist()
+    # Tage als Abstände speichern (erster Wert absolut) – spart ~60 % Größe
+    dt = [days[0]] + [b - a for a, b in zip(days, days[1:])]
     series[sid] = {"name": name, "g": group, "u": unit, "k": kind, "src": src, "f": freq,
-                   "t": days, "v": [round(float(x), dec) for x in s.values]}
+                   "dt": dt, "v": [round(float(x), dec) for x in s.values]}
 
 
 def ser(sid):
     d = series.get(sid)
     if not d:
         return None
-    return pd.Series(d["v"], index=pd.Timestamp("1970-01-01") + pd.to_timedelta(d["t"], unit="D"))
+    days = d["t"] if "t" in d else np.cumsum(d["dt"]).tolist()
+    return pd.Series(d["v"], index=pd.Timestamp("1970-01-01") + pd.to_timedelta(days, unit="D"))
 
 
 # ------------------------------------------------------------------ vorheriger Lauf (Cache)
@@ -350,7 +353,8 @@ def bls():
     out = {}
     for s in j["Results"]["series"]:
         rows = [(pd.Timestamp(int(r["year"]), int(r["period"][1:]), 1), float(r["value"]))
-                for r in s["data"] if r["period"].startswith("M") and r["period"] != "M13"]
+                for r in s["data"] if r["period"].startswith("M") and r["period"] != "M13"
+                and re.fullmatch(r"-?[0-9.]+", str(r["value"]).strip())]
         out[BLS[s["seriesID"]]] = pd.Series(dict(rows)).sort_index()
     cpi, core = out["cpi_idx"], out["core_idx"]
     put("cpi", (cpi / cpi.shift(12) - 1) * 100, "US-Inflation (CPI, ggü. Vorjahr)", "konjunktur", "%", "rate", "BLS", "m", 2)
