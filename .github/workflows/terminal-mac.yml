@@ -2,7 +2,7 @@ name: Mac-App bauen
 
 on:
   push:
-    branches: [main, terminal-dev]
+    branches: [main]
     paths:
       - 'mac/**'
       - '.github/workflows/terminal-mac.yml'

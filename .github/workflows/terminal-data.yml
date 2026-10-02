@@ -9,7 +9,7 @@ on:
   push:
     branches: [main, terminal-dev]
     paths:
-      - 'terminal/build_data.py'
+      - 'terminal/*.py'
       - '.github/workflows/terminal-data.yml'
 
 permissions:
@@ -31,16 +31,20 @@ jobs:
       - name: Pakete
         run: pip install -q pandas xlrd requests yfinance
       - name: Daten sammeln
+        env:
+          DATA_BRANCH: ${{ github.ref_name == 'main' && 'terminal-data' || 'terminal-data-dev' }}
         run: |
           set -o pipefail
           mkdir -p out; python terminal/build_data.py | tee out/log.txt || python terminal/build_data.py | tee out/log.txt
           (grep '^FEHL' out/log.txt || true) | while IFS= read -r l; do echo "::warning::$l"; done
-      - name: Auf Branch terminal-data schreiben
+      - name: Auf Daten-Branch schreiben
+        env:
+          DATA_BRANCH: ${{ github.ref_name == 'main' && 'terminal-data' || 'terminal-data-dev' }}
         run: |
           cd out
-          git init -q -b terminal-data
+          git init -q -b "$DATA_BRANCH"
           git config user.name "markt-bot"
           git config user.email "actions@users.noreply.github.com"
           git add terminal.json log.txt
           git commit -q -m "Terminal-Daten $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" terminal-data
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "$DATA_BRANCH"

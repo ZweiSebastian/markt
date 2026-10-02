@@ -4,7 +4,7 @@
  */
 'use strict';
 
-const DATA_URL = 'https://raw.githubusercontent.com/ZweiSebastian/markt/terminal-data/terminal.json';
+const DATA_URL = new URLSearchParams(location.search).get('data') || 'https://raw.githubusercontent.com/ZweiSebastian/markt/terminal-data/terminal.json';
 const DAY = 86400;
 
 // ------------------------------------------------------------------ Native Brücke
@@ -40,13 +40,13 @@ const RANGES = [['1M', 31], ['3M', 92], ['6M', 183], ['1J', 365], ['3J', 1096], 
 let RANGE = +(load('range') || 365);
 
 const SECTIONS = [
-  ['lage', 'Lage'], ['maerkte', 'Märkte'], ['zinsen', 'Zinsen'], ['risiko', 'Risiko & Kredit'],
-  ['rohstoffe', 'Rohstoffe'], ['fx', 'Währungen & Krypto'], ['konjunktur', 'Konjunktur'],
+  ['einschaetzung', 'Einschätzung'], ['lage', 'Lage'], ['maerkte', 'Märkte'], ['bewertung', 'Bewertung'], ['zinsen', 'Zinsen'],
+  ['risiko', 'Risiko & Kredit'], ['rohstoffe', 'Rohstoffe'], ['fx', 'Währungen & Krypto'], ['konjunktur', 'Konjunktur'],
   ['zusammen', 'Zusammenhänge'], ['news', 'News'],
 ];
-let SECTION = load('section') || 'lage';
+let SECTION = load('section') || 'einschaetzung';
 
-const STRIP = ['spx', 'ndx', 'rut', 'dax', 'nikkei', 'vix', 'y10', 'y2', 'curve10_2', 'dxy', 'eurusd', 'gold', 'wti', 'btc'];
+const STRIP = ['msci', 'spx', 'ndx', 'dax', 'nikkei', 'vix', 'y10', 'y2', 'curve10_2', 'dxy', 'eurusd', 'gold', 'wti', 'btc'];
 
 const GROUPS = [
   ['aktien', 'Aktien'], ['risiko', 'Volatilität'], ['zinsen', 'Zinsen'], ['anleihen', 'Anleihen-ETFs'], ['rohstoffe', 'Rohstoffe'],
@@ -247,8 +247,8 @@ function chartCard(spec) {
   const ids = spec.ids.filter(id => S[id]);
   if (!ids.length) { card.innerHTML = `<div class="ttl">${esc(spec.title)}</div><div class="note">Keine Daten.</div>`; return card; }
   const s0 = S[ids[0]];
-  const span = Math.max(RANGE, ...ids.map(id => minRangeFor(S[id])));
-  const ext = span > RANGE ? `<small>(${S[ids[0]].f === 'm' ? 'Monatswerte' : 'Wochenwerte'}, mind. ${span >= 1096 ? '3 J.' : '1 J.'})</small>` : '';
+  const span = Math.max(RANGE, spec.minDays || 0, ...ids.map(id => minRangeFor(S[id])));
+  const ext = s0.f === 'm' ? '<small>(Monatswerte)</small>' : s0.f === 'w' ? '<small>(Wochenwerte)</small>' : '';
   card.innerHTML = `<div class="hd"><div><div class="ttl">${esc(spec.title)}${ext}</div>${spec.sub ? `<div class="sub">${spec.sub}</div>` : ''}</div>
     <button class="open" title="Im Vergleich öffnen">Vergleich ↗</button></div>
     <div class="legend"></div><div class="chart ${spec.height || ''}"></div>${spec.note ? `<div class="note">${spec.note}</div>` : ''}`;
@@ -277,7 +277,7 @@ function chartCard(spec) {
       }
       ser.setData(data);
       if (spec.ref != null) ser.createPriceLine({ price: spec.ref, color: C.mut, lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: spec.refLabel || '' });
-      lines.push({ id, ser, col, first: sl.v[0], lastv: sl.v[sl.v.length - 1], lastd: sl.t[sl.t.length - 1] });
+      lines.push({ id, ser, col, first: sl.v[0], firstd: sl.t[0], lastv: sl.v[sl.v.length - 1], lastd: sl.t[sl.t.length - 1] });
     });
     if (spec.sma) { // gleitender Durchschnitt zur ersten Reihe
       const s = S[ids[0]]; const m = sma(s.v, spec.sma); const from = (lastDay(ids[0]) || 0) - span; const d = [];
@@ -294,7 +294,7 @@ function chartCard(spec) {
         const c = spec.norm ? null : chg(l.id, l.first, val);
         return `<span><i style="border-color:${spec.type === 'baseline' || spec.type === 'hist' ? C.s1 : l.col}"></i>${esc(S[l.id].name)}<b>${shown}</b> ${c ? fmtC(c) : ''}</span>`;
       }).join('') + (spec.sma ? `<span><i style="border-color:${C.mut};border-top-style:dashed"></i>${spec.sma}-Tage-Linie</span>` : '') +
-        `<span class="d">${day != null ? fmtDate(day) : 'seit ' + fmtDate(Math.max(...lines.map(l => l.lastd)) - span, true)}</span>`;
+        `<span class="d">${day != null ? fmtDate(day) : 'seit ' + fmtDate(Math.min(...lines.map(l => l.firstd)))}</span>`;
     };
     draw(null, null);
     ch.subscribeCrosshairMove(p => { if (!p || p.time == null) draw(null, null); else draw(p.seriesData, p.time / DAY); });
@@ -349,7 +349,7 @@ function renderStrip() {
   }).join('');
   el.querySelectorAll('.tk').forEach(tk => { spark(tk.querySelector('canvas'), sparkVals(tk.dataset.id, 31)); tk.onclick = () => openCompare(tk.dataset.id); });
 }
-const SHORT = { spx: 'S&P 500', ndx: 'Nasdaq 100', rut: 'Russell 2000', dax: 'DAX', nikkei: 'Nikkei', vix: 'VIX', y10: 'US 10J', y2: 'US 2J', curve10_2: 'Kurve 10J−2J', dxy: 'Dollar-Index', eurusd: 'EUR/USD', gold: 'Gold', wti: 'Öl WTI', btc: 'Bitcoin' };
+const SHORT = { msci: 'MSCI World', spx: 'S&P 500', ndx: 'Nasdaq 100', rut: 'Russell 2000', dax: 'DAX', nikkei: 'Nikkei', vix: 'VIX', y10: 'US 10J', y2: 'US 2J', curve10_2: 'Kurve 10J−2J', dxy: 'Dollar-Index', eurusd: 'EUR/USD', gold: 'Gold', wti: 'Öl WTI', btc: 'Bitcoin' };
 const short = id => SHORT[id] || S[id].name;
 
 function renderStatus() {
@@ -370,8 +370,8 @@ function renderSection() {
   disposeCharts(); hideTip();
   const m = document.getElementById('main'); m.innerHTML = '';
   if (!DATA) return;
-  ({ lage: secLage, maerkte: secMaerkte, zinsen: secZinsen, risiko: secRisiko, rohstoffe: secRohstoffe, fx: secFx,
-    konjunktur: secKonjunktur, zusammen: secZusammen, news: secNews }[SECTION] || secLage)(m);
+  ({ einschaetzung: secEinschaetzung, lage: secLage, maerkte: secMaerkte, bewertung: secBewertung, zinsen: secZinsen, risiko: secRisiko,
+    rohstoffe: secRohstoffe, fx: secFx, konjunktur: secKonjunktur, zusammen: secZusammen, news: secNews }[SECTION] || secEinschaetzung)(m);
 }
 function head(m, title, lead) { m.insertAdjacentHTML('beforeend', `<h1>${title}</h1>${lead ? `<p class="lead">${lead}</p>` : ''}`); }
 function grid(m, cls = '') { const g = document.createElement('div'); g.className = 'grid ' + cls; m.appendChild(g); return g; }
@@ -381,6 +381,9 @@ function sect(m, t) { m.insertAdjacentHTML('beforeend', `<h2 class="sect">${t}</
 function status(cls, label) { const ic = { good: '✓', warn: '!', serious: '!', crit: '!!', neutral: '–' }[cls]; return `<span class="badge ${cls}">${label}</span>`; }
 function tileDefs() {
   const T = [];
+  const MT = DATA.model && DATA.model.targets;
+  if (MT && MT.world) { const n = MT.world.now; T.push({ id: '__model', l: 'Einschätzung MSCI World', v: `${n.score} / 100`, s: n.action,
+    b: status(n.cls === 'crit' ? 'crit' : n.cls, n.label), spark: MT.world.hist.score.slice(-60) }); }
   const spx = S.spx;
   if (spx) {
     const m200 = sma(spx.v, 200); const r = (last('spx') / m200[m200.length - 1] - 1) * 100;
@@ -425,8 +428,8 @@ function secLage(m) {
   for (const t of tileDefs()) {
     const d = document.createElement('div'); d.className = 'tile';
     d.innerHTML = `<div class="th"><div class="tl">${t.l}</div>${t.b}</div><div class="tv">${t.v}</div><div class="ts">${t.s}</div><canvas></canvas>`;
-    d.onclick = () => openCompare(t.id); g.appendChild(d);
-    requestAnimationFrame(() => spark(d.querySelector('canvas'), sparkVals(t.id, 365), C.s1));
+    d.onclick = () => t.id === '__model' ? go('einschaetzung') : openCompare(t.id); g.appendChild(d);
+    requestAnimationFrame(() => spark(d.querySelector('canvas'), t.spark || sparkVals(t.id, 365), C.s1));
   }
 
   const g2 = grid(m, 'wide'); g2.style.marginTop = '12px';
@@ -548,7 +551,7 @@ function sectorCard() {
 function secMaerkte(m) {
   head(m, 'Märkte', 'Alle Reihen mit Veränderungen. Klick auf eine Zeile öffnet sie im Vergleich.');
   const g = grid(m, 'wide');
-  g.appendChild(chartCard({ ids: ['spx', 'ndx', 'rut', 'dax', 'nikkei', 'em'], title: 'Aktienindizes im Vergleich', sub: 'Start des Zeitraums = 100', norm: true, height: 'tall' }));
+  g.appendChild(chartCard({ ids: ['msci', 'spx', 'ndx', 'dax', 'nikkei', 'em'], title: 'Aktienindizes im Vergleich', sub: 'Start des Zeitraums = 100', norm: true, height: 'tall' }));
   g.appendChild(sectorCard());
   const g2 = grid(m); g2.style.marginTop = '12px';
   g2.appendChild(overviewTable(['aktien', 'risiko', 'zinsen', 'anleihen', 'rohstoffe', 'fx', 'krypto', 'verhaeltnis', 'bewertung', 'konjunktur'], 'Alle Werte'));
@@ -595,7 +598,12 @@ function secRisiko(m) {
   head(m, 'Risiko & Kredit', 'Wie viel Risiko Anleger gerade eingehen wollen – Angstbarometer, Kreditmarkt und Marktbreite.');
   const g = grid(m);
   g.appendChild(chartCard({ ids: ['vix'], title: 'VIX – Angst am Aktienmarkt', ref: 20, refLabel: '20' }));
+  g.appendChild(chartCard({ ids: ['vix_term'], title: 'VIX-Kurve (1 Monat / 3 Monate)', ref: 1, refLabel: '1,0', sub: 'Über 1 = kurzfristige Angst größer als längerfristige – typisch für akuten Stress' }));
   g.appendChild(chartCard({ ids: ['move'], title: 'MOVE – Angst am Anleihemarkt' }));
+  g.appendChild(chartCard({ ids: ['nfci', 'anfci'], title: 'Finanzbedingungen (Chicago Fed)', ref: 0, refLabel: '0', sub: 'Über 0 = straffer als im Durchschnitt seit 1971, unter 0 = locker' }));
+  g.appendChild(chartCard({ ids: ['aaii'], title: 'Anlegerstimmung (AAII)', ref: 0, refLabel: '0', sub: 'Bullen minus Bären in Prozentpunkten – Extreme gelten als Kontraindikator' }));
+  g.appendChild(chartCard({ ids: ['skew'], title: 'SKEW – Nachfrage nach Crash-Absicherung' }));
+  g.appendChild(chartCard({ ids: ['kre', 'xlf'], title: 'Regionalbanken vs. Finanzsektor', norm: true, sub: 'Start = 100 · Regionalbanken reagieren früh auf Kreditstress' }));
   g.appendChild(chartCard({ ids: ['hyg_ief'], title: 'Kreditappetit (HYG/IEF)', sma: 200, sub: 'Steigt, wenn Anleger riskante Unternehmensanleihen Staatsanleihen vorziehen' }));
   g.appendChild(chartCard({ ids: ['breadth'], title: 'Marktbreite (RSP/SPY)', sub: 'Fällt, wenn nur wenige große Aktien den Index tragen' }));
   g.appendChild(chartCard({ ids: ['ndx_spx'], title: 'Tech-Dominanz (Nasdaq 100 / S&P 500)' }));
@@ -629,14 +637,169 @@ function secFx(m) {
 function secKonjunktur(m) {
   head(m, 'Konjunktur', 'Monats- und Wochendaten zur US-Wirtschaft. Kurze Zeiträume werden automatisch auf mindestens 1–3 Jahre erweitert.');
   const g = grid(m);
-  g.appendChild(chartCard({ ids: ['cpi', 'core'], title: 'US-Inflation', ref: 2, refLabel: 'Ziel 2 %' }));
+  g.appendChild(chartCard({ ids: ['cpi', 'core', 'hicp'], title: 'Inflation USA und Euroraum', ref: 2, refLabel: 'Ziel 2 %' }));
+  g.appendChild(chartCard({ ids: ['cli_us', 'cli_g7'], title: 'OECD-Frühindikator', ref: 100, refLabel: '100', sub: 'Über 100 und steigend = Wachstum über Trend; läuft der Konjunktur einige Monate voraus' }));
+  g.appendChild(chartCard({ ids: ['claims'], title: 'Erstanträge auf Arbeitslosenhilfe (Tsd., 4-W.-Ø)', sub: 'Wöchentlich und schnell – steigt früh, wenn Firmen entlassen (nicht saisonbereinigt)' }));
   g.appendChild(chartCard({ ids: ['unemp'], title: 'US-Arbeitslosenquote' }));
   g.appendChild(chartCard({ ids: ['sahm'], title: 'Sahm-Regel', ref: 0.5, refLabel: 'Schwelle 0,5', sub: 'Steigt der Wert über 0,5, begann bisher fast immer eine Rezession' }));
   g.appendChild(chartCard({ ids: ['payrolls'], title: 'Neue Stellen pro Monat (Tsd.)', type: 'hist' }));
   g.appendChild(chartCard({ ids: ['fedbs'], title: 'Fed-Bilanzsumme', sub: 'Steigt bei Anleihekäufen (QE), fällt beim Abbau (QT)' }));
+  g.appendChild(chartCard({ ids: ['ecbbs'], title: 'EZB-Bilanzsumme' }));
   g.appendChild(chartCard({ ids: ['mort30'], title: 'US-Hypothekenzins 30J' }));
   g.appendChild(chartCard({ ids: ['diesel'], title: 'US-Diesel (Tankstelle)' }));
+}
+function secBewertung(m) {
+  head(m, 'Bewertung', 'Wie teuer Aktien gemessen an Gewinnen, Zinsen und Wirtschaftsleistung sind. Bewertung sagt wenig über die nächsten Monate, aber viel über die nächsten 10 Jahre.');
+  const g = grid(m);
   g.appendChild(capeCard());
+  g.appendChild(chartCard({ ids: ['cape_long'], title: 'Shiller-KGV seit 1881', sub: 'Monatswerte · Langfristiger Schnitt rund 17', ref: 17, refLabel: 'Ø ~17', minDays: 99999 }));
+  g.appendChild(chartCard({ ids: ['ecy'], title: 'Aktien-Risikoprämie (Excess CAPE Yield)', type: 'baseline', sub: 'Gewinnrendite (1/CAPE) minus realer 10J-Zins. Niedrig = Aktien bieten wenig Mehrertrag gegenüber Anleihen', minDays: 99999 }));
+  g.appendChild(chartCard({ ids: ['buffett'], title: 'Buffett-Indikator', sub: 'US-Börsenwert (Wilshire 5000) im Verhältnis zum BIP – Näherung', minDays: 3653 }));
+  g.appendChild(chartCard({ ids: ['spx_real'], title: 'S&P 500 seit 1871 – real, mit Dividenden', log: true, sub: 'Logarithmisch · inflationsbereinigt, heute = 100', minDays: 99999 }));
+  g.appendChild(chartCard({ ids: ['world_us'], title: 'MSCI World gegenüber S&P 500', sub: 'Fällt, wenn die USA den Rest der Welt schlagen', minDays: 3653 }));
+}
+
+// ---------- Einschätzung (Modell)
+let TGT = load('tgt') || 'world';
+const BANDC = [[0, 35, C.crit], [35, 45, C.warn], [45, 65, '#5b6170'], [65, 100, C.good]];
+function monthDay(p) { return Math.floor(Date.UTC(+p.slice(0, 4), +p.slice(5, 7) - 1, 1) / 864e5); }
+function gaugeHTML(score) {
+  const segs = BANDC.map(([a, b, c]) => `<div style="left:${a}%;width:${b - a}%;background:${c}"></div>`).join('');
+  return `<div class="gauge">${segs}<i style="left:calc(${Math.max(0, Math.min(100, score))}% - 2px)"></i></div>
+    <div class="gscale">${[0, 35, 45, 65, 100].map(v => `<span style="left:${v}%">${v}</span>`).join('')}</div>`;
+}
+function pillarBar(v) { // 0..100, Mitte 50
+  if (v == null) return '<span class="mut">–</span>';
+  const x = Math.max(0, Math.min(100, v)); const l = Math.min(50, x), w = Math.abs(x - 50);
+  return `<span class="pbar"><b style="left:${l}%;width:${w}%;background:${x >= 50 ? C.s1 : C.s8}"></b><i></i></span>`;
+}
+function compBar(v) { // -1..+1
+  if (v == null) return '<span class="mut">–</span>';
+  return pillarBar(50 + 50 * v);
+}
+function secEinschaetzung(m) {
+  const M = DATA.model;
+  head(m, 'Einschätzung', 'Alle Daten zusammen gelesen: ein Regelmodell aus fünf Säulen, dazu der Rückblick, was historisch auf ähnliche Werte folgte.');
+  if (!M || !M.targets || !M.targets[TGT]) { m.insertAdjacentHTML('beforeend', '<div class="card"><div class="note">Das Modell ist noch nicht berechnet – die nächste Datenaktualisierung liefert es.</div></div>'); return; }
+  const T = M.targets[TGT], N = T.now;
+  const ctl = document.createElement('div'); ctl.className = 'ctl';
+  ctl.innerHTML = `<span class="seg" id="tgt">${Object.entries(M.targets).map(([k, t]) => `<button data-t="${k}" class="${k === TGT ? 'on' : ''}">${esc(t.name)}</button>`).join('')}</span>
+    <span class="mut" style="font-size:12px">Stand ${N.month} · Score monatlich, aktueller Monat mit den neuesten Werten</span>`;
+  ctl.querySelector('#tgt').onclick = e => { const b = e.target.closest('button'); if (!b) return; TGT = b.dataset.t; store('tgt', TGT); renderSection(); };
+  m.appendChild(ctl);
+
+  // Kopf: Score, Ampel, Handlung, Säulen, Klartext
+  const hero = document.createElement('div'); hero.className = 'card hero';
+  hero.innerHTML = `<div class="hgrid">
+    <div>
+      <div class="lbl">Gesamtscore ${esc(T.name)}</div>
+      <div class="hscore"><span class="big">${N.score}</span><span class="mut"> / 100</span> <span class="badge ${N.cls === 'crit' ? 'crit' : N.cls}">${esc(N.label)}</span></div>
+      ${gaugeHTML(N.score)}
+      <div class="action"><span class="mut">Modell sagt:</span> <b>${esc(N.action)}</b></div>
+    </div>
+    <div>
+      <div class="lbl">Säulen <span class="mut">(50 = neutral)</span></div>
+      <table class="t pil">${N.pillars.map(p => `<tr><td>${esc(p.name)} <span class="mut">${Math.round(p.weight * 100)} %</span></td><td>${pillarBar(p.score)}</td><td>${p.score == null ? '–' : p.score}</td></tr>`).join('')}</table>
+    </div></div>
+    <div class="interp">${N.text.map(esc).join(' ')}</div>`;
+  m.appendChild(hero);
+
+  // Säulen im Detail
+  sect(m, 'Säulen im Detail');
+  const g = grid(m);
+  N.pillars.forEach(p => {
+    const c = document.createElement('div'); c.className = 'card';
+    c.innerHTML = `<div class="hd"><div class="ttl">${esc(p.name)} <small>${Math.round(p.weight * 100)} % Gewicht</small></div><div class="big" style="font-size:20px">${p.score == null ? '–' : p.score}</div></div>
+      <table class="t comp">${p.comps.map(k => `<tr style="${k.stale ? 'opacity:.55' : ''}"><td>${esc(k.name)}<div class="mut" style="font-size:11px">${esc(k.text || '')}${k.asof && k.asof !== N.month ? ' · Stand ' + k.asof : ''}${k.stale ? ' · zu alt, nicht eingerechnet' : ''}</div></td><td>${compBar(k.score)}</td></tr>`).join('')}</table>`;
+    g.appendChild(c);
+  });
+  g.appendChild(ruleCard(M));
+
+  // Verlauf
+  sect(m, 'Verlauf');
+  const vh = document.createElement('div'); vh.className = 'card full';
+  vh.innerHTML = `<div class="hd"><div><div class="ttl">${esc(T.name)} und Score seit ${T.since.slice(0, 4)}</div><div class="sub">Oben der Index (logarithmisch), unten der Score. Gestrichelt die Grenzen 35 / 45 / 55 / 65.</div></div></div>
+    <div class="legend" id="vlg"></div><div class="chart" style="height:260px"></div><div class="chart" style="height:170px"></div>`;
+  m.appendChild(vh);
+  queueMicrotask(() => {
+    const els = vh.querySelectorAll('.chart'); const H = T.hist; const ds = H.months.map(monthDay);
+    const a = baseChart(els[0], { log: true, fmt: p => nf(p, 0) });
+    const ps = a.addLineSeries({ color: C.s1, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, priceFormat: pf(0) });
+    ps.setData(ds.map((d, i) => ({ time: d * DAY, value: H.price[i] })).filter(x => x.value != null));
+    a.timeScale().fitContent();
+    const b = baseChart(els[1], { fmt: p => nf(p, 0) });
+    const sc = b.addBaselineSeries({ baseValue: { type: 'price', price: 50 }, lineWidth: 2, priceLineVisible: false, priceFormat: pf(0),
+      topLineColor: C.s3, topFillColor1: 'rgba(25,158,112,.25)', topFillColor2: 'rgba(25,158,112,.03)',
+      bottomLineColor: C.s8, bottomFillColor1: 'rgba(230,103,103,.03)', bottomFillColor2: 'rgba(230,103,103,.25)',
+      autoscaleInfoProvider: () => ({ priceRange: { minValue: 15, maxValue: 85 } }) });
+    sc.setData(ds.map((d, i) => ({ time: d * DAY, value: H.score[i] })));
+    [35, 45, 55, 65].forEach(v => sc.createPriceLine({ price: v, color: C.mut, lineWidth: 1, lineStyle: 2, axisLabelVisible: false }));
+    b.timeScale().fitContent();
+    let lock = false;
+    const sync = (x, y) => x.timeScale().subscribeVisibleLogicalRangeChange(() => { if (lock) return; lock = true; const r = x.timeScale().getVisibleRange(); if (r) y.timeScale().setVisibleRange(r); lock = false; });
+    sync(a, b); sync(b, a);
+    const lg = vh.querySelector('#vlg');
+    const draw = t => { const i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < 0) return;
+      lg.innerHTML = `<span><i style="border-color:${C.s1}"></i>${esc(T.name)}<b>${nf(H.price[i], 0)}</b></span><span><i style="border-color:${C.s3}"></i>Score<b>${nf(H.score[i], 0)}</b></span>` +
+        Object.entries(H.pillars).map(([k, v]) => `<span class="mut">${esc((N.pillars.find(p => p.id === k) || {}).name || k)} ${v[i] == null ? '–' : nf(v[i], 0)}</span>`).join('') + `<span class="d">${H.months[i]}</span>`; };
+    draw(null);
+    const ch = p => draw(p && p.time ? p.time / DAY : null); a.subscribeCrosshairMove(ch); b.subscribeCrosshairMove(ch);
+  });
+
+  // Was danach kam
+  sect(m, 'Was historisch danach kam');
+  const g2 = grid(m, 'wide');
+  const bt = document.createElement('div'); bt.className = 'card';
+  const cur = T.bands.find(b => N.score >= b.lo && N.score < b.hi);
+  bt.innerHTML = `<div class="hd"><div><div class="ttl">Renditen nach Score-Bereich</div><div class="sub">${esc(T.name)}, Monate seit ${T.since.slice(0, 4)}. Kursrendite ohne Dividenden, Median.</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th>Score</th><th>Monate</th><th>1 J.</th><th>im Plus</th><th>schlechtester 1 J.</th><th>3 J. p.a.</th><th>5 J. p.a.</th><th>tiefster Stand im 1. J.</th></tr>
+    ${T.bands.map(b => `<tr class="${b === cur ? 'hl' : ''}"><td>${b.band}${b === cur ? ' ◀' : ''}</td><td>${b.n}</td><td>${fmtPct(b.f12)}</td><td>${b.pos12 == null ? '–' : nf(b.pos12, 0) + ' %'}</td><td>${fmtPct(b.worst12, 0)}</td><td>${fmtPct(b.f36)}</td><td>${fmtPct(b.f60)}</td><td>${fmtPct(b.dd12)}</td></tr>`).join('')}
+    <tr><td class="mut">alle Monate</td><td class="mut"></td><td>${fmtPct(T.base.f12)}</td><td>${nf(T.base.pos12, 0)} %</td><td></td><td>${fmtPct(T.base.f36)}</td><td></td><td></td></tr></table>
+    <div class="note">Lesart: Steigen die Renditen von oben nach unten, hat der Score etwas getaugt. „Tiefster Stand im 1. J.“ = wie weit es nach dem Kauf zwischenzeitlich im Median nach unten ging.</div>`;
+  g2.appendChild(bt);
+  const rk = document.createElement('div'); rk.className = 'card';
+  const R = T.rank;
+  rk.innerHTML = `<div class="hd"><div><div class="ttl">Welche Säule hat bisher geholfen?</div><div class="sub">Rangkorrelation mit der Rendite danach. 0 = kein Zusammenhang, positiv = höherer Wert, bessere Rendite.</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th></th><th>nächste 12 M.</th><th>nächste 3 J.</th></tr>
+    <tr class="hl"><td>Gesamtscore</td><td>${fmtR(R.score_f12)}</td><td>${fmtR(R.score_f36)}</td></tr>
+    ${Object.entries(R.pillars).map(([k, v]) => `<tr><td>${esc((N.pillars.find(p => p.id === k) || {}).name || k)}</td><td>${fmtR(v.f12)}</td><td>${fmtR(v.f36)}</td></tr>`).join('')}</table>
+    <div class="note">Werte um ±0,1 sind Rauschen, ab etwa 0,2 ein echter, aber schwacher Zusammenhang. Bewertung wirkt typischerweise erst über Jahre, Trend und Stimmung eher kurzfristig.</div>`;
+  g2.appendChild(rk);
+
+  // Strategien
+  sect(m, 'Regeln im Test');
+  const st = document.createElement('div'); st.className = 'card full';
+  const S3 = T.strategies;
+  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)} seit ${T.since.slice(0, 4)}, monatlich angepasst, nicht investiertes Geld im Geldmarkt. Ohne Dividenden, Steuern und Kosten.</div></div></div>
+    <div class="legend" id="slg"></div><div class="chart tall"></div>
+    <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th></tr>
+    ${S3.map((x, j) => `<tr><td><i style="display:inline-block;width:12px;border-top:2px solid ${[C.s1, C.s2, C.s3][j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td>${fmtPct(x.cagr)}</td><td>${fmtPct(x.mdd, 0)}</td><td>${nf(x.vol, 1)} %</td><td>${nf(x.expo, 0)} %</td></tr>`).join('')}</table>
+    <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge.</div>`;
+  m.appendChild(st);
+  queueMicrotask(() => {
+    const ch = baseChart(st.querySelector('.chart'), { log: true, fmt: p => nf(p, 0) });
+    const ds = T.strat_months.map(monthDay); const lines = [];
+    S3.forEach((x, j) => { const l = ch.addLineSeries({ color: [C.s1, C.s2, C.s3][j], lineWidth: 2, priceLineVisible: false, priceFormat: pf(0) });
+      l.setData(x.eq.map((v, i) => ({ time: ds[i] * DAY, value: v * 100 }))); lines.push(l); });
+    ch.timeScale().fitContent();
+    const lg = st.querySelector('#slg');
+    const draw = t => { const i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < 0) return;
+      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${[C.s1, C.s2, C.s3][j]}"></i>${esc(x.name)}<b>${nf(x.eq[i] * 100, 0)}</b></span>`).join('') + `<span class="d">${T.strat_months[i]}</span>`; };
+    draw(null); ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));
+  });
+  m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">${esc(M.note)} Das Modell fasst Daten nach festen Regeln zusammen, es kennt deine persönliche Lage nicht und garantiert nichts. Rückblicke zeigen, was war – nicht, was kommt.</div>`);
+}
+function fmtPct(v, d = 1) { if (v == null) return '–'; const c = v > 0 ? 'up' : v < 0 ? 'down' : 'flat'; return `<span class="${c}">${v > 0 ? '+' : ''}${nf(v, d)} %</span>`; }
+function fmtR(v) { if (v == null) return '–'; return `<span style="color:${Math.abs(v) < 0.1 ? C.mut : v > 0 ? C.up : C.down}">${v > 0 ? '+' : ''}${nf(v, 2)}</span>`; }
+function ruleCard(M) {
+  const c = document.createElement('div'); c.className = 'card';
+  const r = M.rule || {}; const rows = [['world', 'MSCI World'], ['spx', 'S&P 500']].filter(([k]) => r[k]);
+  c.innerHTML = `<div class="hd"><div><div class="ttl">Deine Einstiegsregel</div><div class="sub">Kurs an oder unter der 200-Wochen-Linie, dann kaufen, sobald das CAPE wieder steigt.</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th>Index</th><th>Abstand zur 200-W.-Linie</th><th>zuletzt berührt</th></tr>
+    ${rows.map(([k, n]) => `<tr><td>${n}</td><td>${fmtPct(r[k].dist)}</td><td>${r[k].lastTouch ? fmtDate(Math.floor(new Date(r[k].lastTouch) / 864e5)) : '–'}</td></tr>`).join('')}</table>
+    <div class="flag ${r.signalScore >= 70 ? 'off' : 'on'}" style="margin-top:10px"><span class="fi">${r.signalScore >= 70 ? '✓' : '…'}</span><div>Einstiegssignal der Markt-App: <b>${r.signalScore != null ? r.signalScore + ' / 100' : '–'}</b><div class="fd">ab 70 Kaufzone, 100 = bestätigte Wende</div></div></div>
+    <div class="note">Deine Regel ist bewusst streng: Sie wartet auf echte Schwächephasen. Das Modell oben bewertet dagegen jede Lage und sagt, wie günstig oder ungünstig sie im Vergleich zur Geschichte war.</div>`;
+  return c;
 }
 
 // ---------- Zusammenhänge
@@ -651,7 +814,7 @@ function matrixCard() {
   c.innerHTML = `<div class="hd"><div><div class="ttl">Korrelationsmatrix</div><div class="sub">Wie stark sich die Veränderungen zweier Reihen gemeinsam bewegen: +1 gleichläufig, −1 gegenläufig, 0 kein Zusammenhang. Zinsen über ihre Veränderung, Preise über Renditen.</div></div></div>
     <div class="ctl"><label>Zeitraum <span class="seg" id="mxd">${WIN.map(([n, d]) => `<button data-d="${d}" class="${d === MX.d ? 'on' : ''}">${n}</button>`).join('')}</span></label>
     <label>Basis <span class="seg" id="mxf"><button data-f="d" class="${MX.f === 'd' ? 'on' : ''}">Tage</button><button data-f="w" class="${MX.f === 'w' ? 'on' : ''}">Wochen</button></span></label></div>
-    <div class="mx"><table><tr><th></th>${ids.map(id => `<th class="c">${esc(short2(id))}</th>`).join('')}</tr>
+    <div class="mx"><table><tr><th></th>${ids.map(id => `<th class="c"><div class="vh"><span>${esc(short2(id))}</span></div></th>`).join('')}</tr>
     ${ids.map((a, i) => `<tr><th class="r">${esc(short2(a))}</th>${ids.map((b, j) => i === j ? '<td class="self"></td>' : `<td data-i="${i}" data-j="${j}" style="background:${M[i][j] == null ? 'transparent' : heatColor(M[i][j], 1)}">${M[i][j] == null ? '' : nf(M[i][j] * 10, 0)}</td>`).join('')}</tr>`).join('')}</table></div>
     <div class="scale">−1 <span class="bar" style="background:linear-gradient(90deg,${heatColor(-1, 1)},${heatColor(0, 1)},${heatColor(1, 1)})"></span> +1 · Zahlen = Korrelation × 10 · Klick öffnet das Paar im Vergleich${MX.f === 'd' ? ' · Achtung: Börsen in Asien/Europa schließen vor den USA – Wochenbasis ist bei Tageswerten fairer.' : ''}</div>`;
   c.querySelector('#mxd').onclick = e => { const b = e.target.closest('button'); if (!b) return; MX.d = +b.dataset.d; store('mx_d', MX.d); c.replaceWith(matrixCard()); };
@@ -712,7 +875,8 @@ function seriesOptions(sel) {
 function compareCard() {
   const c = document.createElement('div'); c.className = 'card full'; c.id = 'compare';
   if (!S[CMP.a]) CMP.a = 'y10'; if (!S[CMP.b]) CMP.b = 'ndx';
-  const a = CMP.a, b = CMP.b, f = freqOf(a, b);
+  const a = CMP.a, b = CMP.b;
+  let f = freqOf(a, b); if (f === 'd' && RANGE > 3000) f = 'w'; // vor 11 J. liegen nur Wochenwerte vor
   const unitF = { d: 'Tage', w: 'Wochen', m: 'Monate' }[f];
   const wins = f === 'd' ? [[60, '60 T.'], [120, '120 T.'], [250, '1 J.']] : f === 'w' ? [[26, '26 W.'], [52, '52 W.'], [104, '2 J.']] : [[12, '12 M.'], [24, '24 M.'], [36, '36 M.']];
   const win = wins.some(w => w[0] === CMP.win) ? CMP.win : wins[f === 'd' ? 1 : 1][0];
