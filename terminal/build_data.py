@@ -170,7 +170,7 @@ def ser(sid):
 
 
 # ------------------------------------------------------------------ vorheriger Lauf (Cache)
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 cache_meta = {}
 prev = {}
 try:
@@ -255,6 +255,13 @@ def yahoo():
         except Exception as e:  # noqa
             note("yahoo " + t, False, e)
         time.sleep(1)
+    if full:   # S&P 500 so lang wie möglich (ab 1927) – für Rückblick und Analogien
+        try:
+            h = yf.Ticker("^GSPC").history(period="max", interval="1d", auto_adjust=True)
+            if "^GSPC" not in got or len(h) > len(got["^GSPC"]):
+                got["^GSPC"] = h["Close"]
+        except Exception as e:  # noqa
+            note("yahoo ^GSPC max", False, e)
     # Reihen ohne brauchbare Historie (neu oder zu kurz) einzeln komplett laden – Krypto u. a. mögen kein Startdatum 1970
     for sid, t, name, g, u, k in YAHOO:
         o = prev_series(sid)
@@ -369,11 +376,21 @@ def rates():
     # 3M-T-Bill monatlich seit 1934 (für das Modell)
     put("tbill_m", dbn("FED/H15/RIFSGFSM03_N.M", "1934-01-01"), "US-T-Bill 3M (monatlich)", "intern", "%", "rate", "Fed H.15", "m", 2)
     # Fed Funds täglich (lange Historie)
-    put("ff_long", dbn("FED/H15/RIFSPFF_N.B", "1970-01-01"), "Fed Funds (H.15)", "intern", "%", "rate", "Fed H.15", dec=2)
+    put("ff_long", dbn("FED/H15/RIFSPFF_N.B", "1954-07-01"), "Fed Funds (H.15)", "intern", "%", "rate", "Fed H.15", dec=2)
+    # Unternehmensanleihen (Moody's) seit 1919, 10J-Zins monatlich seit 1953
+    baa = dbn("FED/H15/RIMLPBAAR_N.M", "1919-01-01")
+    aaa = dbn("FED/H15/RIMLPAAAR_N.M", "1919-01-01")
+    y10m = dbn("FED/H15/RIFLGFCY10_N.M", "1953-01-01")
+    put("baa", baa, "Unternehmensanleihen Baa (Moody's)", "zinsen", "%", "rate", "Fed H.15 / Moody's", "m", 2)
+    put("y10_m", y10m, "US-Zins 10J (monatlich)", "intern", "%", "rate", "Fed H.15", "m", 2)
+    j = pd.concat([baa, y10m], axis=1, join="inner").dropna()
+    put("baa_spread", j.iloc[:, 0] - j.iloc[:, 1], "Kreditaufschlag Baa − 10J", "risiko", "Pp.", "rate", "Fed H.15 (berechnet)", "m", 2)
+    j = pd.concat([baa, aaa], axis=1, join="inner").dropna()
+    put("baa_aaa", j.iloc[:, 0] - j.iloc[:, 1], "Kreditaufschlag Baa − Aaa", "risiko", "Pp.", "rate", "Fed H.15 (berechnet)", "m", 2)
     note("zinsen", True, ", ".join(f"{k}:{len(v)}" for k, v in hist.items()))
 
 
-slow("zinsen", rates, ["y3m", "y2", "y10", "y30", "real10", "tbill_m", "ff_long"])
+slow("zinsen", rates, ["y3m", "y2", "y10", "y30", "real10", "tbill_m", "ff_long", "baa", "y10_m", "baa_spread", "baa_aaa"])
 if cache_meta.get("zinsen", {}).get("at") != NOW.strftime("%Y-%m-%dT%H:%M:%SZ"):
     try:   # im Cache-Fall die letzten Tage frisch nachziehen
         tr = treasury_year(NOW.year)
@@ -634,6 +651,47 @@ derive("disc_stap", "xly", "xlp", lambda x, y: x / y, "Risikoappetit Konsum (XLY
 derive("world_us", "msci", "spx", lambda x, y: x / y, "MSCI World / S&P 500", "verhaeltnis", "", "price", 4)
 derive("gold_eur", "gold", "eurusd", lambda x, y: x / y, "Gold in Euro", "rohstoffe", "€/oz", "price", 1)
 derive("spx_eur", "spx", "eurusd", lambda x, y: x / y, "S&P 500 in Euro", "aktien", "Pkt", "price", 1)
+
+
+
+# Marktbreite: Anteil im Aufwärtstrend (Schluss über 200-Tage-Linie)
+def participation(ids, sid, name, minn):
+    cols = {}
+    for i in ids:
+        x = ser(i)
+        if x is None:
+            continue
+        x = x[x.index >= "1985-01-01"]
+        cols[i] = x / x.rolling(200, min_periods=200).mean() - 1
+    if not cols:
+        note(sid, False, "keine Reihen")
+        return
+    d = pd.DataFrame(cols).sort_index().ffill(limit=5)
+    n = d.notna().sum(axis=1)
+    share = ((d > 0).sum(axis=1) / n * 100).where(n >= minn).dropna()
+    put(sid, share, name, "breite", "%", "rate", "berechnet", dec=0)
+
+
+participation(["xlk", "xlf", "xle", "xlv", "xli", "xly", "xlp", "xlu", "xlb", "xlre", "xlc"], "sect_part",
+              "US-Sektoren im Aufwärtstrend (über 200-Tage-Linie)", 8)
+participation(["spx", "ndx", "rut", "dax", "sx5e", "ftse", "nikkei", "hsi", "em"], "world_part",
+              "Weltbörsen im Aufwärtstrend (über 200-Tage-Linie)", 5)
+for sid in ("breadth", "small_large"):
+    if sid in series:
+        series[sid]["g"] = "breite"
+
+# Öl monatlich seit 1946 (Forschung) + aktuelle Monate (WTI-Future)
+try:
+    mm_ = pd.read_csv(os.path.join(ROOT, "research", "macro_monthly.csv"))
+    wl = pd.Series(mm_.wti.values, index=pd.to_datetime(mm_.month + "-01")).dropna()
+    wd = ser("wti")
+    if wd is not None:
+        wm = wd.groupby(wd.index.to_period("M")).mean()
+        wm.index = wm.index.to_timestamp()
+        wl = pd.concat([wl[wl.index < wm.index.min()], wm])
+    put("wti_long", wl, "Öl WTI (Monats-Ø seit 1946)", "intern", "$/bbl", "price", "FRED/Yahoo", "m", 2)
+except Exception as e:  # noqa
+    note("wti_long", False, e)
 
 # Buffett-Indikator: Wilshire 5000 (≈ Mrd. $ Marktwert) / BIP
 try:

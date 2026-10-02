@@ -41,7 +41,7 @@ let RANGE = +(load('range') || 365);
 
 const SECTIONS = [
   ['einschaetzung', 'Einschätzung'], ['lage', 'Lage'], ['maerkte', 'Märkte'], ['bewertung', 'Bewertung'], ['zinsen', 'Zinsen'],
-  ['risiko', 'Risiko & Kredit'], ['rohstoffe', 'Rohstoffe'], ['fx', 'Währungen & Krypto'], ['konjunktur', 'Konjunktur'],
+  ['risiko', 'Risiko & Breite'], ['rohstoffe', 'Rohstoffe'], ['fx', 'Währungen & Krypto'], ['konjunktur', 'Konjunktur'],
   ['zusammen', 'Zusammenhänge'], ['news', 'News'],
 ];
 let SECTION = load('section') || 'einschaetzung';
@@ -51,7 +51,7 @@ const STRIP = ['msci', 'spx', 'ndx', 'dax', 'nikkei', 'vix', 'y10', 'y2', 'curve
 const GROUPS = [
   ['aktien', 'Aktien'], ['risiko', 'Volatilität'], ['zinsen', 'Zinsen'], ['anleihen', 'Anleihen-ETFs'], ['rohstoffe', 'Rohstoffe'],
   ['fx', 'Währungen'], ['krypto', 'Krypto'], ['verhaeltnis', 'Verhältnisse'], ['konjunktur', 'Konjunktur'],
-  ['bewertung', 'Bewertung'], ['sektoren', 'Sektoren'],
+  ['bewertung', 'Bewertung'], ['breite', 'Marktbreite'], ['sektoren', 'Sektoren'],
 ];
 
 // Reihen für die Korrelationsmatrix (nur tägliche)
@@ -595,7 +595,7 @@ function secZinsen(m) {
   g.appendChild(chartCard({ ids: ['mort30'], title: 'US-Hypothekenzins 30J' }));
 }
 function secRisiko(m) {
-  head(m, 'Risiko & Kredit', 'Wie viel Risiko Anleger gerade eingehen wollen – Angstbarometer, Kreditmarkt und Marktbreite.');
+  head(m, 'Risiko & Breite', 'Wie viel Risiko Anleger gerade eingehen wollen und wie breit der Markt steigt – Angstbarometer, Kreditmarkt und Marktbreite.');
   const g = grid(m);
   g.appendChild(chartCard({ ids: ['vix'], title: 'VIX – Angst am Aktienmarkt', ref: 20, refLabel: '20' }));
   g.appendChild(chartCard({ ids: ['vix_term'], title: 'VIX-Kurve (1 Monat / 3 Monate)', ref: 1, refLabel: '1,0', sub: 'Über 1 = kurzfristige Angst größer als längerfristige – typisch für akuten Stress' }));
@@ -605,7 +605,10 @@ function secRisiko(m) {
   g.appendChild(chartCard({ ids: ['skew'], title: 'SKEW – Nachfrage nach Crash-Absicherung' }));
   g.appendChild(chartCard({ ids: ['kre', 'xlf'], title: 'Regionalbanken vs. Finanzsektor', norm: true, sub: 'Start = 100 · Regionalbanken reagieren früh auf Kreditstress' }));
   g.appendChild(chartCard({ ids: ['hyg_ief'], title: 'Kreditappetit (HYG/IEF)', sma: 200, sub: 'Steigt, wenn Anleger riskante Unternehmensanleihen Staatsanleihen vorziehen' }));
+  g.appendChild(chartCard({ ids: ['baa_spread'], title: 'Kreditaufschlag Baa − 10J (seit 1953)', sub: 'Was mittelgute Unternehmen mehr zahlen müssen als der Staat. Steigt vor und in Krisen.', minDays: 3653 }));
   g.appendChild(chartCard({ ids: ['breadth'], title: 'Marktbreite (RSP/SPY)', sub: 'Fällt, wenn nur wenige große Aktien den Index tragen' }));
+  g.appendChild(chartCard({ ids: ['sect_part'], title: 'US-Sektoren im Aufwärtstrend', ref: 50, refLabel: '50 %', sub: 'Anteil der 11 Sektoren über ihrer 200-Tage-Linie – steigt der Index, während dieser Anteil fällt, tragen immer weniger den Markt' }));
+  g.appendChild(chartCard({ ids: ['world_part'], title: 'Weltbörsen im Aufwärtstrend', ref: 50, refLabel: '50 %', sub: 'Anteil von 9 großen Indizes (USA, Europa, Japan, Hongkong, Schwellenländer) über ihrer 200-Tage-Linie' }));
   g.appendChild(chartCard({ ids: ['ndx_spx'], title: 'Tech-Dominanz (Nasdaq 100 / S&P 500)' }));
   g.appendChild(chartCard({ ids: ['small_large'], title: 'Nebenwerte gegenüber Standardwerten', sub: 'Small Caps hängen stärker an Konjunktur und Zinsen' }));
   g.appendChild(chartCard({ ids: ['disc_stap'], title: 'Zyklischer Konsum vs. Basiskonsum', sub: 'Steigt in Phasen von Konsumlaune, fällt bei Vorsicht' }));
@@ -679,7 +682,7 @@ function compBar(v) { // -1..+1
 }
 function secEinschaetzung(m) {
   const M = DATA.model;
-  head(m, 'Einschätzung', 'Alle Daten zusammen gelesen: ein Regelmodell aus fünf Säulen, dazu der Rückblick, was historisch auf ähnliche Werte folgte.');
+  head(m, 'Einschätzung', 'Alle Daten zusammen gelesen: ein Regelmodell aus sechs Säulen mit 26 Komponenten, die ähnlichsten Momente der Vergangenheit und was danach kam.');
   if (!M || !M.targets || !M.targets[TGT]) { m.insertAdjacentHTML('beforeend', '<div class="card"><div class="note">Das Modell ist noch nicht berechnet – die nächste Datenaktualisierung liefert es.</div></div>'); return; }
   const T = M.targets[TGT], N = T.now;
   const ctl = document.createElement('div'); ctl.className = 'ctl';
@@ -696,6 +699,8 @@ function secEinschaetzung(m) {
       <div class="hscore"><span class="big">${N.score}</span><span class="mut"> / 100</span> <span class="badge ${N.cls === 'crit' ? 'crit' : N.cls}">${esc(N.label)}</span></div>
       ${gaugeHTML(N.score)}
       <div class="action"><span class="mut">Modell sagt:</span> <b>${esc(N.action)}</b></div>
+      ${N.risk ? `<div class="riskline"><span class="mut">Rückgang ≥ ${Math.round(T.crash * 100)} % innerhalb von 12 Monaten – so oft kam das vor:</span>
+        <div class="rk"><span><b>${N.risk.band ?? '–'} %</b> bei ähnlichem Score</span><span><b>${N.risk.analog ?? '–'} %</b> in den ähnlichsten Momenten</span><span class="mut"><b>${N.risk.base} %</b> im Schnitt aller Monate</span></div></div>` : ''}
     </div>
     <div>
       <div class="lbl">Säulen <span class="mut">(50 = neutral)</span></div>
@@ -747,47 +752,120 @@ function secEinschaetzung(m) {
   });
 
   // Was danach kam
+  analogSection(m, T);
+  episodeSection(m, T);
   sect(m, 'Was historisch danach kam');
   const g2 = grid(m, 'wide');
   const bt = document.createElement('div'); bt.className = 'card';
   const cur = T.bands.find(b => N.score >= b.lo && N.score < b.hi);
   bt.innerHTML = `<div class="hd"><div><div class="ttl">Renditen nach Score-Bereich</div><div class="sub">${esc(T.name)}, Monate seit ${T.since.slice(0, 4)}. Kursrendite ohne Dividenden, Median.</div></div></div>
-    <table class="t" style="margin-top:6px"><tr><th>Score</th><th>Monate</th><th>1 J.</th><th>im Plus</th><th>schlechtester 1 J.</th><th>3 J. p.a.</th><th>5 J. p.a.</th><th>tiefster Stand im 1. J.</th></tr>
-    ${T.bands.map(b => `<tr class="${b === cur ? 'hl' : ''}"><td>${b.band}${b === cur ? ' ◀' : ''}</td><td>${b.n}</td><td>${fmtPct(b.f12)}</td><td>${b.pos12 == null ? '–' : nf(b.pos12, 0) + ' %'}</td><td>${fmtPct(b.worst12, 0)}</td><td>${fmtPct(b.f36)}</td><td>${fmtPct(b.f60)}</td><td>${fmtPct(b.dd12)}</td></tr>`).join('')}
-    <tr><td class="mut">alle Monate</td><td class="mut"></td><td>${fmtPct(T.base.f12)}</td><td>${nf(T.base.pos12, 0)} %</td><td></td><td>${fmtPct(T.base.f36)}</td><td></td><td></td></tr></table>
-    <div class="note">Lesart: Steigen die Renditen von oben nach unten, hat der Score etwas getaugt. „Tiefster Stand im 1. J.“ = wie weit es nach dem Kauf zwischenzeitlich im Median nach unten ging.</div>`;
+    <table class="t" style="margin-top:6px"><tr><th>Score</th><th>Monate</th><th>Rückgang ≥ ${Math.round(T.crash * 100)} % im 1. J.</th><th>tiefster Stand im 1. J.</th><th>1 J.</th><th>im Plus</th><th>schlechtester 1 J.</th><th>3 J. p.a.</th><th>5 J. p.a.</th></tr>
+    ${T.bands.map(b => `<tr class="${b === cur ? 'hl' : ''}"><td>${b.band}${b === cur ? ' ◀' : ''}</td><td>${b.n}</td><td>${riskCell(b.crash12)}</td><td>${fmtPct(b.dd12)}</td><td>${fmtPct(b.f12)}</td><td>${b.pos12 == null ? '–' : nf(b.pos12, 0) + ' %'}</td><td>${fmtPct(b.worst12, 0)}</td><td>${fmtPct(b.f36)}</td><td>${fmtPct(b.f60)}</td></tr>`).join('')}
+    <tr><td class="mut">alle Monate</td><td class="mut"></td><td>${T.base.crash12} %</td><td>${fmtPct(T.base.dd12)}</td><td>${fmtPct(T.base.f12)}</td><td>${nf(T.base.pos12, 0)} %</td><td></td><td>${fmtPct(T.base.f36)}</td><td></td></tr></table>
+    <div class="note">Lesart: Die Spalte „Rückgang“ zeigt, wie oft es nach einem Monat in diesem Bereich innerhalb eines Jahres mindestens ${Math.round(T.crash * 100)} % nach unten ging (Monatsschlusskurse). „Tiefster Stand“ = wie weit es im Median zwischenzeitlich fiel.</div>`;
   g2.appendChild(bt);
   const rk = document.createElement('div'); rk.className = 'card';
   const R = T.rank;
-  rk.innerHTML = `<div class="hd"><div><div class="ttl">Welche Säule hat bisher geholfen?</div><div class="sub">Rangkorrelation mit der Rendite danach. 0 = kein Zusammenhang, positiv = höherer Wert, bessere Rendite.</div></div></div>
-    <table class="t" style="margin-top:6px"><tr><th></th><th>nächste 12 M.</th><th>nächste 3 J.</th></tr>
-    <tr class="hl"><td>Gesamtscore</td><td>${fmtR(R.score_f12)}</td><td>${fmtR(R.score_f36)}</td></tr>
-    ${Object.entries(R.pillars).map(([k, v]) => `<tr><td>${esc((N.pillars.find(p => p.id === k) || {}).name || k)}</td><td>${fmtR(v.f12)}</td><td>${fmtR(v.f36)}</td></tr>`).join('')}</table>
-    <div class="note">Werte um ±0,1 sind Rauschen, ab etwa 0,2 ein echter, aber schwacher Zusammenhang. Bewertung wirkt typischerweise erst über Jahre, Trend und Stimmung eher kurzfristig.</div>`;
+  rk.innerHTML = `<div class="hd"><div><div class="ttl">Welche Säule hat bisher geholfen?</div><div class="sub">Rangkorrelation mit dem, was danach kam. 0 = kein Zusammenhang, positiv = höherer Wert, besserer Verlauf.</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th></th><th>Rückgang im 1. J.</th><th>Rendite 12 M.</th><th>Rendite 3 J.</th></tr>
+    <tr class="hl"><td>Gesamtscore</td><td>${fmtR(R.score_dd)}</td><td>${fmtR(R.score_f12)}</td><td>${fmtR(R.score_f36)}</td></tr>
+    ${Object.entries(R.pillars).map(([k, v]) => `<tr><td>${esc((N.pillars.find(p => p.id === k) || {}).name || k)}</td><td>${fmtR(v.dd)}</td><td>${fmtR(v.f12)}</td><td>${fmtR(v.f36)}</td></tr>`).join('')}</table>
+    <div class="note">Werte um ±0,1 sind Rauschen, ab etwa 0,2 ein echter, aber schwacher Zusammenhang. Bewertung wirkt typischerweise erst über Jahre, Trend und Stimmung eher kurzfristig. „Rückgang“: positiv = höherer Score, kleinere Rückgänge danach.</div>`;
   g2.appendChild(rk);
 
   // Strategien
   sect(m, 'Regeln im Test');
   const st = document.createElement('div'); st.className = 'card full';
   const S3 = T.strategies;
-  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)} seit ${T.since.slice(0, 4)}, monatlich angepasst, nicht investiertes Geld im Geldmarkt. Ohne Dividenden, Steuern und Kosten.</div></div></div>
+  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)} seit ${T.since.slice(0, 4)}, monatlich angepasst (Entscheidung mit den Daten des Vormonats), nicht investiertes Geld im Geldmarkt. Ohne Dividenden, Steuern und Kosten. Logarithmisch.</div></div></div>
     <div class="legend" id="slg"></div><div class="chart tall"></div>
     <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th></tr>
-    ${S3.map((x, j) => `<tr><td><i style="display:inline-block;width:12px;border-top:2px solid ${[C.s1, C.s2, C.s3][j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td>${fmtPct(x.cagr)}</td><td>${fmtPct(x.mdd, 0)}</td><td>${nf(x.vol, 1)} %</td><td>${nf(x.expo, 0)} %</td></tr>`).join('')}</table>
+    ${S3.map((x, j) => `<tr><td><i style="display:inline-block;width:12px;border-top:2px solid ${SER[j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td>${fmtPct(x.cagr)}</td><td>${fmtPct(x.mdd, 0)}</td><td>${nf(x.vol, 1)} %</td><td>${nf(x.expo, 0)} %</td></tr>`).join('')}</table>
     <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge.</div>`;
   m.appendChild(st);
   queueMicrotask(() => {
     const ch = baseChart(st.querySelector('.chart'), { log: true, fmt: p => nf(p, 0) });
     const ds = T.strat_months.map(monthDay); const lines = [];
-    S3.forEach((x, j) => { const l = ch.addLineSeries({ color: [C.s1, C.s2, C.s3][j], lineWidth: 2, priceLineVisible: false, priceFormat: pf(0) });
+    S3.forEach((x, j) => { const l = ch.addLineSeries({ color: SER[j], lineWidth: 2, priceLineVisible: false, priceFormat: pf(0) });
       l.setData(x.eq.map((v, i) => ({ time: ds[i] * DAY, value: v * 100 }))); lines.push(l); });
     ch.timeScale().fitContent();
     const lg = st.querySelector('#slg');
     const draw = t => { const i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < 0) return;
-      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${[C.s1, C.s2, C.s3][j]}"></i>${esc(x.name)}<b>${nf(x.eq[i] * 100, 0)}</b></span>`).join('') + `<span class="d">${T.strat_months[i]}</span>`; };
+      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${SER[j]}"></i>${esc(x.name)}<b>${nf(x.eq[i] * 100, 0)}</b></span>`).join('') + `<span class="d">${T.strat_months[i]}</span>`; };
     draw(null); ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));
   });
   m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">${esc(M.note)} Das Modell fasst Daten nach festen Regeln zusammen, es kennt deine persönliche Lage nicht und garantiert nichts. Rückblicke zeigen, was war – nicht, was kommt.</div>`);
+}
+function riskCell(v) {
+  if (v == null) return '–';
+  const c = v >= 40 ? C.crit : v >= 25 ? C.serious : v >= 15 ? C.warn : C.sec;
+  return `<span style="color:${c};font-weight:600">${nf(v, 0)} %</span>`;
+}
+function analogSection(m, T) {
+  const A = T.analogs; if (!A || !A.items || !A.items.length) return;
+  sect(m, 'Ähnliche Momente in der Vergangenheit');
+  const c = document.createElement('div'); c.className = 'card full';
+  const PN = { bewertung: 'Bew.', trend: 'Trend', breite: 'Breite', konjunktur: 'Konj.', finanzen: 'Fin.', stimmung: 'Stimm.' };
+  const NOWP = Object.fromEntries(T.now.pillars.map(p => [p.id, p.score]));
+  c.innerHTML = `<div class="hd"><div><div class="ttl">Die ${A.n} ähnlichsten Monate seit ${T.since.slice(0, 4)}</div>
+    <div class="sub">Gesucht wird über alle Komponenten der sechs Säulen gleichzeitig – nicht nur über den Score. Zwischen zwei Treffern liegen mindestens 18 Monate, damit es verschiedene Episoden sind. Darunter der Verlauf des ${esc(T.name)} in den 36 Monaten danach (Start = 100).</div></div></div>
+    <div class="anasum">
+      <div><div class="lbl">nach 12 Monaten (Median)</div><div class="big" style="font-size:22px">${fmtPct(A.f12)}</div></div>
+      <div><div class="lbl">nach 24 Monaten (Median)</div><div class="big" style="font-size:22px">${fmtPct(A.f24)}</div></div>
+      <div><div class="lbl">im Plus nach 12 M.</div><div class="big" style="font-size:22px">${A.pos12 ?? '–'} %</div></div>
+      <div><div class="lbl">Rückgang ≥ ${Math.round(T.crash * 100)} % im 1. Jahr</div><div class="big" style="font-size:22px">${riskCell(A.crash12)}</div><div class="mut" style="font-size:11px">normal: ${A.crash_base} %</div></div>
+    </div>
+    <div class="legend" id="alg"></div><div class="chart tall" id="ach"></div>
+    <table class="t ana" style="margin-top:10px"><tr><th>Monat</th><th>Ähnlichkeit</th><th>Score</th>${Object.keys(PN).map(k => `<th>${PN[k]}</th>`).join('')}<th>6 M.</th><th>12 M.</th><th>24 M.</th><th>tiefster Stand 12 M.</th><th>24 M.</th></tr>
+    <tr class="hl"><td>heute</td><td></td><td>${T.now.score}</td>${Object.keys(PN).map(k => `<td>${NOWP[k] ?? '–'}</td>`).join('')}<td colspan="5" class="mut" style="font-family:inherit">?</td></tr>
+    ${A.items.map((a, i) => `<tr class="row" data-i="${i}"><td><i class="sw" style="background:${SER[i % 8]}"></i>${esc(a.name)}</td><td>${a.sim} %</td><td>${a.score}</td>${Object.keys(PN).map(k => `<td>${a.pillars[k] ?? '–'}</td>`).join('')}<td>${fmtPct(a.f6)}</td><td>${fmtPct(a.f12)}</td><td>${fmtPct(a.f24)}</td><td>${fmtPct(a.dd12)}</td><td>${fmtPct(a.dd24)}</td></tr>`).join('')}</table>
+    <div class="note">Säulenwerte 0–100, 50 = neutral. Eine Analogie ist kein Fahrplan: Ähnliche Ausgangslagen entwickelten sich oft sehr unterschiedlich – entscheidend ist die Streuung, nicht der Durchschnitt. Klick auf eine Zeile hebt ihren Verlauf hervor.</div>`;
+  m.appendChild(c);
+  queueMicrotask(() => {
+    const el = c.querySelector('#ach');
+    const base = 0; // Zeitachse: Monate nach dem Analog-Monat als künstliche Tage
+    const ch = baseChart(el, { fmt: p => nf(p, 0) });
+    ch.applyOptions({ timeScale: { tickMarkFormatter: t => `${Math.round(t / DAY / 30.44)} M.` }, localization: { timeFormatter: t => `Monat ${Math.round(t / DAY / 30.44)}`, priceFormatter: p => nf(p, 0) } });
+    const T0 = 0, step = 30.44 * DAY;
+    const lines = A.items.map((a, i) => {
+      const l = ch.addLineSeries({ color: SER[i % 8], lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerRadius: 3, priceFormat: pf(0) });
+      l.setData(a.path.map((v, h) => v == null ? null : { time: Math.round(T0 + h * step), value: v }).filter(Boolean));
+      return l;
+    });
+    const md = ch.addLineSeries({ color: C.txt, lineWidth: 3, priceLineVisible: false, lastValueVisible: true, priceFormat: pf(0) });
+    md.setData(A.median_path.map((v, h) => v == null ? null : { time: Math.round(T0 + h * step), value: v }).filter(Boolean));
+    md.createPriceLine({ price: 100, color: C.mut, lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
+    md.createPriceLine({ price: 100 * (1 - T.crash), color: C.serious, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: `−${Math.round(T.crash * 100)} %` });
+    ch.timeScale().fitContent();
+    const lg = c.querySelector('#alg');
+    const draw = h => {
+      lg.innerHTML = `<span><i style="border-color:${C.txt};border-top-width:3px"></i>Median<b>${h == null ? '' : nf(A.median_path[h], 0)}</b></span>` +
+        A.items.map((a, i) => `<span><i style="border-color:${SER[i % 8]}"></i>${esc(a.name)}${h == null || a.path[h] == null ? '' : `<b>${nf(a.path[h], 0)}</b>`}</span>`).join('') +
+        `<span class="d">${h == null ? '36 Monate danach' : 'Monat ' + h}</span>`;
+    };
+    draw(null);
+    ch.subscribeCrosshairMove(p => draw(p && p.time != null ? Math.round(p.time / step) : null));
+    let sel = null;
+    c.querySelectorAll('tr.row').forEach(r => r.onclick = () => {
+      const i = +r.dataset.i; sel = sel === i ? null : i;
+      lines.forEach((l, j) => l.applyOptions({ lineWidth: sel === null ? 1 : j === sel ? 3 : 1, color: sel === null || j === sel ? SER[j % 8] : 'rgba(120,126,140,.25)' }));
+      c.querySelectorAll('tr.row').forEach(x => x.classList.toggle('hl', sel !== null && +x.dataset.i === sel));
+    });
+  });
+}
+function episodeSection(m, T) {
+  const E = T.episodes; if (!E || !E.length) return;
+  sect(m, 'Große Einbrüche – hat das Modell gewarnt?');
+  const c = document.createElement('div'); c.className = 'card full';
+  const mn = p => { const [y, mo] = p.split('-'); return `${['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'][+mo - 1]} ${y}`; };
+  c.innerHTML = `<div class="hd"><div><div class="ttl">Alle Rückgänge des ${esc(T.name)} von mindestens ${Math.round(T.episode * 100)} % seit ${T.since.slice(0, 4)}</div>
+    <div class="sub">Monatsschlusskurse. „Warnung“ = erster Monat ab 6 Monate vor dem Hoch bis zum Tief, in dem der Score unter 45 fiel. Rechts: größter Verlust im selben Zeitraum, wenn man der jeweiligen Regel gefolgt wäre.</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th>Hoch</th><th>Tief</th><th>Verlust</th><th>Dauer</th><th>Score am Hoch</th><th>Warnung</th><th>da schon verloren</th><th>Modell-Quote</th><th>Trendregel</th><th>Schutzregel</th></tr>
+    ${E.map(e => `<tr><td>${mn(e.peak)}</td><td>${mn(e.trough)}</td><td>${fmtPct(e.depth, 0)}</td><td>${e.months} M.</td><td>${e.s_peak ?? '–'}</td>
+      <td style="font-family:inherit">${e.warn ? mn(e.warn) : '<span style="color:var(--serious)">keine</span>'}</td><td>${e.lost_at_warn == null ? '–' : fmtPct(e.lost_at_warn, 0)}</td>
+      <td>${fmtPct(e.dd_score, 0)}</td><td>${fmtPct(e.dd_trend, 0)}</td><td>${fmtPct(e.dd_schutz, 0)}</td></tr>`).join('')}</table>
+    <div class="note">Schnelle Schocks wie 1987 oder 2020 kündigen sich in Monatsdaten kaum an – das Modell hilft vor allem bei langen Abwärtsphasen wie 1973/74, 2000–2002 und 2007–2009, die den größten Schaden anrichten.</div>`;
+  m.appendChild(c);
 }
 function fmtPct(v, d = 1) { if (v == null) return '–'; const c = v > 0 ? 'up' : v < 0 ? 'down' : 'flat'; return `<span class="${c}">${v > 0 ? '+' : ''}${nf(v, d)} %</span>`; }
 function fmtR(v) { if (v == null) return '–'; return `<span style="color:${Math.abs(v) < 0.1 ? C.mut : v > 0 ? C.up : C.down}">${v > 0 ? '+' : ''}${nf(v, 2)}</span>`; }
