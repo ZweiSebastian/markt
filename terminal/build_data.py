@@ -475,13 +475,16 @@ slow("claims", claims, ["claims"])
 def aaii():
     r = get("https://www.aaii.com/files/surveys/sentiment.xls", 60)
     x = pd.read_excel(io.BytesIO(r.content), sheet_name=0, header=None, engine="xlrd")
-    rows = [i for i in range(min(60, len(x))) if any("bull" in str(v).lower() for v in x.iloc[i]) and any("bear" in str(v).lower() for v in x.iloc[i])]
+    def isb(v, a, b):
+        v = str(v).lower()
+        return a in v and b not in v
+    rows = [i for i in range(min(60, len(x))) if any(isb(v, "bull", "bear") for v in x.iloc[i]) and any(isb(v, "bear", "bull") for v in x.iloc[i])]
     if not rows:
         raise RuntimeError("Kopf nicht gefunden: " + " | ".join(" ".join(str(v)[:12] for v in x.iloc[i, :8]) for i in range(8)))
     hdr = rows[0]
     cols = [str(v).strip().lower() for v in x.iloc[hdr]]
-    ib = next(i for i, c in enumerate(cols) if "bull" in c)
-    ir = next(i for i, c in enumerate(cols) if "bear" in c)
+    ib = next(i for i, c in enumerate(cols) if isb(c, "bull", "bear"))
+    ir = next(i for i, c in enumerate(cols) if isb(c, "bear", "bull"))
     d = x.iloc[hdr + 1:]
     dt = pd.to_datetime(d.iloc[:, 0], errors="coerce")
     bull = pd.to_numeric(d.iloc[:, ib], errors="coerce")
@@ -490,10 +493,12 @@ def aaii():
         bull, bear = bull * 100, bear * 100
     s = pd.Series((bull - bear).values, index=dt).dropna()
     s = s[s.index.notna()]
+    if s.tail(20).abs().max() < 0.01:
+        raise RuntimeError("Bullen und Bären identisch – Spalten falsch erkannt: " + str(cols[:10]))
     put("aaii", s.rolling(4).mean(), "Anlegerstimmung AAII (Bullen − Bären, 4-W.-Ø)", "risiko", "Pp.", "rate", "AAII", "w", 1)
 
 
-slow("aaii", aaii, ["aaii"])
+slow("aaii2", aaii, ["aaii"])
 
 
 def msci_eur():

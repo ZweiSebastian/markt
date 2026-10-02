@@ -277,7 +277,7 @@ function chartCard(spec) {
       }
       ser.setData(data);
       if (spec.ref != null) ser.createPriceLine({ price: spec.ref, color: C.mut, lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: spec.refLabel || '' });
-      lines.push({ id, ser, col, first: sl.v[0], lastv: sl.v[sl.v.length - 1], lastd: sl.t[sl.t.length - 1] });
+      lines.push({ id, ser, col, first: sl.v[0], firstd: sl.t[0], lastv: sl.v[sl.v.length - 1], lastd: sl.t[sl.t.length - 1] });
     });
     if (spec.sma) { // gleitender Durchschnitt zur ersten Reihe
       const s = S[ids[0]]; const m = sma(s.v, spec.sma); const from = (lastDay(ids[0]) || 0) - span; const d = [];
@@ -294,7 +294,7 @@ function chartCard(spec) {
         const c = spec.norm ? null : chg(l.id, l.first, val);
         return `<span><i style="border-color:${spec.type === 'baseline' || spec.type === 'hist' ? C.s1 : l.col}"></i>${esc(S[l.id].name)}<b>${shown}</b> ${c ? fmtC(c) : ''}</span>`;
       }).join('') + (spec.sma ? `<span><i style="border-color:${C.mut};border-top-style:dashed"></i>${spec.sma}-Tage-Linie</span>` : '') +
-        `<span class="d">${day != null ? fmtDate(day) : 'seit ' + fmtDate(Math.max(...lines.map(l => l.lastd)) - span, true)}</span>`;
+        `<span class="d">${day != null ? fmtDate(day) : 'seit ' + fmtDate(Math.min(...lines.map(l => l.firstd)))}</span>`;
     };
     draw(null, null);
     ch.subscribeCrosshairMove(p => { if (!p || p.time == null) draw(null, null); else draw(p.seriesData, p.time / DAY); });
