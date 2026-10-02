@@ -12,6 +12,6 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for t in build-19 build-20 build-21 build-22 build-23 build-24 build-25; do
+          for t in build-19 build-20 build-21 build-22 build-23 build-24 build-25 build-26; do
             gh release delete "$t" -R "${{ github.repository }}" --yes --cleanup-tag && echo "gelöscht $t" || echo "::warning::$t nicht gelöscht"
           done
