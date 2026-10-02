@@ -390,7 +390,7 @@ def run(ser, markt, now):
                "crash_same_score": None if not len(sim_score) else round(float((sim_score.dd <= -CRASH).mean() * 100))}
 
         # ---------- aktueller Stand
-        now_score = None if last_i is None else float(score[last_i])
+        now_score = None if last_i is None else float(round(score[last_i]))   # gerundet, damit Anzeige, Ampel und Bereich zusammenpassen
         lab = label(now_score)
         pil_now = []
         for p in WEIGHTS:
