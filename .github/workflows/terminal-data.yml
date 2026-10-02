@@ -34,7 +34,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p out; python terminal/build_data.py | tee out/log.txt || python terminal/build_data.py | tee out/log.txt
-          grep '^FEHL' out/log.txt | while IFS= read -r l; do echo "::warning::$l"; done
+          (grep '^FEHL' out/log.txt || true) | while IFS= read -r l; do echo "::warning::$l"; done
       - name: Auf Branch terminal-data schreiben
         run: |
           cd out
