@@ -631,7 +631,7 @@ function secKonjunktur(m) {
   const g = grid(m);
   g.appendChild(chartCard({ ids: ['cpi', 'core'], title: 'US-Inflation', ref: 2, refLabel: 'Ziel 2 %' }));
   g.appendChild(chartCard({ ids: ['unemp'], title: 'US-Arbeitslosenquote' }));
-  g.appendChild(chartCard({ ids: ['sahm'], title: 'Sahm-Regel', type: 'baseline', base: 0.5, sub: 'Über 0,5 (rot) begann bisher fast immer eine Rezession' }));
+  g.appendChild(chartCard({ ids: ['sahm'], title: 'Sahm-Regel', ref: 0.5, refLabel: 'Schwelle 0,5', sub: 'Steigt der Wert über 0,5, begann bisher fast immer eine Rezession' }));
   g.appendChild(chartCard({ ids: ['payrolls'], title: 'Neue Stellen pro Monat (Tsd.)', type: 'hist' }));
   g.appendChild(chartCard({ ids: ['fedbs'], title: 'Fed-Bilanzsumme', sub: 'Steigt bei Anleihekäufen (QE), fällt beim Abbau (QT)' }));
   g.appendChild(chartCard({ ids: ['mort30'], title: 'US-Hypothekenzins 30J' }));
