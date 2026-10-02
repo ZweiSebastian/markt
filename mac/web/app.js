@@ -666,7 +666,7 @@ function monthDay(p) { return Math.floor(Date.UTC(+p.slice(0, 4), +p.slice(5, 7)
 function gaugeHTML(score) {
   const segs = BANDC.map(([a, b, c]) => `<div style="left:${a}%;width:${b - a}%;background:${c}"></div>`).join('');
   return `<div class="gauge">${segs}<i style="left:calc(${Math.max(0, Math.min(100, score))}% - 2px)"></i></div>
-    <div class="gscale"><span>0</span><span style="margin-left:20%">35</span><span>45</span><span style="margin-left:10%">65</span><span>100</span></div>`;
+    <div class="gscale">${[0, 35, 45, 65, 100].map(v => `<span style="left:${v}%">${v}</span>`).join('')}</div>`;
 }
 function pillarBar(v) { // 0..100, Mitte 50
   if (v == null) return '<span class="mut">–</span>';
@@ -710,7 +710,7 @@ function secEinschaetzung(m) {
   N.pillars.forEach(p => {
     const c = document.createElement('div'); c.className = 'card';
     c.innerHTML = `<div class="hd"><div class="ttl">${esc(p.name)} <small>${Math.round(p.weight * 100)} % Gewicht</small></div><div class="big" style="font-size:20px">${p.score == null ? '–' : p.score}</div></div>
-      <table class="t comp">${p.comps.map(k => `<tr><td>${esc(k.name)}<div class="mut" style="font-size:11px">${esc(k.text || '')}${k.asof && k.asof !== N.month ? ' · Stand ' + k.asof : ''}</div></td><td>${compBar(k.score)}</td></tr>`).join('')}</table>`;
+      <table class="t comp">${p.comps.map(k => `<tr style="${k.stale ? 'opacity:.55' : ''}"><td>${esc(k.name)}<div class="mut" style="font-size:11px">${esc(k.text || '')}${k.asof && k.asof !== N.month ? ' · Stand ' + k.asof : ''}${k.stale ? ' · zu alt, nicht eingerechnet' : ''}</div></td><td>${compBar(k.score)}</td></tr>`).join('')}</table>`;
     g.appendChild(c);
   });
   g.appendChild(ruleCard(M));

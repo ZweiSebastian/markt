@@ -210,7 +210,9 @@ svg text { font-family: -apple-system, system-ui, sans-serif; }
 .gauge div { position: absolute; top: 0; bottom: 0; opacity: .85; }
 .gauge div + div { border-left: 2px solid var(--panel); }
 .gauge i { position: absolute; top: -4px; width: 4px; height: 18px; background: var(--txt); border-radius: 2px; box-shadow: 0 0 0 2px var(--panel); }
-.gscale { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--mut); margin-top: 3px; font-family: var(--mono); }
+.gscale { position: relative; height: 14px; font-size: 10.5px; color: var(--mut); margin-top: 3px; font-family: var(--mono); }
+.gscale span { position: absolute; transform: translateX(-50%); }
+.gscale span:first-child { transform: none; } .gscale span:last-child { transform: translateX(-100%); }
 .action { margin-top: 14px; font-size: 14px; }
 .action b { color: var(--txt); }
 table.pil td, table.comp td { padding: 6px 6px; }

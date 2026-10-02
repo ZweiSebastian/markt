@@ -514,6 +514,8 @@ def gdp():
         raise RuntimeError("BIP-Reihe nicht gefunden: " + ", ".join(d["series_code"] for d in docs[:10]))
     code = sorted(cand, key=lambda d: len(d["series_code"]))[0]["series_code"]
     s = dbn("BEA/NIPA-T10105/" + code, "1970-01-01")
+    if s.median() > 1e6:   # BEA liefert Mio. $
+        s = s / 1000
     put("gdp", s, "US-BIP nominal (Jahresrate, Mrd. $)", "intern", "Mrd. $", "price", "BEA", "m", 0)
     note("gdp", True, code)
 

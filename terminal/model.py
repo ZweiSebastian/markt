@@ -17,6 +17,7 @@ Einschränkung: Konjunkturdaten sind in der heutigen (revidierten) Fassung verwe
 wie man sie damals kannte; der Rückblick ist dadurch etwas zu optimistisch.
 """
 import math
+import re
 
 import numpy as np
 import pandas as pd
@@ -262,8 +263,9 @@ def run(ser, markt, now):
                     txt = m2[c][3](vv) if vv is not None else ""
                 except Exception:  # noqa
                     txt = ""
+                stale = sc.index[-1] != last_i or pd.isna(C[c].get(last_i))
                 comps.append({"id": c, "name": m2[c][1], "text": txt, "score": round(float(sc.iloc[-1]), 2),
-                              "asof": str(sc.index[-1])})
+                              "asof": str(sc.index[-1]), "stale": bool(stale)})
             pv = Pl[p].loc[:last_i].dropna()
             pil_now.append({"id": p, "name": PILLAR_NAMES[p], "weight": WEIGHTS[p],
                             "score": None if not len(pv) else round(float(50 + 50 * pv.iloc[-1]), 0), "comps": comps})
@@ -284,12 +286,27 @@ def run(ser, markt, now):
             sent.append(f"Seit {bt_start.year} lag der Score in {b['n']} Monaten in diesem Bereich ({b['band']}). "
                         f"Ein Jahr später stand der {tname} im Median {b['f12']:+.1f} % (alle Monate: {base['f12']:+.1f} %), "
                         f"in {b['pos12']:.0f} % der Fälle im Plus; der schlechteste Fall war {b['worst12']:+.0f} %.")
+        lo = bands[0]
+        mid = [x for x in bands[1:] if x["n"]]
+        if lo["n"] and mid:
+            lo_f = lo["f12"]; mid_f = sorted(x["f12"] for x in mid)
+            sent.append(f"Den größten Unterschied macht die Gefahrenzone: Unter 35 lag der {tname} ein Jahr später im Median bei {lo_f:+.1f} % "
+                        f"(nur {lo['pos12']:.0f} % der Fälle im Plus). Oberhalb davon unterschieden sich die Ergebnisse kaum "
+                        f"({mid_f[0]:+.1f} bis {mid_f[-1]:+.1f} %) – der Score ist vor allem eine Risiko-Ampel, kein Renditeprognose-Werkzeug.")
         rc = rank["score_f12"]
         if rc is not None:
             q = "kaum" if abs(rc) < 0.1 else "schwach" if abs(rc) < 0.2 else "spürbar" if abs(rc) < 0.35 else "deutlich"
             sent.append(f"Wie gut der Score bisher war: Er hing {q} mit der Rendite der folgenden 12 Monate zusammen "
                         f"(Rangkorrelation {rc:+.2f}; über 5 Jahre {rank['score_f60']:+.2f}).")
 
+        sb, ss = strategies[0], strategies[2]
+        sent.append(f"Als feste Regel umgesetzt (Modell-Quote) wären es seit {bt_start.year} {ss['cagr']:+.1f} % p.a. bei höchstens {ss['mdd']:.0f} % Verlust gewesen – "
+                    f"Kaufen und Halten brachte {sb['cagr']:+.1f} % p.a., musste aber {sb['mdd']:.0f} % aushalten.")
+        dez = lambda t: re.sub(r"(\d)\.(\d)", r"\1,\2", t)   # deutsche Dezimalkommas
+        sent = [dez(x) for x in sent]
+        for p_ in pil_now:
+            for c_ in p_["comps"]:
+                c_["text"] = dez(c_.get("text") or "")
         hist_idx = score.dropna().index
         targets[key] = {
             "name": tname,
