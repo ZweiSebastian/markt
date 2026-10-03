@@ -526,9 +526,28 @@ def ecb():
     put("eu10", ecb_csv("YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y", "2004-01-01"), "Euro-Zins 10J (AAA-Kurve)", "zinsen", "%", "rate", "EZB", dec=3)
     put("hicp", ecb_csv("ICP/M.U2.N.000000.4.ANR", "1997-01-01"), "Euro-Inflation (HICP)", "konjunktur", "%", "rate", "EZB", "m", 1)
     put("ecbbs", ecb_csv("ILM/W.U2.C.T000000.Z5.Z01", "1999-01-01") / 1e6, "EZB-Bilanzsumme", "konjunktur", "Bio. €", "price", "EZB", "w", 3)
+    s3 = ecb_csv("YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_3M", "2004-01-01")
+    eu10 = ser("eu10")
+    if eu10 is not None:
+        j = pd.concat([eu10, s3], axis=1, join="inner").dropna()
+        cm = (j.iloc[:, 0] - j.iloc[:, 1])
+        cm = cm.groupby(cm.index.to_period("M")).mean()
+        cm.index = cm.index.to_timestamp()
+        put("curve_ea", cm, "Zinskurve 10J − 3M Euroraum (AAA)", "zinsen", "Pp.", "rate", "EZB (berechnet)", "m", 2)
 
 
-slow("ezb", ecb, ["ecb", "eu10", "hicp", "ecbbs"])
+slow("ezb", ecb, ["ecb", "eu10", "hicp", "ecbbs", "curve_ea"])
+
+
+def eurostat_unemp():
+    j = get("https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/une_rt_m?geo=EA20&s_adj=SA&age=TOTAL&sex=T&unit=PC_ACT&format=JSON&lang=EN", 60).json()
+    tix = j["dimension"]["time"]["category"]["index"]
+    vals = j["value"]
+    s_ = pd.Series({pd.Timestamp(k.replace("M", "-") + "-01"): vals.get(str(i)) for k, i in tix.items()}).dropna().sort_index()
+    put("unemp_ea", s_, "Arbeitslosenquote Euroraum", "konjunktur", "%", "rate", "Eurostat", "m", 1)
+
+
+slow("eurostat_unemp", eurostat_unemp, ["unemp_ea"])
 
 
 # ------------------------------------------------------------------ Konjunktur (BLS, lange Historie)
@@ -572,15 +591,18 @@ slow("nfci", nfci, ["nfci", "anfci"])
 
 
 def oecd():
-    url = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/USA+G7+DEU+JPN+CHN+EA19.M.LI...AA...H"
+    url = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/USA+G7+DEU+JPN+CHN+EA19+EA20.M.LI...AA...H"
            "?startPeriod=1960-01&dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
     d = pd.read_csv(io.StringIO(get(url, 90).text))
     for area, sid, name in [("USA", "cli_us", "OECD-Frühindikator USA"), ("G7", "cli_g7", "OECD-Frühindikator G7"),
-                            ("DEU", "cli_de", "OECD-Frühindikator Deutschland"), ("EA19", "cli_ea", "OECD-Frühindikator Euroraum"),
+                            ("DEU", "cli_de", "OECD-Frühindikator Deutschland"), ("EA20", "cli_ea", "OECD-Frühindikator Euroraum"), ("EA19", "cli_ea", "OECD-Frühindikator Euroraum"),
                             ("JPN", "cli_jp", "OECD-Frühindikator Japan"), ("CHN", "cli_cn", "OECD-Frühindikator China")]:
         x = d[d["REF_AREA"] == area]
         if not len(x):
-            note(sid, False, "keine Daten")
+            if sid not in series:
+                note(sid + " " + area, False, "keine Daten")
+            continue
+        if sid in series:
             continue
         s = pd.Series(x["OBS_VALUE"].values, index=pd.to_datetime(x["TIME_PERIOD"]))
         put(sid, s, name, "konjunktur", "", "rate", "OECD", "m", 2)
