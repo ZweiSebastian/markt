@@ -40,7 +40,7 @@ const RANGES = [['1M', 31], ['3M', 92], ['6M', 183], ['1J', 365], ['3J', 1096], 
 let RANGE = +(load('range') || 365);
 
 const SECTIONS = [
-  ['einschaetzung', 'Einschätzung'], ['lage', 'Lage'], ['maerkte', 'Märkte'], ['bewertung', 'Bewertung'], ['zinsen', 'Zinsen'],
+  ['einschaetzung', 'Einschätzung'], ['signale', 'Signale'], ['lage', 'Lage'], ['maerkte', 'Märkte'], ['bewertung', 'Bewertung'], ['zinsen', 'Zinsen'],
   ['risiko', 'Risiko & Breite'], ['rohstoffe', 'Rohstoffe'], ['fx', 'Währungen & Krypto'], ['konjunktur', 'Konjunktur'],
   ['zusammen', 'Zusammenhänge'], ['news', 'News'],
 ];
@@ -370,7 +370,7 @@ function renderSection() {
   disposeCharts(); hideTip();
   const m = document.getElementById('main'); m.innerHTML = '';
   if (!DATA) return;
-  ({ einschaetzung: secEinschaetzung, lage: secLage, maerkte: secMaerkte, bewertung: secBewertung, zinsen: secZinsen, risiko: secRisiko,
+  ({ einschaetzung: secEinschaetzung, signale: secSignale, lage: secLage, maerkte: secMaerkte, bewertung: secBewertung, zinsen: secZinsen, risiko: secRisiko,
     rohstoffe: secRohstoffe, fx: secFx, konjunktur: secKonjunktur, zusammen: secZusammen, news: secNews }[SECTION] || secEinschaetzung)(m);
 }
 function head(m, title, lead) { m.insertAdjacentHTML('beforeend', `<h1>${title}</h1>${lead ? `<p class="lead">${lead}</p>` : ''}`); }
@@ -980,6 +980,90 @@ function ruleCard(M) {
   return c;
 }
 
+
+// ---------- Signale (Ein-/Ausstieg, eigener Reiter zum Vergleich mit der Einschätzung)
+function secSignale(m) {
+  const M = DATA.model;
+  head(m, 'Signale', 'Klare Ein- und Ausstiegssignale statt Score. Sicherheit hat Vorrang: raus erst bei Bestätigung, wieder rein bewusst spät. Die Regeln wurden nur mit dem S&P 500 bis 1989 festgelegt und danach unverändert getestet – an 1990 bis heute und an allen anderen Indizes.');
+  if (!M || !M.signal_params || !M.targets) { m.insertAdjacentHTML('beforeend', '<div class="card"><div class="note">Signale werden mit der nächsten Datenaktualisierung berechnet.</div></div>'); return; }
+  if (!M.targets[TGT] || !M.targets[TGT].signals || M.targets[TGT].signals.error) TGT = 'world';
+  const Pp = M.signal_params, Cal = M.signal_cal || {};
+  const rule = `<b>Aussteigen</b>, wenn der Score an ${Pp.exit_n} Börsentagen in Folge unter ${Pp.exit_s} liegt${Pp.exit_trend ? ' und der Kurs unter seiner 10-Monats-Linie' : ''}. <b>Wieder einsteigen</b>, wenn der Score an ${Pp.entry_n} Börsentagen in Folge mindestens ${Pp.entry_s} erreicht und der Kurs über seiner 10-Monats-Linie liegt. Nach jedem Wechsel mindestens 20 Börsentage Pause.`;
+  const rc = document.createElement('div'); rc.className = 'card full';
+  rc.innerHTML = `<div class="hd"><div><div class="ttl">Die Regel</div><div class="sub">${rule}</div></div></div>
+    <div class="note">Ausgewählt aus ${Cal.n_tested || '–'} Varianten mit dem S&P 500 ${Cal.from ? Cal.from.slice(0, 4) : ''}–${Cal.to ? Cal.to.slice(0, 4) : ''}: kleinster größter Verlust bei höchstens 2,5 Ausstiegen pro Jahrzehnt und höchstens 1 Prozentpunkt weniger Rendite als Kaufen und Halten. In diesem Zeitraum: ${fmtPct(Cal.cagr)} p.a. bei höchstens ${fmtPct(Cal.mdd, 0)} Verlust – Kaufen und Halten ${fmtPct(Cal.bh_cagr)} p.a. bei ${fmtPct(Cal.bh_mdd, 0)}. Alles danach hat die Regel nie gesehen.</div>`;
+  m.appendChild(rc);
+
+  const ov = document.createElement('div'); ov.className = 'card full';
+  const condTxt = (S) => S.state === 1
+    ? `Ausstieg erst nach ${S.need} Tagen Score &lt; ${Pp.exit_s}${Pp.exit_trend ? ' + Kurs unter Linie' : ''} – erfüllt seit ${S.run} Tagen`
+    : `Wiedereinstieg erst nach ${S.need} Tagen Score ≥ ${Pp.entry_s} + Kurs über Linie – erfüllt seit ${S.run} Tagen`;
+  ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes</div><div class="sub">Stand nach dem letzten Tagesschluss. Kennzahlen ab 1990 – also außerhalb des Zeitraums, mit dem die Regel festgelegt wurde. Klick auf eine Zeile zeigt Details.</div></div></div>
+    <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Signal</th><th>seit</th><th>Score</th><th>Bedingung</th><th>Rendite p.a.<br>Signal / Halten</th><th>größter Verlust<br>Signal / Halten</th><th>Ausstiege<br>pro Jahrzehnt</th><th>davon<br>Fehlalarme</th></tr>
+    ${Object.entries(M.targets).filter(([k, t]) => t.signals && !t.signals.error).map(([k, t]) => { const S = t.signals, O = S.oos || S.all;
+      return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td>
+      <td style="font-family:inherit">${S.state === 1 ? '<span class="badge good">Investiert</span>' : '<span class="badge crit">Draußen</span>'}</td>
+      <td>${fmtDate(monthDay(S.since))}</td><td>${S.score}</td><td style="font-family:inherit;white-space:normal;font-size:11.5px;color:var(--sec);max-width:260px">${condTxt(S)}</td>
+      <td>${fmtPct(O.cagr)} / ${fmtPct(O.bh_cagr)}</td><td>${fmtPct(O.mdd, 0)} / ${fmtPct(O.bh_mdd, 0)}</td><td>${nf(O.per_decade ?? 0, 1)}</td>
+      <td>${S.false} von ${S.false + S.useful}</td></tr>`; }).join('')}</table>
+    <div class="note">Fehlalarm = Ausstieg, nach dem der Wiedereinstieg teurer war als der Ausstieg. Das Signal wird mit den Tagesdaten der Pipeline berechnet (alle 30 Minuten während der US-Handelszeit), nicht mit jedem Live-Kurs – ein Wechsel braucht ohnehin mehrere Tage Bestätigung.</div>`;
+  ov.querySelectorAll('tr.row').forEach(r => r.onclick = () => { TGT = r.dataset.t; store('tgt', TGT); renderSection(); });
+  m.appendChild(ov);
+
+  const T = M.targets[TGT], S = T.signals;
+  if (!S || S.error) return;
+  sect(m, esc(T.name) + ' im Detail');
+  // Chart mit Wechseln
+  const ch = document.createElement('div'); ch.className = 'card full';
+  ch.innerHTML = `<div class="hd"><div><div class="ttl">${esc(T.name)} mit allen Ein- und Ausstiegen seit ${S.all.from.slice(0, 4)}</div><div class="sub">Rot ▼ = Ausstieg, grün ▲ = Wiedereinstieg. Logarithmisch, Wochenwerte. Darunter: was aus 100 geworden wäre.</div></div></div>
+    <div class="legend" id="sglg"></div><div class="chart tall"></div><div class="chart" style="height:220px"></div>
+    <table class="t" style="margin-top:8px"><tr><th>Zeitraum</th><th>Rendite p.a. Signal</th><th>Halten</th><th>größter Verlust Signal</th><th>Halten</th><th>Ausstiege</th><th>Ø investiert</th></tr>
+    ${[['Festlegung (bis 1989)', S.is], ['Test (ab 1990)', S.oos], ['gesamt', Object.assign({ exits: S.n_trades ? Math.ceil(S.n_trades / 2) : 0 }, S.all)]].filter(x => x[1]).map(([n, O]) =>
+      `<tr class="${n.startsWith('Test') ? 'hl' : ''}"><td>${n} <span class="mut">${O.from ? O.from.slice(0, 4) : ''}${O.to ? '–' + O.to.slice(0, 4) : ''}</span></td><td>${fmtPct(O.cagr)}</td><td>${fmtPct(O.bh_cagr)}</td><td>${fmtPct(O.mdd, 0)}</td><td>${fmtPct(O.bh_mdd, 0)}</td><td>${O.exits ?? '–'}</td><td>${O.invested} %</td></tr>`).join('')}</table>
+    <div class="note">Kursrenditen ohne Dividenden, nicht investiertes Geld im Geldmarkt, ohne Steuern und Kosten. Wichtig: Jeder Ausstieg ist in Deutschland ein steuerpflichtiger Verkauf – bei wenigen Wechseln pro Jahrzehnt fällt das weniger ins Gewicht, verschwindet aber nicht.</div>`;
+  m.appendChild(ch);
+  queueMicrotask(() => {
+    const els = ch.querySelectorAll('.chart'); const H = T.hist; const ds = H.days.map(monthDay);
+    const a = baseChart(els[0], { log: true, fmt: p => nf(p, 0) });
+    const ps = a.addLineSeries({ color: C.s1, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, priceFormat: pf(0) });
+    const data = ds.map((d, i) => ({ time: d * DAY, value: H.price[i] })).filter(x => x.value != null);
+    ps.setData(data);
+    const times = data.map(x => x.time);
+    const snap = t => { let lo = 0, hi = times.length - 1; while (lo < hi) { const mid = (lo + hi) >> 1; if (times[mid] < t) lo = mid + 1; else hi = mid; } return times[lo]; };
+    ps.setMarkers(S.trades.map(x => ({ time: snap(monthDay(x.d) * DAY), position: x.k === 'aus' ? 'aboveBar' : 'belowBar', color: x.k === 'aus' ? C.crit : C.good, shape: x.k === 'aus' ? 'arrowDown' : 'arrowUp', size: 1 }))
+      .filter((v, i, arr) => arr.findIndex(y => y.time === v.time) === i).sort((x, y) => x.time - y.time));
+    a.timeScale().fitContent();
+    const b = baseChart(els[1], { log: true, fmt: p => nf(p, 0) });
+    const qd = S.eq.days.map(monthDay);
+    const l1 = b.addLineSeries({ color: C.s3, lineWidth: 2, priceLineVisible: false, priceFormat: pf(0) });
+    l1.setData(qd.map((d, i) => ({ time: d * DAY, value: S.eq.sig[i] * 100 })));
+    const l2 = b.addLineSeries({ color: C.s2, lineWidth: 1.5, priceLineVisible: false, priceFormat: pf(0) });
+    l2.setData(qd.map((d, i) => ({ time: d * DAY, value: S.eq.bh[i] * 100 })));
+    b.timeScale().fitContent();
+    const lg = ch.querySelector('#sglg');
+    lg.innerHTML = `<span><i style="border-color:${C.s1}"></i>${esc(T.name)}</span><span style="color:${C.crit}">▼ Ausstieg</span><span style="color:${C.good}">▲ Wiedereinstieg</span><span><i style="border-color:${C.s3}"></i>Signal (unten)</span><span><i style="border-color:${C.s2}"></i>Kaufen und halten (unten)</span>`;
+  });
+  // Bilanz je Crash
+  const ep = document.createElement('div'); ep.className = 'card full';
+  ep.innerHTML = `<div class="hd"><div><div class="ttl">Bilanz je großem Einbruch (≥ 20 %)</div><div class="sub">Wie weit unter dem Hoch kam der Ausstieg, wie weit über dem Tief der Wiedereinstieg? Hellere Zeilen: Zeitraum, mit dem die Regel festgelegt wurde.</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th>Hoch</th><th>Tief</th><th>Verlust Index</th><th>Ausstieg</th><th>unter Hoch</th><th>Wiedereinstieg</th><th>über Tief</th><th>Verlust mit Signal</th></tr>
+    ${S.episodes.map(e => `<tr style="${e.oos ? '' : 'opacity:.6'}"><td>${fmtDate(monthDay(e.peak))}</td><td>${fmtDate(monthDay(e.trough))}</td><td>${fmtPct(e.depth, 0)}</td>
+      <td style="font-family:inherit">${e.exit ? fmtDate(monthDay(e.exit)) + (e.already_out ? ' <span class="mut">(schon vorher)</span>' : '') : '<span style="color:var(--serious)">keiner</span>'}</td>
+      <td>${e.exit_vs_peak == null ? '–' : e.already_out ? '<span class="up">vorher raus</span>' : fmtPct(e.exit_vs_peak)}</td>
+      <td style="font-family:inherit">${e.entry ? fmtDate(monthDay(e.entry)) : e.exit ? '<span class="mut">noch draußen</span>' : '–'}</td><td>${e.entry_vs_trough == null ? '–' : fmtPct(e.entry_vs_trough)}</td>
+      <td>${fmtPct(e.strat_dd, 0)}</td></tr>`).join('')}</table>
+    <div class="note">„Keiner“ heißt: Der Einbruch war zu schnell oder zu flach für die Bestätigungsregel – der volle Verlust wurde mitgenommen. Der Wiedereinstieg liegt oft deutlich über dem Tief: Das ist der Preis dafür, nicht in Zwischenerholungen einzusteigen.</div>`;
+  m.appendChild(ep);
+  // alle Wechsel
+  const tr = document.createElement('div'); tr.className = 'card full';
+  tr.innerHTML = `<div class="hd"><div><div class="ttl">Alle Ausstiege – sinnvoll oder Fehlalarm?</div><div class="sub">${S.useful} sinnvoll (im Median ${S.useful_gain == null ? '–' : nf(S.useful_gain, 1) + ' %'} günstiger wieder eingestiegen), ${S.false} Fehlalarme (im Median ${S.false_cost == null ? '–' : nf(S.false_cost, 1) + ' %'} teurer wieder eingestiegen).</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th>Ausstieg</th><th>Wiedereinstieg</th><th>Kurs bei Wiedereinstieg ggü. Ausstieg</th><th>tiefster Stand dazwischen</th><th>Ergebnis</th></tr>
+    ${S.pairs.slice().reverse().map(x => `<tr><td>${fmtDate(monthDay(x.aus))}</td><td>${x.ein ? fmtDate(monthDay(x.ein)) : '<span class="mut">noch draußen</span>'}</td>
+      <td>${x.chg == null ? '–' : `<span class="${x.chg < 0 ? 'up' : 'down'}">${x.chg > 0 ? '+' : ''}${nf(x.chg, 1)} %</span>`}</td>
+      <td>${fmtPct(x.low)}</td><td style="font-family:inherit">${x.chg == null ? '–' : x.chg < 0 ? '<span class="badge good">sinnvoll</span>' : '<span class="badge warn">Fehlalarm</span>'}</td></tr>`).join('')}</table>`;
+  m.appendChild(tr);
+  m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">Vergleich zur Einschätzung: Dort gibt es eine stufenlose Lagebewertung und eine Wahrscheinlichkeit, hier eine Ja/Nein-Entscheidung mit Bestätigungsregeln. Beide nutzen denselben Score. Kein Anlagerat – ein Regelwerk, getestet an der Vergangenheit.</div>`);
+}
 // ---------- Zusammenhänge
 let MX = { f: load('mx_f') || 'w', d: +(load('mx_d') || 730) };
 let CMP = { a: load('cmp_a') || 'y10', b: load('cmp_b') || 'ndx', mode: load('cmp_mode') || 'auto', win: +(load('cmp_win') || 0) };
