@@ -999,14 +999,14 @@ function secSignale(m) {
     ? `Ausstieg erst nach ${S.need} Tagen Score &lt; ${Pp.exit_s}${Pp.exit_trend ? ' + Kurs unter Linie' : ''} – erfüllt seit ${S.run} Tagen`
     : `Wiedereinstieg erst nach ${S.need} Tagen Score ≥ ${Pp.entry_s} + Kurs über Linie – erfüllt seit ${S.run} Tagen`;
   ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes</div><div class="sub">Stand nach dem letzten Tagesschluss. Kennzahlen ab 1990 – also außerhalb des Zeitraums, mit dem die Regel festgelegt wurde. Klick auf eine Zeile zeigt Details.</div></div></div>
-    <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Signal</th><th>seit</th><th>Score</th><th>Bedingung</th><th>Rendite p.a.<br>Signal / Halten</th><th>größter Verlust<br>Signal / Halten</th><th>Ausstiege<br>pro Jahrzehnt</th><th>davon<br>Fehlalarme</th></tr>
+    <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Signal</th><th>seit</th><th>Score</th><th>Bedingung</th><th>Rendite p.a.<br>Signal / Halten</th><th>größter Verlust<br>Signal / Halten</th><th>Ausstiege<br>pro Jahrzehnt</th><th>davon<br>teurer zurück</th></tr>
     ${Object.entries(M.targets).filter(([k, t]) => t.signals && !t.signals.error).map(([k, t]) => { const S = t.signals, O = S.oos || S.all;
       return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td>
       <td style="font-family:inherit">${S.state === 1 ? '<span class="badge good">Investiert</span>' : '<span class="badge crit">Draußen</span>'}</td>
       <td>${fmtDate(monthDay(S.since))}</td><td>${S.score}</td><td style="font-family:inherit;white-space:normal;font-size:11.5px;color:var(--sec);max-width:260px">${condTxt(S)}</td>
       <td>${fmtPct(O.cagr)} / ${fmtPct(O.bh_cagr)}</td><td>${fmtPct(O.mdd, 0)} / ${fmtPct(O.bh_mdd, 0)}</td><td>${nf(O.per_decade ?? 0, 1)}</td>
       <td>${S.false} von ${S.false + S.useful}</td></tr>`; }).join('')}</table>
-    <div class="note">Fehlalarm = Ausstieg, nach dem der Wiedereinstieg teurer war als der Ausstieg. Das Signal wird mit den Tagesdaten der Pipeline berechnet (alle 30 Minuten während der US-Handelszeit), nicht mit jedem Live-Kurs – ein Wechsel braucht ohnehin mehrere Tage Bestätigung.</div>`;
+    <div class="note">„Teurer zurück“ = Ausstieg, nach dem der Wiedereinstieg teurer war als der Ausstieg – echte Fehlalarme, aber auch richtige Ausstiege mit spätem Wiedereinstieg (z. B. 2020). Das Signal wird mit den Tagesdaten der Pipeline berechnet (alle 30 Minuten während der US-Handelszeit), nicht mit jedem Live-Kurs – ein Wechsel braucht ohnehin mehrere Tage Bestätigung.</div>`;
   ov.querySelectorAll('tr.row').forEach(r => r.onclick = () => { TGT = r.dataset.t; store('tgt', TGT); renderSection(); });
   m.appendChild(ov);
 
@@ -1056,11 +1056,11 @@ function secSignale(m) {
   m.appendChild(ep);
   // alle Wechsel
   const tr = document.createElement('div'); tr.className = 'card full';
-  tr.innerHTML = `<div class="hd"><div><div class="ttl">Alle Ausstiege – sinnvoll oder Fehlalarm?</div><div class="sub">${S.useful} sinnvoll (im Median ${S.useful_gain == null ? '–' : nf(S.useful_gain, 1) + ' %'} günstiger wieder eingestiegen), ${S.false} Fehlalarme (im Median ${S.false_cost == null ? '–' : nf(S.false_cost, 1) + ' %'} teurer wieder eingestiegen).</div></div></div>
+  tr.innerHTML = `<div class="hd"><div><div class="ttl">Alle Ausstiege – hat es sich gelohnt?</div><div class="sub">${S.useful} lohnten sich (im Median ${S.useful_gain == null ? '–' : nf(S.useful_gain, 1) + ' %'} günstiger wieder eingestiegen), ${S.false} kosteten Geld (im Median ${S.false_cost == null ? '–' : nf(S.false_cost, 1) + ' %'} teurer wieder eingestiegen). Die Ausstiege, die sich lohnten, waren die großen Crashs – sie gleichen viele kleine Kosten aus. Das ist die Versicherungsprämie.</div></div></div>
     <table class="t" style="margin-top:6px"><tr><th>Ausstieg</th><th>Wiedereinstieg</th><th>Kurs bei Wiedereinstieg ggü. Ausstieg</th><th>tiefster Stand dazwischen</th><th>Ergebnis</th></tr>
     ${S.pairs.slice().reverse().map(x => `<tr><td>${fmtDate(monthDay(x.aus))}</td><td>${x.ein ? fmtDate(monthDay(x.ein)) : '<span class="mut">noch draußen</span>'}</td>
       <td>${x.chg == null ? '–' : `<span class="${x.chg < 0 ? 'up' : 'down'}">${x.chg > 0 ? '+' : ''}${nf(x.chg, 1)} %</span>`}</td>
-      <td>${fmtPct(x.low)}</td><td style="font-family:inherit">${x.chg == null ? '–' : x.chg < 0 ? '<span class="badge good">sinnvoll</span>' : '<span class="badge warn">Fehlalarm</span>'}</td></tr>`).join('')}</table>`;
+      <td>${fmtPct(x.low)}</td><td style="font-family:inherit">${x.chg == null ? '–' : x.chg < 0 ? '<span class="badge good">lohnte sich</span>' : '<span class="badge warn">kostete</span>'}</td></tr>`).join('')}</table>`;
   m.appendChild(tr);
   m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">Vergleich zur Einschätzung: Dort gibt es eine stufenlose Lagebewertung und eine Wahrscheinlichkeit, hier eine Ja/Nein-Entscheidung mit Bestätigungsregeln. Beide nutzen denselben Score. Kein Anlagerat – ein Regelwerk, getestet an der Vergangenheit.</div>`);
 }
