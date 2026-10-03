@@ -666,7 +666,7 @@ function secBewertung(m) {
 // ---------- Einschätzung (Modell)
 let TGT = load('tgt') || 'world';
 const BANDC = [[0, 35, C.crit], [35, 45, C.warn], [45, 65, '#5b6170'], [65, 100, C.good]];
-function monthDay(p) { return Math.floor(Date.UTC(+p.slice(0, 4), +p.slice(5, 7) - 1, 1) / 864e5); }
+function monthDay(p) { return Math.floor(Date.UTC(+p.slice(0, 4), +p.slice(5, 7) - 1, p.length > 7 ? +p.slice(8, 10) : 1) / 864e5); }
 function gaugeHTML(score) {
   const segs = BANDC.map(([a, b, c]) => `<div style="left:${a}%;width:${b - a}%;background:${c}"></div>`).join('');
   return `<div class="gauge">${segs}<i style="left:calc(${Math.max(0, Math.min(100, score))}% - 2px)"></i></div>
@@ -683,21 +683,22 @@ function compBar(v) { // -1..+1
 }
 function secEinschaetzung(m) {
   const M = DATA.model;
-  head(m, 'Einschätzung', 'Alle Daten zusammen gelesen: ein Regelmodell aus sechs Säulen mit 25 Komponenten, die ähnlichsten Momente der Vergangenheit und was danach kam.');
+  head(m, 'Einschätzung', 'Alle Daten zusammen gelesen, täglich neu berechnet: ein Regelmodell aus acht Säulen, eine vorwärts getestete Crash-Wahrscheinlichkeit, die ähnlichsten Momente der Vergangenheit und was danach kam. Kursabhängige Teile rechnet die App mit jedem Live-Kurs nach.');
   if (M && M.targets && !M.targets[TGT]) TGT = 'world';
   if (!M || !M.targets || !M.targets[TGT]) { m.insertAdjacentHTML('beforeend', '<div class="card"><div class="note">Das Modell ist noch nicht berechnet – die nächste Datenaktualisierung liefert es.</div></div>'); return; }
   const T = M.targets[TGT], N = T.now;
   // Übersicht aller Indizes – zugleich Auswahl
   const ov = document.createElement('div'); ov.className = 'card full';
   const yrs = t => { const a = +t.since.slice(0, 4), b = +t.now.month.slice(0, 4); return b - a; };
-  ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes im Überblick</div><div class="sub">Klick auf eine Zeile zeigt die Einschätzung im Detail. Stand ${N.month} – monatliches Modell mit den neuesten Tageswerten.</div></div></div>
-    <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Region</th><th>Score</th><th>Lage</th><th>Risiko*<br>ähnl. Score</th><th>Risiko*<br>Analogien</th><th>Risiko*<br>normal</th><th>Trend</th><th>Daten</th></tr>
+  ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes im Überblick</div><div class="sub">Klick auf eine Zeile zeigt die Einschätzung im Detail. Stand ${fmtDate(monthDay(N.day))} (Tagesmodell); Score und Wahrscheinlichkeit live mit den aktuellen Kursen.</div></div></div>
+    <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Region</th><th>Score</th><th>Lage</th><th>Wahrsch.*<br>Modell</th><th>Häufigkeit*<br>ähnl. Score</th><th>Häufigkeit*<br>Analogien</th><th>Häufigkeit*<br>normal</th><th>Trend</th><th>Daten</th></tr>
     ${Object.entries(M.targets).map(([k, t]) => { const tr = (t.now.pillars.find(p => p.id === 'trend') || {}).score; const y = yrs(t);
-      return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b>${t.now.score}</b></td>
-      <td style="font-family:inherit"><span class="badge ${t.now.cls === 'crit' ? 'crit' : t.now.cls}">${esc(t.now.label)}</span></td>
+      return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b id="ov-s-${k}">${t.now.score}</b></td>
+      <td style="font-family:inherit" id="ov-l-${k}"><span class="badge ${t.now.cls === 'crit' ? 'crit' : t.now.cls}">${esc(t.now.label)}</span></td>
+      <td id="ov-p-${k}">${riskCell(t.now.risk ? t.now.risk.prob : null)}${t.prob && t.prob.pooled ? '<span class="mut" title="kurze Historie – Modell vom S&P 500 übernommen">¹</span>' : ''}</td>
       <td>${riskCell(t.now.risk ? t.now.risk.band : null)}</td><td>${riskCell(t.now.risk ? t.now.risk.analog : null)}</td><td class="mut">${t.now.risk ? t.now.risk.base + ' %' : '–'}</td>
       <td>${pillarBar(tr)}</td><td style="font-family:inherit" class="${y < 25 ? '' : 'mut'}">seit ${t.since.slice(0, 4)}${y < 25 ? ' <span style="color:var(--warn)" title="Kurzer Rückblick – Prozentwerte beruhen auf wenigen Fällen">⚠</span>' : ''}</td></tr>`; }).join('')}</table>
-    <div class="note">Konjunktur, Zinsen, Kredit, Bewertung (Shiller-CAPE) und Stimmung sind US-Daten und für alle Indizes gleich – die USA prägen die Weltbörsen am stärksten. Trend, Überdehnung und Abstand vom Hoch werden je Index berechnet. ⚠ = weniger als 25 Jahre Daten, die Prozentwerte beruhen dann auf wenigen Fällen. * Risiko = wie oft es historisch innerhalb von 12 Monaten um mindestens 15 % nach unten ging: bei ähnlichem Score, in den ähnlichsten Momenten und im Schnitt aller Monate. Der MSCI World in Euro enthält Dividenden (Nettoindex) – so, wie ihn ein Euro-Anleger mit einem thesaurierenden ETF erlebt.</div>`;
+    <div class="note">USA und Welt nutzen US-Konjunktur, Shiller-KGV und Gewinndaten; DAX und Euro Stoxx haben eigene Konjunktur- und Zinsdaten für Deutschland bzw. den Euroraum, der Nikkei für Japan, die Schwellenländer China-Frühindikator, Dollar und Kupfer. Für sie gibt es kein frei verfügbares KGV, die Bewertung ist dort eine Näherung (Kurs ggü. 10-Jahres-Durchschnitt). ⚠ = weniger als 25 Jahre Daten. * Wahrscheinlichkeit = Modell für einen Rückgang von mindestens 15 % in den nächsten 12 Monaten, vorwärts getestet (¹ kurze Historie: am S&P 500 gelernt). Häufigkeit = wie oft das früher tatsächlich passierte: bei ähnlichem Score, in den ähnlichsten Momenten und im Schnitt. Der MSCI World in Euro enthält Dividenden (Nettoindex) – so, wie ihn ein Euro-Anleger mit einem thesaurierenden ETF erlebt.</div>`;
   ov.querySelectorAll('tr.row').forEach(r => r.onclick = () => { TGT = r.dataset.t; store('tgt', TGT); renderSection(); setTimeout(() => { const h = document.getElementById('hero'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); });
   m.appendChild(ov);
   sect(m, esc(T.name) + ' im Detail');
@@ -707,11 +708,12 @@ function secEinschaetzung(m) {
   hero.innerHTML = `<div class="hgrid">
     <div>
       <div class="lbl">Gesamtscore ${esc(T.name)}</div>
-      <div class="hscore"><span class="big">${N.score}</span><span class="mut"> / 100</span> <span class="badge ${N.cls === 'crit' ? 'crit' : N.cls}">${esc(N.label)}</span></div>
+      <div class="hscore"><span class="big" id="hs-score">${N.score}</span><span class="mut"> / 100</span> <span id="hs-badge"><span class="badge ${N.cls === 'crit' ? 'crit' : N.cls}">${esc(N.label)}</span></span><span class="livetag" id="hs-live"></span></div>
       ${gaugeHTML(N.score)}
-      <div class="action"><span class="mut">Modell sagt:</span> <b>${esc(N.action)}</b></div>
-      ${N.risk ? `<div class="riskline"><span class="mut">Rückgang ≥ ${Math.round(T.crash * 100)} % innerhalb von 12 Monaten – so oft kam das vor:</span>
-        <div class="rk"><span><b>${N.risk.band ?? '–'} %</b> bei ähnlichem Score</span><span><b>${N.risk.analog ?? '–'} %</b> in den ähnlichsten Momenten</span><span class="mut"><b>${N.risk.base} %</b> im Schnitt aller Monate</span></div></div>` : ''}
+      <div class="action"><span class="mut">Modell sagt:</span> <b id="hs-action">${esc(N.action)}</b></div>
+      ${N.risk ? `<div class="probbox"><div class="lbl">Wahrscheinlichkeit für einen Rückgang von mindestens ${Math.round(T.crash * 100)} % in den nächsten 12 Monaten</div>
+        <div><span class="big" id="hs-prob" style="font-size:30px">${N.risk.prob ?? '–'} %</span> <span class="mut">normal: ${N.risk.base} %</span>${T.prob && T.prob.pooled ? ' <span class="mut">· am S&P 500 gelernt (kurze Historie)</span>' : ''}</div>
+        <div class="rk"><span>So oft kam es tatsächlich vor: <b>${N.risk.band ?? '–'} %</b> bei ähnlichem Score</span><span><b>${N.risk.analog ?? '–'} %</b> in den ähnlichsten Momenten</span></div></div>` : ''}
     </div>
     <div>
       <div class="lbl">Säulen <span class="mut">(50 = neutral)</span></div>
@@ -730,15 +732,16 @@ function secEinschaetzung(m) {
     g.appendChild(c);
   });
   g.appendChild(ruleCard(M));
+  if (M.quality && (T.region === 'USA' || T.region === 'Welt')) qualitySection(m, M.quality);
 
   // Verlauf
   sect(m, 'Verlauf');
   const vh = document.createElement('div'); vh.className = 'card full';
-  vh.innerHTML = `<div class="hd"><div><div class="ttl">${esc(T.name)} und Score seit ${T.since.slice(0, 4)}</div><div class="sub">Oben der Index (logarithmisch), unten der Score. Gestrichelt die Grenzen 35 / 45 / 55 / 65.</div></div></div>
+  vh.innerHTML = `<div class="hd"><div><div class="ttl">${esc(T.name)}, Score und Wahrscheinlichkeit seit ${T.since.slice(0, 4)}</div><div class="sub">Oben der Index (logarithmisch), unten Score (Fläche) und Crash-Wahrscheinlichkeit in % (orange, ab ${T.prob && T.prob.oos_from ? T.prob.oos_from.slice(0, 4) : '–'} vorwärts getestet). Wochenwerte, gestrichelt 35 / 45 / 55 / 65.</div></div></div>
     <div class="legend" id="vlg"></div><div class="chart" style="height:260px"></div><div class="chart" style="height:170px"></div>`;
   m.appendChild(vh);
   queueMicrotask(() => {
-    const els = vh.querySelectorAll('.chart'); const H = T.hist; const ds = H.months.map(monthDay);
+    const els = vh.querySelectorAll('.chart'); const H = T.hist; const ds = H.days.map(monthDay);
     const a = baseChart(els[0], { log: true, fmt: p => nf(p, 0) });
     const ps = a.addLineSeries({ color: C.s1, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, priceFormat: pf(0) });
     ps.setData(ds.map((d, i) => ({ time: d * DAY, value: H.price[i] })).filter(x => x.value != null));
@@ -750,14 +753,15 @@ function secEinschaetzung(m) {
       autoscaleInfoProvider: () => ({ priceRange: { minValue: 15, maxValue: 85 } }) });
     sc.setData(ds.map((d, i) => ({ time: d * DAY, value: H.score[i] })));
     [35, 45, 55, 65].forEach(v => sc.createPriceLine({ price: v, color: C.mut, lineWidth: 1, lineStyle: 2, axisLabelVisible: false }));
+    const pr = b.addLineSeries({ color: C.s4, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, priceFormat: pf(0) });
+    pr.setData(ds.map((d, i) => ({ time: d * DAY, value: H.prob[i] })).filter(x => x.value != null));
     b.timeScale().fitContent();
     let lock = false;
     const sync = (x, y) => x.timeScale().subscribeVisibleLogicalRangeChange(() => { if (lock) return; lock = true; const r = x.timeScale().getVisibleRange(); if (r) y.timeScale().setVisibleRange(r); lock = false; });
     sync(a, b); sync(b, a);
     const lg = vh.querySelector('#vlg');
     const draw = t => { const i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < 0) return;
-      lg.innerHTML = `<span><i style="border-color:${C.s1}"></i>${esc(T.name)}<b>${nf(H.price[i], 0)}</b></span><span><i style="border-color:${C.s3}"></i>Score<b>${nf(H.score[i], 0)}</b></span>` +
-        Object.entries(H.pillars).map(([k, v]) => `<span class="mut">${esc((N.pillars.find(p => p.id === k) || {}).name || k)} ${v[i] == null ? '–' : nf(v[i], 0)}</span>`).join('') + `<span class="d">${H.months[i]}</span>`; };
+      lg.innerHTML = `<span><i style="border-color:${C.s1}"></i>${esc(T.name)}<b>${nf(H.price[i], 0)}</b></span><span><i style="border-color:${C.s3}"></i>Score<b>${nf(H.score[i], 0)}</b></span><span><i style="border-color:${C.s4}"></i>Wahrscheinlichkeit<b>${H.prob[i] == null ? '–' : nf(H.prob[i], 0) + ' %'}</b></span><span class="d">${fmtDate(ds[i])}</span>`; };
     draw(null);
     const ch = p => draw(p && p.time ? p.time / DAY : null); a.subscribeCrosshairMove(ch); b.subscribeCrosshairMove(ch);
   });
@@ -765,6 +769,7 @@ function secEinschaetzung(m) {
   // Was danach kam
   analogSection(m, T);
   episodeSection(m, T);
+  probSection(m, T);
   sect(m, 'Was historisch danach kam');
   const g2 = grid(m, 'wide');
   const bt = document.createElement('div'); bt.className = 'card';
@@ -788,7 +793,7 @@ function secEinschaetzung(m) {
   sect(m, 'Regeln im Test');
   const st = document.createElement('div'); st.className = 'card full';
   const S3 = T.strategies;
-  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)} seit ${T.since.slice(0, 4)}, monatlich angepasst (Entscheidung mit den Daten des Vormonats), nicht investiertes Geld im Geldmarkt. Ohne Dividenden, Steuern und Kosten. Logarithmisch.</div></div></div>
+  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)} seit ${T.since.slice(0, 4)}, wöchentlich angepasst (Entscheidung am Freitag, gilt ab Montag), nicht investiertes Geld im Geldmarkt. Tageskurse. Ohne Dividenden, Steuern und Kosten. Logarithmisch.</div></div></div>
     <div class="legend" id="slg"></div><div class="chart tall"></div>
     <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th></tr>
     ${S3.map((x, j) => `<tr><td><i style="display:inline-block;width:12px;border-top:2px solid ${SER[j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td>${fmtPct(x.cagr)}</td><td>${fmtPct(x.mdd, 0)}</td><td>${nf(x.vol, 1)} %</td><td>${nf(x.expo, 0)} %</td></tr>`).join('')}</table>
@@ -806,6 +811,90 @@ function secEinschaetzung(m) {
     draw(null); ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));
   });
   m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">${esc(M.note)} Das Modell fasst Daten nach festen Regeln zusammen, es kennt deine persönliche Lage nicht und garantiert nichts. Rückblicke zeigen, was war – nicht, was kommt.</div>`);
+}
+function qualitySection(m, Q) {
+  sect(m, 'Gewinnqualität der Schwergewichte');
+  const c = document.createElement('div'); c.className = 'card full';
+  const pc = v => v == null ? '–' : fmtPct(v * 100, 0);
+  const cell = (v, bad, good, f) => { if (v == null) return '–'; const col = bad(v) ? C.serious : good(v) ? C.up : C.txt; return `<span style="color:${col}">${f(v)}</span>`; };
+  const P = Q.parts || {};
+  c.innerHTML = `<div class="hd"><div><div class="ttl">Sind die Gewinne der Tech-Riesen echt?</div>
+    <div class="sub">Kreisgeschäfte – A investiert in B, B kauft bei A, beide melden Wachstum – hinterlassen Spuren in der Bilanz: Gewinne ohne Geldzufluss, Forderungen, die schneller wachsen als der Umsatz, Investitionen, die den Cashflow auffressen, und stark steigende Beteiligungen an anderen Firmen. Genau das wird hier gemessen (letzte 12 Monate, Quartalsberichte über Yahoo Finance, Stand ${esc(Q.at || '')}).</div></div>
+    <div class="big" style="font-size:20px">${Math.round(50 + 50 * Q.score)}</div></div>
+    <div class="anasum" style="grid-template-columns:repeat(4,1fr)">
+      ${[['cc', 'Gewinn durch Cashflow gedeckt'], ['rec', 'Forderungen vs. Umsatz'], ['capex', 'Investitionen vs. Cashflow'], ['inv', 'Beteiligungen']].map(([k, n]) => `<div><div class="lbl">${n}</div><div>${compBar(P[k] ?? null)}</div></div>`).join('')}
+    </div>
+    <table class="t" style="margin-top:8px"><tr><th>Firma</th><th>Börsenwert</th><th>Cashflow / Gewinn</th><th>freier Cashflow / Gewinn</th><th>Investitionen / Cashflow</th><th>Umsatz ggü. Vorjahr</th><th>Forderungen ggü. Vorjahr</th><th>Beteiligungen ggü. Vorjahr</th><th>Stand</th></tr>
+    ${(Q.companies || []).map(x => `<tr><td>${esc(x.t)}</td><td>${x.mc ? nf(x.mc / 1e12, 2) + ' Bio. $' : '–'}</td>
+      <td>${cell(x.cash_conv, v => v < 0.8, v => v >= 1.0, v => nf(v * 100, 0) + ' %')}</td>
+      <td>${cell(x.fcf_ni, v => v < 0.5, v => v >= 0.9, v => nf(v * 100, 0) + ' %')}</td>
+      <td>${cell(x.capex_ocf, v => v > 0.8, v => v < 0.4, v => nf(v * 100, 0) + ' %')}</td>
+      <td>${pc(x.rev_g)}</td>
+      <td>${cell(x.rec_g, v => x.rev_g != null && v - x.rev_g > 0.15, () => false, v => fmtPct(v * 100, 0))}</td>
+      <td>${cell(x.inv_g, v => v > 0.5, () => false, v => fmtPct(v * 100, 0))}</td><td class="mut">${x.asof ? fmtDate(monthDay(x.asof)) : '–'}</td></tr>`).join('')}</table>
+    ${Q.flags && Q.flags.length ? `<div class="interp"><b>Auffällig:</b> ${Q.flags.map(esc).join(' · ')}</div>` : ''}
+    <div class="note">Das ist ein Warnsignal, kein Beweis: Hohe Investitionen können sich auszahlen, und Forderungen steigen auch bei echtem Wachstum. Konkrete Gegengeschäfte (wer wem was zusagt) stehen nur im Fließtext der Berichte und lassen sich nicht automatisch auslesen. Die Werte fließen mit dem Gewinnwachstum in die Säule „Gewinne“ ein – nur für den aktuellen Stand, denn diese Daten gibt es nicht für frühere Jahrzehnte.</div>`;
+  m.appendChild(c);
+}
+function probSection(m, T) {
+  const Pq = T.prob; if (!Pq || !Pq.calib || !Pq.calib.length) return;
+  sect(m, 'Wie verlässlich ist die Wahrscheinlichkeit?');
+  const c = document.createElement('div'); c.className = 'card full';
+  c.innerHTML = `<div class="hd"><div><div class="ttl">Vorwärts getestet seit ${Pq.oos_from ? Pq.oos_from.slice(0, 4) : '–'}</div>
+    <div class="sub">Für jedes Jahr wurde das Modell nur mit Daten trainiert, deren Ausgang damals schon bekannt war, und dann auf das neue Jahr angewendet${Pq.pooled ? ' – wegen der kurzen Historie mit dem am S&P 500 gelernten Zusammenhang' : ''}. Die Tabelle vergleicht, was es vorhergesagt hat, mit dem, was passierte (Monatsenden).</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th>vorhergesagt</th><th>Fälle</th><th>Ø vorhergesagt</th><th>tatsächlich eingetreten</th></tr>
+    ${Pq.calib.filter(x => x.n).map(x => `<tr><td>${x.lo}–${x.hi} %</td><td>${x.n}</td><td>${x.pred} %</td><td>${riskCell(x.real)}</td></tr>`).join('')}</table>
+    <div class="interp">${Pq.skill == null ? 'Zu wenig Fälle für eine Bewertung.' : Pq.skill > 5 ? `Das Modell war treffsicherer als der bloße Durchschnitt (Brier-Skill <b>${fmtPct(Pq.skill, 0)}</b>). Die Werte sind eher vorsichtig: Was es als niedrig einstufte, trat etwas häufiger ein. Der Wert ist eine grobe Orientierung, keine Präzisionsangabe.` : Pq.skill > 0 ? `Das Modell war nur knapp besser als der bloße Durchschnitt (Brier-Skill <b>${fmtPct(Pq.skill, 0)}</b>). Lies den Wert als grobe Richtung.` : `Das Modell war hier <b>nicht besser</b> als der bloße Durchschnitt (Brier-Skill ${fmtPct(Pq.skill, 0)}) – für diesen Index taugt die Zahl nur als Hinweis.`}</div>`;
+  m.appendChild(c);
+}
+// ---------- Live-Score: kursabhängige Komponenten mit dem aktuellen Kurs neu rechnen (spiegelt terminal/model.py)
+function ip(v, xs, ys) { if (v == null || !isFinite(v)) return null; if (v <= xs[0]) return ys[0]; if (v >= xs[xs.length - 1]) return ys[ys.length - 1];
+  for (let i = 1; i < xs.length; i++) if (v <= xs[i]) { const f = (v - xs[i - 1]) / (xs[i] - xs[i - 1]); return ys[i - 1] + f * (ys[i] - ys[i - 1]); } return null; }
+const cl1 = v => v == null || !isFinite(v) ? null : Math.max(-1, Math.min(1, v));
+function liveModel(T) {
+  const L = T.live; if (!L || !L.closes || !S[T.sid]) return null;
+  const s = S[T.sid]; const pNow = s.v[s.v.length - 1], dNow = s.t[s.t.length - 1];
+  const lastD = monthDay(L.last);
+  let series = L.closes.slice();
+  if (dNow === lastD) series[series.length - 1] = pNow; else if (dNow > lastD) series.push(pNow); else return null;
+  const n = series.length, p = series[n - 1];
+  const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+  const comps = {};
+  if (n >= 210) comps.sma10 = ['trend', cl1((p / mean(series.slice(n - 210)) - 1) / 0.05)];
+  if (n >= 253) comps.mom12 = ['trend', cl1((p / series[n - 1 - 252] - 1 - (L.tbill || 0) / 100) / 0.15)];
+  if (n >= 1000) comps.w200 = ['trend', ip(p / mean(series.slice(n - 1000)) - 1, [-0.05, 0.10, 0.30, 0.50], [1.0, 0.3, 0.0, -0.4])];
+  comps.dd = ['stimmung', ip(p / Math.max(...series.slice(Math.max(0, n - 252))) - 1, [-0.25, -0.10, 0.0], [1.0, 0.4, 0.0])];
+  if (n >= 22 && L.rv_med) { const r = []; for (let i = n - 21; i < n; i++) r.push(Math.log(series[i] / series[i - 1]));
+    const m_ = mean(r); const sd = Math.sqrt(r.reduce((x, y) => x + (y - m_) ** 2, 0) / (r.length - 1)) * Math.sqrt(252);
+    comps.rv = ['schwankung', ip(sd / L.rv_med, [0.8, 1.25, 2.0], [0.3, 0.0, -1.0])]; }
+  const all = Object.assign({}, L.fixed, comps);
+  const pil = {}; L.pillars.forEach(k => pil[k] = []);
+  Object.values(all).forEach(([k, v]) => { if (v != null && isFinite(v) && pil[k]) pil[k].push(v); });
+  let num = 0, den = 0; const pv = {};
+  L.pillars.forEach(k => { if (pil[k].length) { pv[k] = mean(pil[k]); num += L.weights[k] * pv[k]; den += L.weights[k]; } });
+  if (!den) return null;
+  const tot = num / den; const t = tot / L.sd;
+  const score = Math.max(0, Math.min(100, 50 + 15 * t));
+  const prob = L.coef ? 100 / (1 + Math.exp(-(L.coef[0] + L.coef[1] * t))) : null;
+  return { score, prob, day: dNow };
+}
+function labelOf(sc) { return sc >= 65 ? ['Rückenwind', 'good', 'Kaufen – auch größere Beträge'] : sc >= 45 ? ['Neutral', 'neutral', 'Normal investieren (Sparplan oder in Raten)'] : sc >= 35 ? ['Gegenwind', 'warn', 'Nur in Raten investieren, keine großen Einmalbeträge'] : ['Gefahrenzone', 'crit', 'Abwarten – historisch folgten hier meist Verluste']; }
+function updateLive() {
+  const M = DATA && DATA.model; if (!M || !M.targets || SECTION !== 'einschaetzung') return;
+  for (const [k, T] of Object.entries(M.targets)) {
+    const r = liveModel(T); if (!r) continue;
+    const sc = Math.round(r.score), lb = labelOf(sc);
+    const e1 = document.getElementById('ov-s-' + k); if (e1) e1.textContent = sc;
+    const e2 = document.getElementById('ov-l-' + k); if (e2) e2.innerHTML = `<span class="badge ${lb[1]}">${lb[0]}</span>`;
+    const e3 = document.getElementById('ov-p-' + k); if (e3 && r.prob != null) e3.innerHTML = riskCell(Math.round(r.prob)) + (T.prob && T.prob.pooled ? '<span class="mut">¹</span>' : '');
+    if (k === TGT) {
+      const h = document.getElementById('hs-score'); if (h) h.textContent = sc;
+      const hb = document.getElementById('hs-badge'); if (hb) hb.innerHTML = `<span class="badge ${lb[1]}">${lb[0]}</span>`;
+      const ha = document.getElementById('hs-action'); if (ha) ha.textContent = lb[2];
+      const hp = document.getElementById('hs-prob'); if (hp && r.prob != null) hp.textContent = Math.round(r.prob) + ' %';
+      const hl = document.getElementById('hs-live'); if (hl) hl.innerHTML = LIVEON ? `● live ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : '';
+    }
+  }
 }
 function riskCell(v) {
   if (v == null) return '–';
@@ -868,11 +957,11 @@ function episodeSection(m, T) {
   const E = T.episodes; if (!E || !E.length) return;
   sect(m, 'Große Einbrüche – hat das Modell gewarnt?');
   const c = document.createElement('div'); c.className = 'card full';
-  const mn = p => { const [y, mo] = p.split('-'); return `${['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'][+mo - 1]} ${y}`; };
+  const mn = p => fmtDate(monthDay(p));
   c.innerHTML = `<div class="hd"><div><div class="ttl">Alle Rückgänge des ${esc(T.name)} von mindestens ${Math.round(T.episode * 100)} % seit ${T.since.slice(0, 4)}</div>
-    <div class="sub">Monatsschlusskurse. „Warnung“ = erster Monat ab 6 Monate vor dem Hoch bis zum Tief, in dem der Score unter 45 fiel. Rechts: größter Verlust im selben Zeitraum, wenn man der jeweiligen Regel gefolgt wäre.</div></div></div>
-    <table class="t" style="margin-top:6px"><tr><th>Hoch</th><th>Tief</th><th>Verlust</th><th>Dauer</th><th>Score am Hoch</th><th>Warnung</th><th>da schon verloren</th><th>Modell-Quote</th><th>Trendregel</th><th>Schutzregel</th></tr>
-    ${E.map(e => `<tr><td>${mn(e.peak)}</td><td>${mn(e.trough)}</td><td>${fmtPct(e.depth, 0)}</td><td>${e.months} M.</td><td>${e.s_peak ?? '–'}</td>
+    <div class="sub">Tagesschlusskurse. „Warnung“ = erster Tag ab 6 Monate vor dem Hoch bis zum Tief, an dem der Score unter 45 fiel. Rechts: größter Verlust im selben Zeitraum, wenn man der jeweiligen Regel gefolgt wäre.</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th>Hoch</th><th>Tief</th><th>Verlust</th><th>Dauer</th><th>Score am Hoch</th><th>Wahrsch. am Hoch</th><th>Warnung</th><th>da schon verloren</th><th>Modell-Quote</th><th>Trendregel</th><th>Schutzregel</th></tr>
+    ${E.map(e => `<tr><td>${mn(e.peak)}</td><td>${mn(e.trough)}</td><td>${fmtPct(e.depth, 0)}</td><td>${e.months} M.</td><td>${e.s_peak ?? '–'}</td><td>${e.p_peak == null ? '–' : e.p_peak + ' %'}</td>
       <td style="font-family:inherit">${e.warn ? mn(e.warn) : '<span style="color:var(--serious)">keine</span>'}</td><td>${e.lost_at_warn == null ? '–' : fmtPct(e.lost_at_warn, 0)}</td>
       <td>${fmtPct(e.dd_score, 0)}</td><td>${fmtPct(e.dd_trend, 0)}</td><td>${fmtPct(e.dd_schutz, 0)}</td></tr>`).join('')}</table>
     <div class="note">Schnelle Schocks wie 1987 oder 2020 kündigen sich in Monatsdaten kaum an – das Modell hilft vor allem bei langen Abwärtsphasen wie 1973/74, 2000–2002 und 2007–2009, die den größten Schaden anrichten.</div>`;
@@ -1182,7 +1271,7 @@ async function liveTick(all) {
     ok += r.filter(x => x.status === 'fulfilled' && x.value).length;
   }
   LIVEON = ok > 0; liveAt = Date.now(); _chgCache.clear();
-  renderStrip(); renderStatus();
+  renderStrip(); renderStatus(); updateLive();
 }
 
 // ------------------------------------------------------------------ Suche (⌘K)
