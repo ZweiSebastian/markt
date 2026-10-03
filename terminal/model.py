@@ -406,7 +406,9 @@ def run(ser, markt, now, quality=None):
                 if sid == "dax":
                     comp_region_macro(C, "cli_de", "OECD-Frühindikator Deutschland", "unemp_de", "curve_de", "Deutschland", esi=True, infl_id="hicp")
                 else:
-                    comp_region_macro(C, "cli_ea", "OECD-Frühindikator Euroraum", "unemp_ea", "curve_ea", "Euroraum", esi=True, infl_id="hicp")
+                    has_ea = ser("cli_ea") is not None
+                    comp_region_macro(C, "cli_ea" if has_ea else "cli_de", "OECD-Frühindikator Euroraum" if has_ea else "OECD-Frühindikator Deutschland",
+                                      "unemp_ea", "curve_ea", "Euroraum", esi=True, infl_id="hicp")
                 ecb = D("ecb")
                 ec = ecb - ecb.shift(Y)
                 C["ecb"] = ("finanzen", "EZB-Kurs (Einlagenzins ggü. Vorjahr)", interp(ec, [-1.0, 0.0, 1.5], [0.25, 0.0, -0.5]), ec, lambda v: f"{v:+.2f} Pp.")

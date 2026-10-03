@@ -728,7 +728,7 @@ function secEinschaetzung(m) {
   N.pillars.forEach(p => {
     const c = document.createElement('div'); c.className = 'card';
     c.innerHTML = `<div class="hd"><div class="ttl">${esc(p.name)} <small>${Math.round(p.weight * 100)} % Gewicht</small></div><div class="big" style="font-size:20px">${p.score == null ? '–' : p.score}</div></div>
-      <table class="t comp">${p.comps.map(k => `<tr style="${k.stale ? 'opacity:.55' : ''}"><td>${esc(k.name)}<div class="mut" style="font-size:11px">${esc(k.text || '')}${k.asof && k.asof !== N.month ? ' · Stand ' + k.asof : ''}${k.stale ? ' · zu alt, nicht eingerechnet' : ''}</div></td><td>${compBar(k.score)}</td></tr>`).join('')}</table>`;
+      <table class="t comp">${p.comps.map(k => `<tr style="${k.stale ? 'opacity:.55' : ''}"><td>${esc(k.name)}<div class="mut" style="font-size:11px">${esc(k.text || '')}${k.asof && Math.abs(monthDay(k.asof) - monthDay(N.day)) > 10 ? ' · Stand ' + fmtDate(monthDay(k.asof)) : ''}${k.stale ? ' · zu alt, nicht eingerechnet' : ''}</div></td><td>${compBar(k.score)}</td></tr>`).join('')}</table>`;
     g.appendChild(c);
   });
   g.appendChild(ruleCard(M));
@@ -824,14 +824,14 @@ function qualitySection(m, Q) {
     <div class="anasum" style="grid-template-columns:repeat(4,1fr)">
       ${[['cc', 'Gewinn durch Cashflow gedeckt'], ['rec', 'Forderungen vs. Umsatz'], ['capex', 'Investitionen vs. Cashflow'], ['inv', 'Beteiligungen']].map(([k, n]) => `<div><div class="lbl">${n}</div><div>${compBar(P[k] ?? null)}</div></div>`).join('')}
     </div>
-    <table class="t" style="margin-top:8px"><tr><th>Firma</th><th>Börsenwert</th><th>Cashflow / Gewinn</th><th>freier Cashflow / Gewinn</th><th>Investitionen / Cashflow</th><th>Umsatz ggü. Vorjahr</th><th>Forderungen ggü. Vorjahr</th><th>Beteiligungen ggü. Vorjahr</th><th>Stand</th></tr>
-    ${(Q.companies || []).map(x => `<tr><td>${esc(x.t)}</td><td>${x.mc ? nf(x.mc / 1e12, 2) + ' Bio. $' : '–'}</td>
+    <table class="t qt" style="margin-top:8px"><tr><th>Firma</th><th>Börsen&shy;wert</th><th>Cashflow<br>÷ Gewinn</th><th>freier Cashflow<br>÷ Gewinn</th><th>Investitionen<br>÷ Cashflow</th><th>Umsatz<br>ggü. Vorjahr</th><th>Forderungen<br>ggü. Vorjahr</th><th>Beteiligungen<br>ggü. Vorjahr</th><th>Quartal</th></tr>
+    ${(Q.companies || []).map(x => `<tr><td>${esc(x.t)}</td><td>${x.mc ? nf(x.mc / 1e12, 2) + ' Bio.' : '–'}</td>
       <td>${cell(x.cash_conv, v => v < 0.8, v => v >= 1.0, v => nf(v * 100, 0) + ' %')}</td>
       <td>${cell(x.fcf_ni, v => v < 0.5, v => v >= 0.9, v => nf(v * 100, 0) + ' %')}</td>
       <td>${cell(x.capex_ocf, v => v > 0.8, v => v < 0.4, v => nf(v * 100, 0) + ' %')}</td>
-      <td>${pc(x.rev_g)}</td>
-      <td>${cell(x.rec_g, v => x.rev_g != null && v - x.rev_g > 0.15, () => false, v => fmtPct(v * 100, 0))}</td>
-      <td>${cell(x.inv_g, v => v > 0.5, () => false, v => fmtPct(v * 100, 0))}</td><td class="mut">${x.asof ? fmtDate(monthDay(x.asof)) : '–'}</td></tr>`).join('')}</table>
+      <td>${x.rev_g == null ? '–' : (x.rev_g > 0 ? '+' : '') + nf(x.rev_g * 100, 0) + ' %'}</td>
+      <td>${cell(x.rec_g, v => x.rev_g != null && v - x.rev_g > 0.15, () => false, v => (v > 0 ? '+' : '') + nf(v * 100, 0) + ' %')}</td>
+      <td>${cell(x.inv_g, v => v > 0.5, () => false, v => (v > 0 ? '+' : '') + nf(v * 100, 0) + ' %')}</td><td class="mut">${x.asof ? fmtDate(monthDay(x.asof)) : '–'}</td></tr>`).join('')}</table>
     ${Q.flags && Q.flags.length ? `<div class="interp"><b>Auffällig:</b> ${Q.flags.map(esc).join(' · ')}</div>` : ''}
     <div class="note">Das ist ein Warnsignal, kein Beweis: Hohe Investitionen können sich auszahlen, und Forderungen steigen auch bei echtem Wachstum. Konkrete Gegengeschäfte (wer wem was zusagt) stehen nur im Fließtext der Berichte und lassen sich nicht automatisch auslesen. Die Werte fließen mit dem Gewinnwachstum in die Säule „Gewinne“ ein – nur für den aktuellen Stand, denn diese Daten gibt es nicht für frühere Jahrzehnte.</div>`;
   m.appendChild(c);
@@ -905,10 +905,10 @@ function analogSection(m, T) {
   const A = T.analogs; if (!A || !A.items || !A.items.length) return;
   sect(m, 'Ähnliche Momente in der Vergangenheit');
   const c = document.createElement('div'); c.className = 'card full';
-  const PN = { bewertung: 'Bew.', trend: 'Trend', breite: 'Breite', konjunktur: 'Konj.', finanzen: 'Fin.', stimmung: 'Stimm.' };
+  const PN = { bewertung: 'Bew.', gewinne: 'Gew.', trend: 'Trend', schwankung: 'Schw.', breite: 'Breite', konjunktur: 'Konj.', finanzen: 'Fin.', stimmung: 'Stimm.' };
   const NOWP = Object.fromEntries(T.now.pillars.map(p => [p.id, p.score]));
   c.innerHTML = `<div class="hd"><div><div class="ttl">Die ${A.n} ähnlichsten Monate seit ${T.since.slice(0, 4)}</div>
-    <div class="sub">Gesucht wird über alle Komponenten der sechs Säulen gleichzeitig – nicht nur über den Score. Zwischen zwei Treffern liegen mindestens 18 Monate, damit es verschiedene Episoden sind. Darunter der Verlauf des ${esc(T.name)} in den 36 Monaten danach (Start = 100).</div></div></div>
+    <div class="sub">Gesucht wird über alle Komponenten der acht Säulen gleichzeitig – nicht nur über den Score. Zwischen zwei Treffern liegen mindestens 18 Monate, damit es verschiedene Episoden sind. Darunter der Verlauf des ${esc(T.name)} in den 36 Monaten danach (Start = 100).</div></div></div>
     <div class="anasum">
       <div><div class="lbl">nach 12 Monaten (Median)</div><div class="big" style="font-size:22px">${fmtPct(A.f12)}</div></div>
       <div><div class="lbl">nach 24 Monaten (Median)</div><div class="big" style="font-size:22px">${fmtPct(A.f24)}</div></div>

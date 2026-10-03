@@ -1083,7 +1083,7 @@ FEEDS = [
     ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex", "us"),
     ("FT Markets", "https://www.ft.com/markets?format=rss", "us"),
     ("Investing.com", "https://www.investing.com/rss/news_25.rss", "us"),
-    ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_all.xml", "fed"),
+    ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_monetary.xml", "fed"),
     ("Handelsblatt", "https://www.handelsblatt.com/contentexport/feed/finanzen", "de"),
     ("tagesschau", "https://www.tagesschau.de/wirtschaft/index~rss2.xml", "de"),
 ]
