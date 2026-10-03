@@ -1,0 +1,29 @@
+OK   vorheriger Lauf  2026-10-03T14:23:04Z
+FEHL Tages-Archiv  404 Client Error: Not Found for url: https://raw.githubusercontent.com/ZweiSebastian/markt/terminal-data-dev/full.json
+OK   yahoo  56/56 Ticker (voll)
+OK   quality  aus Cache 2026-10-03T14:11:16Z
+OK   zinsen  aus Cache 2026-10-03T13:55:10Z
+FEHL credit  ReadTimeout: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=40)
+OK   fedfunds  aus Cache 2026-10-03T13:55:10Z
+OK   ezb  aus Cache 2026-10-03T14:17:06Z
+OK   eurostat_unemp  aus Cache 2026-10-03T14:17:06Z
+OK   bls  aus Cache 2026-10-03T13:55:10Z
+OK   nfci  aus Cache 2026-10-03T13:55:10Z
+FEHL cli_ea EA20  keine Daten
+FEHL cli_ea EA19  keine Daten
+FEHL cli_ea OECDE  keine Daten
+OK   payrolls_rt  aus Cache 2026-10-03T14:11:16Z
+OK   claims  aus Cache 2026-10-03T13:55:10Z
+OK   aaii2  aus Cache 2026-10-03T13:55:10Z
+OK   msci_eur  aus Cache 2026-10-03T13:55:10Z
+OK   gdp  aus Cache 2026-10-03T13:55:10Z
+OK   freddie  aus Cache 2026-10-03T13:55:10Z
+OK   eia  aus Cache 2026-10-03T13:55:10Z
+OK   h41  aus Cache 2026-10-03T13:55:10Z
+OK   shiller  aus Cache 2026-10-03T14:11:16Z
+OK   markt.json  2026-10-02
+OK   stress  jetzt 6 Signale
+OK   modell  world: 51 · world_eur: 52 · spx: 50 · ndx: 50 · rut: 48 · sx5e: 56 · dax: 50 · nikkei: 56 · em: 51
+OK   news  155 Meldungen
+OK   Tages-Archiv: 82 Reihen, 4.99 MB
+OK   fertig: 117 Reihen, 4.56 MB
