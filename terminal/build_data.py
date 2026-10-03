@@ -314,6 +314,80 @@ except Exception as e:  # noqa
             series[sid] = prev["series"][sid]
 
 
+# ------------------------------------------------------------------ Gewinnqualität der Schwergewichte (Yahoo-Bilanzen)
+QUAL_TICKERS = ["NVDA", "MSFT", "AAPL", "AMZN", "GOOGL", "META", "AVGO", "TSLA", "ORCL", "AMD"]
+
+
+def _row(df, names):
+    if df is None or not len(df):
+        return None
+    idx = {str(i).strip().lower(): i for i in df.index}
+    for n in names:
+        k = idx.get(n.lower())
+        if k is not None:
+            r = pd.to_numeric(df.loc[k], errors="coerce")
+            r.index = pd.to_datetime(r.index)
+            return r.sort_index()
+    return None
+
+
+def quality():
+    import yfinance as yf
+    comps, caps = [], {}
+    for t in QUAL_TICKERS:
+        try:
+            tk = yf.Ticker(t)
+            inc, cf, bs = tk.quarterly_income_stmt, tk.quarterly_cashflow, tk.quarterly_balance_sheet
+            rev = _row(inc, ["Total Revenue", "Operating Revenue"])
+            ni = _row(inc, ["Net Income", "Net Income Common Stockholders"])
+            ocf = _row(cf, ["Operating Cash Flow", "Cash Flow From Continuing Operating Activities"])
+            capex = _row(cf, ["Capital Expenditure"])
+            rec = _row(bs, ["Accounts Receivable", "Receivables", "Gross Accounts Receivable"])
+            inv = _row(bs, ["Investments And Advances", "Long Term Equity Investment", "Investmentin Financial Assets", "Other Investments"])
+            try:
+                mc = float(tk.fast_info["market_cap"])
+            except Exception:  # noqa
+                mc = None
+            def ttm(x):
+                return None if x is None or x.dropna().shape[0] < 4 else float(x.dropna().iloc[-4:].sum())
+            def yoy(x):
+                x = None if x is None else x.dropna()
+                return None if x is None or len(x) < 5 or not x.iloc[-5] else float(x.iloc[-1] / x.iloc[-5] - 1)
+            n_ttm, o_ttm, c_ttm, r_ttm = ttm(ni), ttm(ocf), ttm(capex), ttm(rev)
+            item = {"t": t, "mc": mc, "asof": None if rev is None or not len(rev.dropna()) else str(rev.dropna().index[-1].date()),
+                    "cash_conv": None if not n_ttm or n_ttm <= 0 or o_ttm is None else round(o_ttm / n_ttm, 2),
+                    "fcf_ni": None if not n_ttm or n_ttm <= 0 or o_ttm is None or c_ttm is None else round((o_ttm + c_ttm) / n_ttm, 2),
+                    "capex_ocf": None if not o_ttm or o_ttm <= 0 or c_ttm is None else round(-c_ttm / o_ttm, 2),
+                    "rev_g": None if yoy(rev) is None else round(yoy(rev), 3),
+                    "rec_g": None if yoy(rec) is None else round(yoy(rec), 3),
+                    "inv_g": None if yoy(inv) is None else round(yoy(inv), 3)}
+            comps.append(item)
+        except Exception as e:  # noqa
+            note("qualität " + t, False, e)
+        time.sleep(0.6)
+    if len(comps) < 5:
+        raise RuntimeError(f"nur {len(comps)} Firmen")
+    return comps
+
+
+qual_out = None
+try:
+    qc = cached("quality", 20)
+    if qc and prev.get("quality"):
+        qual_out = prev["quality"]
+        cache_meta["quality"] = qc
+        note("quality", True, "aus Cache " + qc["at"])
+    else:
+        comps_ = quality()
+        hist_ = (prev.get("quality") or {}).get("hist", [])
+        qual_out = {"companies": comps_, "at": NOW.strftime("%Y-%m-%d"), "hist": hist_}
+        cache_meta["quality"] = {"at": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "v": CACHE_VERSION}
+        note("quality", True, f"{len(comps_)} Firmen")
+except Exception as e:  # noqa
+    qual_out = prev.get("quality")
+    note("quality", False, f"{type(e).__name__}: {e}")
+
+
 # ------------------------------------------------------------------ Zinsen USA
 def dbn(code, start="1970-01-01"):
     url = f"https://api.db.nomics.world/v22/series/{code}?observations=1&format=json"
@@ -448,13 +522,58 @@ def ecb_csv(key, start="1990-01-01"):
 
 
 def ecb():
-    put("ecb", ecb_csv("FM/D.U2.EUR.4F.KR.DFR.LEV", "1999-01-01"), "EZB-Einlagenzins", "zinsen", "%", "rate", "EZB", dec=2)
-    put("eu10", ecb_csv("YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y", "2004-01-01"), "Euro-Zins 10J (AAA-Kurve)", "zinsen", "%", "rate", "EZB", dec=3)
-    put("hicp", ecb_csv("ICP/M.U2.N.000000.4.ANR", "1997-01-01"), "Euro-Inflation (HICP)", "konjunktur", "%", "rate", "EZB", "m", 1)
-    put("ecbbs", ecb_csv("ILM/W.U2.C.T000000.Z5.Z01", "1999-01-01") / 1e6, "EZB-Bilanzsumme", "konjunktur", "Bio. €", "price", "EZB", "w", 3)
+    ok_ = 0
+    for sid, key, start, name, grp, unit, kind, freq, dec, div in [
+        ("ecb", "FM/D.U2.EUR.4F.KR.DFR.LEV", "1999-01-01", "EZB-Einlagenzins", "zinsen", "%", "rate", "d", 2, 1),
+        ("eu10", "YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y", "2004-01-01", "Euro-Zins 10J (AAA-Kurve)", "zinsen", "%", "rate", "d", 3, 1),
+        ("hicp", "ICP/M.U2.N.000000.4.ANR", "1997-01-01", "Euro-Inflation (HICP)", "konjunktur", "%", "rate", "m", 1, 1),
+        ("ecbbs", "ILM/W.U2.C.T000000.Z5.Z01", "1999-01-01", "EZB-Bilanzsumme", "konjunktur", "Bio. €", "price", "w", 3, 1e6),
+    ]:
+        for attempt in range(2):
+            try:
+                put(sid, ecb_csv(key, start) / div, name, grp, unit, kind, "EZB", freq, dec)
+                ok_ += 1
+                break
+            except Exception as e:  # noqa
+                if attempt:
+                    note("ezb " + sid, False, e)
+                    if sid in prev.get("series", {}):
+                        series[sid] = prev["series"][sid]
+                time.sleep(3)
+    try:
+        s3 = ecb_csv("YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_3M", "2004-01-01")
+        eu10 = ser("eu10")
+        if eu10 is not None:
+            j = pd.concat([eu10, s3], axis=1, join="inner").dropna()
+            cm = (j.iloc[:, 0] - j.iloc[:, 1])
+            cm = cm.groupby(cm.index.to_period("M")).mean()
+            cm.index = cm.index.to_timestamp()
+            put("curve_ea", cm, "Zinskurve 10J − 3M Euroraum (AAA)", "zinsen", "Pp.", "rate", "EZB (berechnet)", "m", 2)
+    except Exception as e:  # noqa
+        note("ezb curve_ea", False, e)
+    if ok_ < 2:
+        raise RuntimeError("EZB kaum erreichbar")
 
 
-slow("ezb", ecb, ["ecb", "eu10", "hicp", "ecbbs"])
+slow("ezb", ecb, ["ecb", "eu10", "hicp", "ecbbs", "curve_ea"])
+
+
+def eurostat_unemp():
+    s_ = None
+    for geo in ("EA20", "EA", "EA19", "EU27_2020"):
+        j = get(f"https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/une_rt_m?geo={geo}&s_adj=SA&age=TOTAL&sex=T&unit=PC_ACT&format=JSON&lang=EN", 60).json()
+        tix = j.get("dimension", {}).get("time", {}).get("category", {}).get("index", {})
+        vals = j.get("value", {})
+        x = pd.Series({pd.Timestamp(k.replace("M", "-") + "-01"): vals.get(str(i)) for k, i in tix.items()}, dtype=float).dropna().sort_index()
+        if len(x) > 24:
+            s_ = x
+            break
+    if s_ is None:
+        raise RuntimeError("keine Euroraum-Arbeitslosenquote")
+    put("unemp_ea", s_, "Arbeitslosenquote Euroraum", "konjunktur", "%", "rate", "Eurostat", "m", 1)
+
+
+slow("eurostat_unemp", eurostat_unemp, ["unemp_ea"])
 
 
 # ------------------------------------------------------------------ Konjunktur (BLS, lange Historie)
@@ -498,16 +617,87 @@ slow("nfci", nfci, ["nfci", "anfci"])
 
 
 def oecd():
-    url = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/USA+G7+OECD.M.LI...AA...H"
+    url = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/USA+G7+DEU+JPN+CHN+EA19+EA20+OECDE.M.LI...AA...H"
            "?startPeriod=1960-01&dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
     d = pd.read_csv(io.StringIO(get(url, 90).text))
-    for area, sid, name in [("USA", "cli_us", "OECD-Frühindikator USA"), ("G7", "cli_g7", "OECD-Frühindikator G7")]:
+    for area, sid, name in [("USA", "cli_us", "OECD-Frühindikator USA"), ("G7", "cli_g7", "OECD-Frühindikator G7"),
+                            ("DEU", "cli_de", "OECD-Frühindikator Deutschland"), ("EA20", "cli_ea", "OECD-Frühindikator Euroraum"), ("EA19", "cli_ea", "OECD-Frühindikator Euroraum"), ("OECDE", "cli_ea", "OECD-Frühindikator Europa"),
+                            ("JPN", "cli_jp", "OECD-Frühindikator Japan"), ("CHN", "cli_cn", "OECD-Frühindikator China")]:
         x = d[d["REF_AREA"] == area]
+        if not len(x):
+            if sid not in series:
+                note(sid + " " + area, False, "keine Daten")
+            continue
+        if sid in series:
+            continue
         s = pd.Series(x["OBS_VALUE"].values, index=pd.to_datetime(x["TIME_PERIOD"]))
         put(sid, s, name, "konjunktur", "", "rate", "OECD", "m", 2)
 
 
-slow("oecd", oecd, ["cli_us", "cli_g7"])
+slow("oecd", oecd, ["cli_us", "cli_g7", "cli_de", "cli_ea", "cli_jp", "cli_cn"])
+
+
+def oecd_regions():
+    # Zinsen (3 Monate, 10 Jahre) und Arbeitslosenquoten für Euroraum, Deutschland, Japan
+    url = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_FINMARK,4.0/DEU+JPN+EA19.M.IR3TIB+IRLT.PA....."
+           "?startPeriod=1970-01&dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
+    d = pd.read_csv(io.StringIO(get(url, 90).text))
+    for area, tag in [("DEU", "de"), ("JPN", "jp"), ("EA19", "ea")]:
+        x = d[d["REF_AREA"] == area]
+        sh_ = x[x["MEASURE"] == "IR3TIB"]; lg_ = x[x["MEASURE"] == "IRLT"]
+        a = pd.Series(sh_["OBS_VALUE"].values, index=pd.to_datetime(sh_["TIME_PERIOD"])).sort_index()
+        b = pd.Series(lg_["OBS_VALUE"].values, index=pd.to_datetime(lg_["TIME_PERIOD"])).sort_index()
+        a = a[~a.index.duplicated()]; b = b[~b.index.duplicated()]
+        if len(b):
+            put(f"y10_{tag}", b, f"Zins 10J {dict(de='Deutschland', jp='Japan', ea='Euroraum')[tag]}", "zinsen", "%", "rate", "OECD", "m", 2)
+        j = pd.concat([b, a], axis=1, join="inner").dropna()
+        if len(j):
+            put(f"curve_{tag}", j.iloc[:, 0] - j.iloc[:, 1], f"Zinskurve 10J − 3M {dict(de='Deutschland', jp='Japan', ea='Euroraum')[tag]}",
+                "zinsen", "Pp.", "rate", "OECD (berechnet)", "m", 2)
+    url = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_LFS@DF_IALFS_UNE_M,1.0/DEU+JPN+EA20..._Z.Y._T.Y_GE15..M"
+           "?startPeriod=1990-01&dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
+    d = pd.read_csv(io.StringIO(get(url, 90).text))
+    for area, tag, nm in [("DEU", "de", "Deutschland"), ("JPN", "jp", "Japan"), ("EA20", "ea", "Euroraum")]:
+        x = d[d["REF_AREA"] == area]
+        s_ = pd.Series(x["OBS_VALUE"].values, index=pd.to_datetime(x["TIME_PERIOD"])).sort_index()
+        s_ = s_[~s_.index.duplicated()]
+        if len(s_):
+            put(f"unemp_{tag}", s_, f"Arbeitslosenquote {nm}", "konjunktur", "%", "rate", "OECD", "m", 1)
+    # Wirtschaftsstimmung Euroraum (EU-Kommission)
+    j = get("https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/ei_bssi_m_r2?geo=EA20&indic=BS-ESI-I&s_adj=SA&format=JSON&lang=EN", 60).json()
+    tix = j["dimension"]["time"]["category"]["index"]
+    vals = j["value"]
+    s_ = pd.Series({pd.Timestamp(k.replace("M", "-") + "-01"): vals.get(str(i)) for k, i in tix.items()}).dropna().sort_index()
+    put("esi_ea", s_, "Wirtschaftsstimmung Euroraum (ESI)", "konjunktur", "", "rate", "EU-Kommission", "m", 1)
+
+
+slow("regionen", oecd_regions, ["y10_de", "curve_de", "y10_jp", "curve_jp", "y10_ea", "curve_ea", "unemp_de", "unemp_jp", "unemp_ea", "esi_ea"])
+
+
+def payrolls_realtime():
+    # Stellenaufbau so, wie er damals veröffentlicht war (Philadelphia Fed, Echtzeit-Datensatz)
+    r = get("https://www.philadelphiafed.org/-/media/frbp/assets/surveys-and-data/real-time-data/data-files/xlsx/employMvMd.xlsx", 90)
+    x = pd.read_excel(io.BytesIO(r.content), sheet_name=0)
+    dc = x.columns[0]
+    obs = x[dc].astype(str).str.replace(":", "-")
+    x.index = pd.PeriodIndex(obs, freq="M")
+    out = {}
+    for c in x.columns[1:]:
+        m_ = re.search(r"(\d{2})M(\d{1,2})$", str(c))
+        if not m_:
+            continue
+        yy, mm = int(m_.group(1)), int(m_.group(2))
+        yr = 1900 + yy if yy >= 60 else 2000 + yy
+        v = pd.to_numeric(x[c], errors="coerce").dropna()
+        if len(v) < 5:
+            continue
+        p3 = v.diff().iloc[-3:].mean()
+        out[pd.Timestamp(yr, mm, 1)] = p3
+    s_ = pd.Series(out).sort_index()
+    put("payrolls_rt", s_, "Stellenaufbau 3-M.-Ø (wie damals veröffentlicht)", "intern", "Tsd.", "rate", "Philadelphia Fed", "m", 0)
+
+
+slow("payrolls_rt", payrolls_realtime, ["payrolls_rt"], hours=20)
 
 
 def claims():
@@ -615,7 +805,18 @@ shiller = None
 def shiller_long():
     global shiller
     import update as upd
-    sh = upd.load_shiller()
+    cap = {}
+    orig = pd.read_excel
+
+    def grab(*a, **k):
+        df_ = orig(*a, **k)
+        cap["df"] = df_
+        return df_
+    pd.read_excel = grab
+    try:
+        sh = upd.load_shiller()
+    finally:
+        pd.read_excel = orig
     sh = sh.copy()
     sh.index = pd.to_datetime(dict(year=sh.year, month=sh.month, day=1))
     shiller = sh
@@ -629,9 +830,28 @@ def shiller_long():
     put("spx_m", sh.price, "S&P 500 (Monats-Ø, Shiller)", "intern", "Pkt", "price", "R. Shiller", "m", 2)
     put("cpi_long", sh.cpi, "US-CPI-Index (Shiller)", "intern", "", "price", "R. Shiller", "m", 3)
     put("div_m", sh["div"], "S&P 500 Dividende (Jahresrate)", "intern", "", "price", "R. Shiller", "m", 3)
+    # Gewinne je Aktie (S&P 500, 12 Monate) aus derselben Datei
+    df_ = cap.get("df")
+    if df_ is not None:
+        hdr = next(i for i in range(30) if str(df_.iat[i, 0]).strip() == "Date")
+        heads = [str(x).strip() for x in df_.iloc[hdr]]
+        ec = heads.index("E")
+        rows = []
+        for i in range(hdr + 1, len(df_)):
+            try:
+                d = float(df_.iat[i, 0]); e = float(df_.iat[i, ec])
+            except (TypeError, ValueError):
+                continue
+            if d != d or e != e:
+                continue
+            y = int(d); mo = int(round((d - y) * 100))
+            if 1 <= mo <= 12:
+                rows.append((pd.Timestamp(y, mo, 1), e))
+        es = pd.Series(dict(rows)).sort_index()
+        put("eps", es, "S&P 500 Gewinn je Aktie (12 M., Shiller)", "bewertung", "$", "price", "R. Shiller", "m", 2)
 
 
-slow("shiller", shiller_long, ["spx_real", "cape_long", "spx_m", "cpi_long", "div_m"], hours=20)
+slow("shiller", shiller_long, ["spx_real", "cape_long", "spx_m", "cpi_long", "div_m", "eps"], hours=20)
 
 
 # ------------------------------------------------------------------ abgeleitete Reihen
@@ -843,7 +1063,11 @@ except Exception as e:  # noqa
 model_out = None
 try:
     import model as mdl
-    model_out = mdl.run(ser, markt, NOW)
+    model_out = mdl.run(ser, markt, NOW, qual_out)
+    if qual_out is not None and model_out.get("quality"):
+        h_ = [x for x in (qual_out.get("hist") or []) if x.get("d") != NOW.strftime("%Y-%m-%d")]
+        h_.append({"d": NOW.strftime("%Y-%m-%d"), "s": round(model_out["quality"]["score"], 3)})
+        qual_out["hist"] = h_[-400:]
     note("modell", True, " · ".join(f"{k}: {v['now']['score']}" for k, v in model_out["targets"].items()))
 except Exception as e:  # noqa
     import traceback
@@ -859,7 +1083,7 @@ FEEDS = [
     ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex", "us"),
     ("FT Markets", "https://www.ft.com/markets?format=rss", "us"),
     ("Investing.com", "https://www.investing.com/rss/news_25.rss", "us"),
-    ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_all.xml", "fed"),
+    ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_monetary.xml", "fed"),
     ("Handelsblatt", "https://www.handelsblatt.com/contentexport/feed/finanzen", "de"),
     ("tagesschau", "https://www.tagesschau.de/wirtschaft/index~rss2.xml", "de"),
 ]
@@ -901,6 +1125,7 @@ out = {
     "markt": markt,
     "stress": stress_out,
     "model": model_out,
+    "quality": qual_out,
     "news": news[:120],
     "cache": cache_meta,
     "diag": diag,
