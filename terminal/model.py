@@ -25,6 +25,11 @@ import re
 import numpy as np
 import pandas as pd
 
+try:
+    import signals as sig
+except Exception:  # noqa
+    sig = None
+
 WEIGHTS = {"bewertung": 0.15, "gewinne": 0.10, "trend": 0.20, "schwankung": 0.10, "breite": 0.10,
            "konjunktur": 0.15, "finanzen": 0.10, "stimmung": 0.10}
 PILLARS = list(WEIGHTS)
@@ -380,6 +385,7 @@ def run(ser, markt, now, quality=None):
 
     # ---------- je Zielindex
     targets = {}
+    sig_params, sig_cal = None, None
     pooled = {}           # Jahr -> Koeffizienten aus dem S&P 500 (längste Historie)
     order_ = ["spx"] + [k for k in TARGETS if k != "spx"]
     for key in order_:
@@ -583,6 +589,20 @@ def run(ser, markt, now, quality=None):
             strategies.append({"id": k_, "name": n_, "desc": d_, **S_, "eq": [round(float(v), 4) for v in ew.values]})
         strat_months = [str(d.date()) for d in eqs["bh"].index[eqs["bh"].index.isin(me)]]
 
+        # ---------- Ein-/Ausstiegs-Signale (Parameter nur aus S&P 500 bis 1989)
+        signals_out = None
+        if sig is not None:
+            try:
+                if key == "spx" and sig_params is None:
+                    above_ = (P > sma210).fillna(False)
+                    sig_params, sig_cal = sig.calibrate(score, above_, (P / P.shift(1) - 1).fillna(0), (tbill.ffill() / 100 / Y).fillna(0))
+                if sig_params is not None:
+                    signals_out = sig.evaluate(tname, score, P, sma210, tbill, sig_params)
+            except Exception as e:  # noqa
+                import traceback
+                traceback.print_exc()
+                signals_out = {"error": str(e)}
+
         # ---------- große Einbrüche (Tagesschluss)
         episodes = []
         Pv = P.dropna()
@@ -760,7 +780,7 @@ def run(ser, markt, now, quality=None):
             "prob": {"now": prob_now, "calib": calib, "pooled": bool(use_pool), "brier": None if brier is None else round(brier, 4),
                      "brier_ref": None if brier_ref is None else round(brier_ref, 4), "skill": skill,
                      "oos_from": None if not len(oos) else str(oos.index[0].date())},
-            "live": live, "crash": CRASH, "episode": EPISODE,
+            "live": live, "crash": CRASH, "episode": EPISODE, "signals": signals_out,
         }
 
     targets = {k: targets[k] for k in TARGETS if k in targets}
@@ -783,6 +803,7 @@ def run(ser, markt, now, quality=None):
         rule["signalScore"] = markt.get("score")
     q = quality_score()
     return {"weights": WEIGHTS, "pillar_names": PILLAR_NAMES, "targets": targets, "rule": rule, "quality": q,
+            "signal_params": sig_params, "signal_cal": sig_cal,
             "note": "Kursrenditen ohne Dividenden (außer MSCI World in Euro). Monatsdaten mit Veröffentlichungsverzögerung; "
                     "Stellenaufbau wie damals veröffentlicht (Philadelphia Fed), übrige Konjunkturdaten in heutiger Fassung. "
                     "Kein Anlagerat – ein Regelmodell."}

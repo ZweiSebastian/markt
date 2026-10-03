@@ -202,6 +202,9 @@ def slow(key, fn, ids, hours=12):
     if c and all(i in prev.get("series", {}) for i in ids):
         for i in ids:
             series[i] = prev["series"][i]
+            if i in full_prev:      # volle Tageshistorie für die Berechnungen
+                fd = full_prev[i]
+                raw[i] = pd.Series(fd["v"], index=pd.Timestamp("1970-01-01") + pd.to_timedelta(np.cumsum(fd["dt"]), unit="D"))
         cache_meta[key] = c
         note(key, True, "aus Cache " + c["at"])
         return
@@ -218,8 +221,17 @@ def slow(key, fn, ids, hours=12):
 
 
 # ------------------------------------------------------------------ Yahoo
+FULL_URL = PREV_URL.replace("terminal.json", "full.json")
+full_prev = {}
+try:
+    full_prev = get(FULL_URL, 60).json()
+    note("Tages-Archiv", True, f"{len(full_prev)} Reihen")
+except Exception as e:  # noqa
+    note("Tages-Archiv", False, e)
+
+
 def prev_series(sid):
-    d = (prev.get("series") or {}).get(sid)
+    d = full_prev.get(sid) or (prev.get("series") or {}).get(sid)
     if not d:
         return None
     days = d["t"] if "t" in d else np.cumsum(d["dt"]).tolist()
@@ -229,7 +241,7 @@ def prev_series(sid):
 def yahoo():
     """Volle Historie höchstens alle 20 Std., sonst nur die letzten 40 Tage an den letzten Lauf anhängen."""
     import yfinance as yf
-    full = cached("yahoo_full", 20) is None or any(prev_series(sid) is None for sid, *_ in YAHOO)
+    full = cached("yahoo_full", 20) is None or not full_prev or any(prev_series(sid) is None for sid, *_ in YAHOO)
     start = START if full else TODAY - pd.Timedelta(days=40)
     tick = [t for _, t, *_ in YAHOO]
     got = {}
@@ -1135,4 +1147,21 @@ out["series"].update({k: series[k] for k in series if series[k]["g"] == "intern"
 os.makedirs("out", exist_ok=True)
 with open(OUT, "w") as f:
     json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+# Archiv mit vollen Tageskursen (nur für die Pipeline, die App lädt es nicht)
+full_out = {}
+for sid_ in [y_[0] for y_ in YAHOO] + [k for k, v in series.items() if v.get("f") == "d" and k not in LIVE]:
+    if sid_ in full_out:
+        continue
+    x = raw.get(sid_)
+    if x is None or not len(x):
+        if sid_ in full_prev:
+            full_out[sid_] = full_prev[sid_]
+        continue
+    days_ = ((x.index - pd.Timestamp("1970-01-01")) // pd.Timedelta(days=1)).astype(int).tolist()
+    m_ = float(x.tail(500).abs().median()) or 1.0
+    dec_ = max(0, min(6, 4 - int(math.floor(math.log10(m_)))))
+    full_out[sid_] = {"dt": [days_[0]] + [b - a for a, b in zip(days_, days_[1:])], "v": [round(float(v), dec_) for v in x.values]}
+with open("out/full.json", "w") as f:
+    json.dump(full_out, f, separators=(",", ":"))
+print(f"OK   Tages-Archiv: {len(full_out)} Reihen, {os.path.getsize('out/full.json') / 1e6:.2f} MB")
 print(f"OK   fertig: {len(order)} Reihen, {os.path.getsize(OUT) / 1e6:.2f} MB")
