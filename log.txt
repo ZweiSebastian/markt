@@ -1,0 +1,18 @@
+OK   vorheriger Lauf  2026-10-03T14:50:16Z
+OK   Tages-Archiv  82 Reihen
+OK   yahoo  56/56 Ticker (Ergänzung)
+OK   quality  aus Cache 2026-10-03T14:24:39Z
+OK   zinsen  y3m:11271, y2:12581, y10:14179, y30:12403
+FEHL credit  ReadTimeout: HTTPSConnectionPool(host='fred.stlouisfed.org', port=443): Read timed out. (read timeout=40)
+FEHL cli_ea EA20  keine Daten
+FEHL cli_ea EA19  keine Daten
+FEHL cli_ea OECDE  keine Daten
+OK   payrolls_rt  aus Cache 2026-10-03T14:24:39Z
+OK   gdp  A191RC-Q
+OK   shiller  aus Cache 2026-10-03T14:24:39Z
+OK   markt.json  2026-10-02
+OK   stress  jetzt 6 Signale
+OK   modell  world: 51 · world_eur: 52 · spx: 50 · ndx: 50 · rut: 48 · sx5e: 56 · dax: 50 · nikkei: 56 · em: 51
+OK   news  155 Meldungen
+OK   Tages-Archiv: 88 Reihen, 5.82 MB
+OK   fertig: 117 Reihen, 4.55 MB
