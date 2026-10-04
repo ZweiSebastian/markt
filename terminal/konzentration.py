@@ -129,32 +129,37 @@ def pe_split():
     except Exception:  # noqa
         rsp = {}
     pe_eq = rsp.get("trailingPE")
-    ok = [h for h in hold if h["mc"] and h["w"] == h["w"] and h["w"] > 0]
+    # Rechnung über Gewichte statt Börsenwerte (GOOGL/GOOG melden jeweils den Wert der ganzen Firma):
+    # 1/KGV des Index = Summe der Gewichte / KGV je Aktie. Gewinnrendite der Top 10 = Summe w_i / KGV_i.
+    ok = [h for h in hold if h["w"] == h["w"] and h["w"] > 0]
     w_top = sum(h["w"] for h in ok)
-    mc_top = sum(h["mc"] for h in ok)
-    # Gewinne der Top 10: Börsenwert / KGV, ersatzweise Jahresüberschuss (auch negativ)
-    e_top, e_top_f = 0.0, 0.0
-    for h in ok:
-        e = h["mc"] / h["pe"] if h["pe"] and h["pe"] > 0 else (h["ni"] or 0.0)
-        e_top += e
-        e_top_f += h["mc"] / h["fpe"] if h["fpe"] and h["fpe"] > 0 else e
+    def ey(h, key):
+        v = h.get(key)
+        if v and v > 0:
+            return h["w"] / v
+        if h.get("ni") is not None and h.get("mc"):
+            return h["w"] * h["ni"] / h["mc"]      # Verlust: negative Gewinnrendite
+        return None
+    ys = [ey(h, "pe") for h in ok]
+    ysf = [ey(h, "fpe") if ey(h, "fpe") is not None else y for h, y in zip(ok, ys)]
     res = {"idx": None, "top": None, "top_f": None, "rest": None, "eq": None, "w_top": round(w_top * 100, 1),
-           "src_idx": src_idx, "holdings": [{k: (round(v, 4) if isinstance(v, float) else v) for k, v in h.items() if k != "ni"} for h in hold]}
+           "src_idx": src_idx, "m": 2, "holdings": [{k: (round(v, 4) if isinstance(v, float) else v) for k, v in h.items() if k != "ni"} for h in hold]}
     sane = lambda x: x is not None and 5 < x < 80   # noqa
     if sane(pe_idx):
         res["idx"] = round(float(pe_idx), 1)
-    if e_top > 0:
-        res["top"] = round(mc_top / e_top, 1)
-    if e_top_f > 0:
-        res["top_f"] = round(mc_top / e_top_f, 1)
     if sane(pe_eq):
         res["eq"] = round(float(pe_eq), 1)
-    if res["idx"] and w_top > 0.05 and e_top > 0:
-        mc_tot = mc_top / w_top
-        e_tot = mc_tot / res["idx"]
-        if e_tot > e_top:
-            r = (mc_tot - mc_top) / (e_tot - e_top)
-            res["rest"] = round(r, 1) if sane(r) else None
+    if ok and all(y is not None for y in ys):
+        e_top = sum(ys)
+        if e_top > 0:
+            res["top"] = round(w_top / e_top, 1)
+        if sum(ysf) > 0:
+            res["top_f"] = round(w_top / sum(ysf), 1)
+        if res["idx"] and w_top < 0.9:
+            e_rest = 1 / res["idx"] - e_top
+            if e_rest > 0:
+                r = (1 - w_top) / e_rest
+                res["rest"] = round(r, 1) if sane(r) else None
     return res
 
 
@@ -175,7 +180,7 @@ def build(get, rsp, spy, spx, prev, now, refresh_pe, refresh_ff, note):
             note("konzentration French", True, f"bis {out['hist']['ff_last']['d']}")
         except Exception as e:  # noqa
             note("konzentration French", False, f"{type(e).__name__}: {e}")
-    if refresh_pe or not out.get("pe"):
+    if refresh_pe or not out.get("pe") or out["pe"].get("m") != 2:
         try:
             out["pe"] = pe_split()
             out["pe_at"] = now.strftime("%Y-%m-%d")

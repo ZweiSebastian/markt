@@ -608,6 +608,7 @@ function secRisiko(m) {
   g.appendChild(chartCard({ ids: ['vwehx'], title: 'Hochzinsanleihen (Fonds seit 1978)', sma: 200, sub: 'Fallen riskante Unternehmensanleihen unter ihren Trend, zogen sich Anleger oft schon vor Aktiencrashs aus Risiken zurück' }));
   if (S.baa_spread) g.appendChild(chartCard({ ids: ['baa_spread'], title: 'Kreditaufschlag Baa − 10J (seit 1953)', sub: 'Was mittelgute Unternehmen mehr zahlen müssen als der Staat. Steigt vor und in Krisen.', minDays: 3653 }));
   g.appendChild(chartCard({ ids: ['breadth'], title: 'Marktbreite (RSP/SPY)', sub: 'Fällt, wenn nur wenige große Aktien den Index tragen' }));
+  g.appendChild(chartCard({ ids: ['ew_lag'], title: 'Rückstand der vielen (6 Monate)', ref: 0, refLabel: '0', sub: 'Gleichgewichteter S&P 500 minus normaler, Kursentwicklung über 6 Monate in Prozentpunkten – stark negativ heißt: wenige Schwergewichte tragen den Index' }));
   g.appendChild(chartCard({ ids: ['sect_part'], title: 'US-Sektoren im Aufwärtstrend', ref: 50, refLabel: '50 %', sub: 'Anteil der 11 Sektoren über ihrer 200-Tage-Linie – steigt der Index, während dieser Anteil fällt, tragen immer weniger den Markt' }));
   g.appendChild(chartCard({ ids: ['world_part'], title: 'Weltbörsen im Aufwärtstrend', ref: 50, refLabel: '50 %', sub: 'Anteil von 9 großen Indizes (USA, Europa, Japan, Hongkong, Schwellenländer) über ihrer 200-Tage-Linie' }));
   g.appendChild(chartCard({ ids: ['ndx_spx'], title: 'Tech-Dominanz (Nasdaq 100 / S&P 500)' }));
@@ -732,6 +733,7 @@ function secEinschaetzung(m) {
     g.appendChild(c);
   });
   g.appendChild(ruleCard(M));
+  if (DATA.konz && (T.region === 'USA' || T.region === 'Welt')) konzSection(m, DATA.konz);
   if (M.quality && (T.region === 'USA' || T.region === 'Welt')) qualitySection(m, M.quality);
 
   // Verlauf
@@ -811,6 +813,50 @@ function secEinschaetzung(m) {
     draw(null); ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));
   });
   m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">${esc(M.note)} Das Modell fasst Daten nach festen Regeln zusammen, es kennt deine persönliche Lage nicht und garantiert nichts. Rückblicke zeigen, was war – nicht, was kommt.</div>`);
+}
+function konzSection(m, K) {
+  const P = K.pe || {}, L = K.lag || {}, Hs = K.hist || {}, st = (Hs.stats || {})['1963'], sa = (Hs.stats || {}).all;
+  if (!P.idx && !L.v && !st) return;
+  sect(m, 'Konzentration: breites Risiko oder nur die Schwergewichte?');
+  const c = document.createElement('div'); c.className = 'card full';
+  const pe = v => v == null ? '–' : nf(v, 1);
+  const qName = ['stärkster Rückstand', 'leichter Rückstand', 'gleichauf', 'leicht vorn', 'deutlich vorn'];
+  const rows = st ? st.rows : [];
+  const tile = (lbl, v, sub, col) => `<div><div class="lbl">${lbl}</div><div class="big" style="font-size:22px;${col ? 'color:' + col : ''}">${v}</div><div class="mut" style="font-size:11px">${sub}</div></div>`;
+  const ratio = P.top && P.rest ? P.top / P.rest : null;
+  c.innerHTML = `<div class="hd"><div><div class="ttl">KGV aufgeteilt und Rückstand der „vielen“</div>
+    <div class="sub">Ein einziges Index-KGV vermischt zwei Lagen: Der ganze Markt ist teuer – oder nur die zehn größten Werte. Ebenso bei der Kursentwicklung: Tragen wenige Schwergewichte den Index, während die meisten Aktien zurückbleiben? KGV der letzten 12 Monate über Yahoo Finance (Stand ${esc(K.pe_at || '–')}), Top 10 = die zehn größten Positionen des S&P 500, Rest = der Index ohne sie, errechnet aus Gewicht und Gewinnen.</div></div></div>
+    <div class="anasum" style="grid-template-columns:repeat(5,1fr)">
+      ${tile('KGV S&P 500', pe(P.idx), 'alle 500')}
+      ${tile('KGV Top 10', pe(P.top), `${P.w_top != null ? nf(P.w_top, 0) + ' % des Index' : ''}${P.top_f ? ' · erwartet ' + pe(P.top_f) : ''}`, ratio && ratio >= 1.5 ? C.serious : null)}
+      ${tile('KGV Rest (490)', pe(P.rest), 'ohne Top 10')}
+      ${tile('KGV gleichgewichtet', pe(P.eq), 'RSP, jede Aktie gleich')}
+      ${tile('Rückstand der vielen', L.v == null ? '–' : (L.v > 0 ? '+' : '') + nf(L.v * 100, 1) + ' %', 'gleichgewichtet ggü. normal, 6 Mon.', L.q === 0 ? C.serious : null)}
+    </div>
+    ${(K.flags || []).length ? `<div class="interp"><b>Hinweis:</b> ${K.flags.map(esc).join(' ')}</div>` : `<div class="interp">Keine auffällige Konzentration: Die vielen halten mit, und die Bewertung der Top 10 weicht nicht extrem vom Rest ab.</div>`}
+    ${st ? `<div class="lbl" style="margin-top:10px">Was früher folgte – Index nahe am Hoch, eingeteilt nach Rückstand der vielen (USA seit ${st.from.slice(0, 4)}, Monatsdaten)</div>
+    <table class="t" style="margin-top:4px"><tr><th>Lage der vielen (6 Mon.)</th><th>Monate</th><th>Verlust ≥ 15 % binnen 12 Mon.</th><th>Index nach 12 Mon. (Median)</th><th>Lücke wurde noch größer</th></tr>
+    ${rows.map((r, i) => `<tr style="${L.q === i ? 'background:rgba(255,170,0,.10);font-weight:600' : ''}"><td>${qName[i]}${L.q === i ? ' ← heute' : ''}</td><td>${r.n}</td><td>${riskCell(r.dd15)}</td><td>${fmtPct(r.fw, 0)}</td><td>${r.widen == null ? '–' : nf(r.widen, 0) + ' %'}</td></tr>`).join('')}
+    <tr class="mut"><td>alle Monate nahe Hoch</td><td>${st.n}</td><td>${st.base} %</td><td></td><td></td></tr></table>` : ''}
+    <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+      <div><div class="lbl">Rückstand der vielen, täglich (RSP ggü. SPY, 6 Monate, in %)</div><div class="chart kz1" style="height:170px"></div></div>
+      <div><div class="lbl">KGV mitgeschrieben (ab ${esc(((K.track || [])[0] || {}).d || '–')})</div><div class="chart kz2" style="height:170px"></div></div>
+    </div>
+    <div class="note">So liest du das: Hinken die vielen stark hinterher, während der Index nahe am Hoch steht, kam es seit 1963 etwa dreimal so oft zu einem Rückschlag von 15 % oder mehr – die Rendite über 12 Monate war im Mittel aber trotzdem gut, und meist liefen die Schwergewichte sogar weiter vorneweg. Es ist deshalb ein Hinweis auf <b>erhöhtes Rückschlagrisiko</b>, kein Verkaufssignal. Im Test machte es die Crash-Prognose sogar schlechter (trainiert bis 1989, geprüft ab 1990) und fließt deshalb <b>nicht</b> in den Score ein. Historie: Kenneth-French-Datenbibliothek, größere Hälfte der US-Aktien gleich gewichtet (verläuft zu 94 % wie RSP)${sa ? `; seit 1927: ${sa.rows[0].dd15} % gegenüber ${sa.base} % im Schnitt` : ''}. Ein historisches KGV ohne Top 10 gibt es nicht frei – deshalb wird es ab jetzt täglich mitgeschrieben. Die Top 10 sind die größten Positionen des SPY${P.holdings ? ' (' + P.holdings.map(h => esc(h.t)).join(', ') + ')' : ''} – Alphabet ist mit zwei Aktiengattungen doppelt vertreten. „erwartet“ = KGV auf die geschätzten Gewinne der nächsten 12 Monate (für den Gesamtindex nicht frei verfügbar).</div>`;
+  m.appendChild(c);
+  queueMicrotask(() => {
+    const e1 = c.querySelector('.kz1'), e2 = c.querySelector('.kz2');
+    const s = S.ew_lag;
+    if (s && e1) { const ch = baseChart(e1, { fmt: v => nf(v, 1) + ' %' }); const ser = ch.addAreaSeries({ lineColor: C.s1, topColor: 'rgba(57,135,229,.25)', bottomColor: 'rgba(57,135,229,0)', lineWidth: 1.5, priceLineVisible: false });
+      const from = Math.max(0, s.t.length - 1260); const d = []; for (let i = from; i < s.t.length; i++) d.push({ time: s.t[i] * DAY, value: s.v[i] });
+      ser.setData(d); ser.createPriceLine({ price: 0, color: C.mut, lineStyle: 2, lineWidth: 1, axisLabelVisible: false }); ch.timeScale().fitContent(); }
+    const tr = (K.track || []).filter(x => x.top || x.rest || x.eq);
+    if (e2) { if (tr.length < 2) { e2.innerHTML = '<div class="mut" style="padding:60px 0;text-align:center">Wird ab heute täglich gesammelt – nach ein paar Tagen erscheint hier der Verlauf.</div>'; }
+      else { const ch = baseChart(e2, { fmt: v => nf(v, 1) });
+        [['top', C.serious, 'Top 10'], ['rest', C.s3, 'Rest'], ['eq', C.sec, 'gleichgewichtet'], ['idx', C.s1, 'S&P 500']].forEach(([k, col, t]) => {
+          const d = tr.filter(x => x[k] != null).map(x => ({ time: monthDay(x.d) * DAY, value: x[k] })); if (d.length) ch.addLineSeries({ color: col, lineWidth: 1.5, title: t, priceLineVisible: false }).setData(d); });
+        ch.timeScale().fitContent(); } }
+  });
 }
 function qualitySection(m, Q) {
   sect(m, 'Gewinnqualität der Schwergewichte');
