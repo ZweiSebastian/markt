@@ -829,7 +829,7 @@ function konzSection(m, K) {
     <div class="anasum" style="grid-template-columns:repeat(5,1fr)">
       ${tile('KGV S&P 500', pe(P.idx), 'alle 500')}
       ${tile('KGV Top 10', pe(P.top), `${P.w_top != null ? nf(P.w_top, 0) + ' % des Index' : ''}${P.top_f ? ' · erwartet ' + pe(P.top_f) : ''}`, ratio && ratio >= 1.5 ? C.serious : null)}
-      ${tile('KGV Rest (490)', pe(P.rest), 'ohne Top 10')}
+      ${tile('KGV Rest', pe(P.rest), 'ohne Top 10')}
       ${tile('KGV gleichgewichtet', pe(P.eq), 'RSP, jede Aktie gleich')}
       ${tile('Rückstand der vielen', L.v == null ? '–' : (L.v > 0 ? '+' : '') + nf(L.v * 100, 1) + ' %', 'gleichgewichtet ggü. normal, 6 Mon.', L.q === 0 ? C.serious : null)}
     </div>
