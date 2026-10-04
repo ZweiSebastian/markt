@@ -1087,6 +1087,25 @@ except Exception as e:  # noqa
     model_out = prev.get("model")
     note("modell", False, f"{type(e).__name__}: {e}")
 
+# ------------------------------------------------------------------ Konzentration (nur Anzeige, nicht im Score)
+konz_out = prev.get("konz")
+try:
+    import konzentration as konz
+    rp, fp = cached("konz_pe", 20), cached("konz_ff", 24 * 7)
+    konz_out, lag_ = konz.build(get, ser("rsp"), ser("spy"), ser("spx"), prev.get("konz"), NOW,
+                                refresh_pe=rp is None, refresh_ff=fp is None, note=note)
+    for k_, c_, f_ in (("konz_pe", rp, "pe_at"), ("konz_ff", fp, "ff_at")):
+        if c_ is not None:
+            cache_meta[k_] = c_
+        elif konz_out.get(f_) == NOW.strftime("%Y-%m-%d"):
+            cache_meta[k_] = {"at": NOW.strftime("%Y-%m-%dT%H:%M:%SZ"), "v": CACHE_VERSION}
+    if lag_ is not None:
+        put("ew_lag", lag_ * 100, "Gleichgewichtet vs. normal, 6 Monate", "verhaeltnis", "%", "rate", "Yahoo Finance (RSP, SPY)", dec=2)
+except Exception as e:  # noqa
+    import traceback
+    traceback.print_exc()
+    note("konzentration", False, f"{type(e).__name__}: {e}")
+
 
 # ------------------------------------------------------------------ News (Ersatz, falls die App offline lädt)
 FEEDS = [
@@ -1138,6 +1157,7 @@ out = {
     "stress": stress_out,
     "model": model_out,
     "quality": qual_out,
+    "konz": konz_out,
     "news": news[:120],
     "cache": cache_meta,
     "diag": diag,
