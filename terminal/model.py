@@ -573,7 +573,8 @@ def run(ser, markt, now, quality=None):
             eq = (1 + ret).cumprod()
             yrs = len(ret) / Y
             return {"cagr": round((eq.iloc[-1] ** (1 / yrs) - 1) * 100, 1), "mdd": round(float((eq / eq.cummax() - 1).min()) * 100, 0),
-                    "vol": round(float(ret.std() * math.sqrt(Y)) * 100, 1), "expo": round(float(e.mean() * 100), 0), "eq": eq}
+                    "vol": round(float(ret.std() * math.sqrt(Y)) * 100, 1), "expo": round(float(e.mean() * 100), 0), "eq": eq,
+                    "_e": e.reindex(eq.index)}
         sched = {
             "bh": ("Kaufen und halten", "immer 100 % investiert", pd.Series(1.0, index=days)),
             "trend": ("Trendregel 10 Monate", "investiert, wenn der Kurs über seiner 10-Monats-Linie liegt, sonst Geldmarkt", (P > sma210).astype(float)),
@@ -584,9 +585,14 @@ def run(ser, markt, now, quality=None):
         strategies, eqs = [], {}
         for k_, (n_, d_, e_) in sched.items():
             S_ = strat(e_)
-            eqs[k_] = S_.pop("eq")
+            eqs[k_] = S_.pop("eq"); ex_ = S_.pop("_e")
             ew = eqs[k_][eqs[k_].index.isin(me)]
-            strategies.append({"id": k_, "name": n_, "desc": d_, **S_, "eq": [round(float(v), 4) for v in ew.values]})
+            # je Monat: tiefster Tageswert (für den größten Verlust ab frei gewähltem Start) und mittlere Investitionsquote
+            per = eqs[k_].index.to_period("M")
+            lo = eqs[k_].groupby(per).min().reindex(ew.index.to_period("M")).values
+            exm = ex_.groupby(per).mean().reindex(ew.index.to_period("M")).values
+            strategies.append({"id": k_, "name": n_, "desc": d_, **S_, "eq": [round(float(v), 4) for v in ew.values],
+                               "lo": [round(float(v), 4) for v in lo], "ex": [round(float(v), 2) for v in np.nan_to_num(exm)]})
         strat_months = [str(d.date()) for d in eqs["bh"].index[eqs["bh"].index.isin(me)]]
 
         # ---------- Ein-/Ausstiegs-Signale (Parameter nur aus S&P 500 bis 1989)
