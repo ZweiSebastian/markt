@@ -244,3 +244,26 @@ table.qt td, table.qt th { padding: 5px 6px; }
 .chart:hover .zbar { opacity: 1; }
 .zbar button { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line, #242934); background: rgba(20,23,30,.85); color: #a2a8b6; font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
 .zbar button:hover { color: #e9ebf0; border-color: #3a4150; }
+
+/* Einstiegsplan */
+.pform { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 14px; margin-top: 10px; }
+.pform label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #a2a8b6; }
+.pform input, .pform select, .paddr input { background: #12151b; border: 1px solid #2a303c; border-radius: 7px; color: #e9ebf0; padding: 7px 9px; font: inherit; font-size: 13px; }
+.pbtn { display: flex; gap: 8px; margin-top: 12px; }
+.card button.pri, .card button.ghost, .pbtn button { background: #222733; border: 1px solid #2f3542; color: #e9ebf0; border-radius: 7px; padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.card button.pri { background: #1f4f8f; border-color: #3987e5; }
+.card button.danger { color: #ff6b6b; }
+.card button.ghost { padding: 5px 10px; font-size: 12px; color: #a2a8b6; }
+.plan { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; margin-top: 10px; }
+.pnow { border-left: 3px solid; padding: 4px 0 4px 14px; }
+.phead { font-size: 18px; font-weight: 650; margin: 4px 0; }
+.pwhy { color: #c9cdd6; font-size: 13px; line-height: 1.45; margin-top: 6px; }
+.plive { font-size: 12px; margin-top: 8px; }
+.pbar { width: 100%; position: relative; height: 10px; background: #1c2028; border-radius: 6px; overflow: hidden; margin-top: 6px; }
+.pbar i { position: absolute; left: 0; top: 0; margin: 0; border: 0; display: block; height: 100%; background: linear-gradient(90deg, #3987e5, #3ddc84); }
+.pnums { display: flex; justify-content: space-between; font-size: 12px; color: #a2a8b6; margin-top: 6px; }
+.paddr { display: flex; gap: 6px; margin-top: 12px; }
+.paddr input { width: 120px; }
+button.x { background: none; border: none; color: #697182; cursor: pointer; font-size: 15px; }
+button.x:hover { color: #ff6b6b; }
+@media (max-width: 900px) { .plan, .pform { grid-template-columns: 1fr; } }
