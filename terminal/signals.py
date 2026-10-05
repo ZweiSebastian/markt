@@ -36,35 +36,56 @@ WINDOW = 35
 ROLL_FROM = 1990
 
 
-def simulate(s, above, r, cash, p):
-    """s: Score (np, nan = keine Aussage), above: Kurs über 10-M.-Linie (bool), r/cash: Tagesrenditen.
-    Gibt Positionsreihe (0/1, gilt am jeweiligen Tag) und Wechsel zurück."""
+try:   # schneller Kern, falls numba installiert ist (rollierende Kalibrierung rechnet ~5000 Läufe)
+    from numba import njit
+except Exception:  # noqa
+    def njit(*a, **k):
+        return (lambda f: f) if not (a and callable(a[0])) else a[0]
+
+
+@njit(cache=True)
+def _core(s, above, xs, xn, xt, es, en, hold_min):
     n = len(s)
-    per = isinstance(p, list)
-    P_ = p
     pos = np.ones(n)
-    state, cnt_out, cnt_in, since = 1, 0, 0, HOLD_MIN
-    switches = []
+    sw_t = np.empty(n, np.int64)
+    sw_k = np.empty(n, np.int64)
+    m = 0
+    state, cnt_out, cnt_in, since = 1, 0, 0, hold_min
     for t in range(n):
-        pos[t] = state                       # Position am Tag t (Entscheidung vom Vortag)
-        p = P_[t] if per else P_
+        pos[t] = state
         st = s[t]
         if np.isnan(st):
             continue
         if state == 1:
-            cond = st < p["exit_s"] and (not p["exit_trend"] or not above[t])
+            cond = st < xs[t] and (xt[t] == 0 or not above[t])
             cnt_out = cnt_out + 1 if cond else 0
-            if cnt_out >= p["exit_n"] and since >= HOLD_MIN:
+            if cnt_out >= xn[t] and since >= hold_min:
                 state, since, cnt_out, cnt_in = 0, 0, 0, 0
-                switches.append((t, 0))
+                sw_t[m] = t; sw_k[m] = 0; m += 1
         else:
-            cond = st >= p["entry_s"] and above[t]
+            cond = st >= es[t] and above[t]
             cnt_in = cnt_in + 1 if cond else 0
-            if cnt_in >= p["entry_n"] and since >= HOLD_MIN:
+            if cnt_in >= en[t] and since >= hold_min:
                 state, since, cnt_out, cnt_in = 1, 0, 0, 0
-                switches.append((t, 1))
+                sw_t[m] = t; sw_k[m] = 1; m += 1
         since += 1
-    return pos, switches
+    return pos, sw_t[:m], sw_k[:m]
+
+
+def simulate(s, above, r, cash, p):
+    """s: Score (np, nan = keine Aussage), above: Kurs über 10-M.-Linie (bool), r/cash: Tagesrenditen.
+    p: Parameter (dict) oder Liste von Parametern je Tag. Gibt Positionsreihe (0/1, gilt am jeweiligen Tag) und Wechsel zurück."""
+    n = len(s)
+    if isinstance(p, list):
+        xs = np.array([q["exit_s"] for q in p], float); xn = np.array([q["exit_n"] for q in p], np.int64)
+        xt = np.array([1 if q["exit_trend"] else 0 for q in p], np.int64)
+        es = np.array([q["entry_s"] for q in p], float); en = np.array([q["entry_n"] for q in p], np.int64)
+    else:
+        xs = np.full(n, float(p["exit_s"])); xn = np.full(n, int(p["exit_n"]), np.int64)
+        xt = np.full(n, 1 if p["exit_trend"] else 0, np.int64)
+        es = np.full(n, float(p["entry_s"])); en = np.full(n, int(p["entry_n"]), np.int64)
+    pos, st_, sk_ = _core(np.asarray(s, float), np.asarray(above, bool), xs, xn, xt, es, en, HOLD_MIN)
+    return pos, [(int(a), int(b)) for a, b in zip(st_, sk_)]
 
 
 def perf(pos, r, cash):

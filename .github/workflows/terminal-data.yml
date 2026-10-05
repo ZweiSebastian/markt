@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Pakete
-        run: pip install -q pandas xlrd openpyxl requests yfinance
+        run: pip install -q pandas xlrd openpyxl requests yfinance numba
       - name: Daten sammeln
         env:
           DATA_BRANCH: ${{ github.ref_name == 'main' && 'terminal-data' || 'terminal-data-dev' }}
