@@ -481,20 +481,15 @@ def fred(sid, start="1919-01-01"):
     raise last
 
 
-def credit():
-    # Moody's Baa/Aaa (FRED; die Fed führt sie seit 2016 nicht mehr in H.15) und 10J monatlich
-    baa = fred("BAA")
-    aaa = fred("AAA")
+def y10_monthly():
+    # 10J monatlich (Fed H.15 über DBnomics) – Ersatz für die Tagesreihe vor 1962.
+    # Moody's Baa/Aaa gibt es nur über FRED, das von GitHub aus nicht erreichbar ist – Kreditrisiko kommt stattdessen
+    # aus HYG/IEF und dem Hochzinsfonds VWEHX.
     y10m = dbn("FED/H15/RIFLGFCY10_N.M", "1953-01-01")
-    put("baa", baa, "Unternehmensanleihen Baa (Moody's)", "zinsen", "%", "rate", "FRED / Moody's", "m", 2)
     put("y10_m", y10m, "US-Zins 10J (monatlich)", "intern", "%", "rate", "Fed H.15", "m", 2)
-    j = pd.concat([baa, y10m], axis=1, join="inner").dropna()
-    put("baa_spread", j.iloc[:, 0] - j.iloc[:, 1], "Kreditaufschlag Baa − 10J", "risiko", "Pp.", "rate", "FRED/Fed H.15 (berechnet)", "m", 2)
-    j = pd.concat([baa, aaa], axis=1, join="inner").dropna()
-    put("baa_aaa", j.iloc[:, 0] - j.iloc[:, 1], "Kreditaufschlag Baa − Aaa", "risiko", "Pp.", "rate", "FRED (berechnet)", "m", 2)
 
 
-slow("credit", credit, ["baa", "y10_m", "baa_spread", "baa_aaa"])
+slow("y10m", y10_monthly, ["y10_m"])
 if cache_meta.get("zinsen", {}).get("at") != NOW.strftime("%Y-%m-%dT%H:%M:%SZ"):
     try:   # im Cache-Fall die letzten Tage frisch nachziehen
         tr = treasury_year(NOW.year)
@@ -548,9 +543,11 @@ def ecb():
                 break
             except Exception as e:  # noqa
                 if attempt:
-                    note("ezb " + sid, False, e)
                     if sid in prev.get("series", {}):
                         series[sid] = prev["series"][sid]
+                        note("ezb " + sid, True, f"aus letztem Lauf ({type(e).__name__})")
+                    else:
+                        note("ezb " + sid, False, e)
                 time.sleep(3)
     try:
         s3 = ecb_csv("YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_3M", "2004-01-01")
@@ -562,7 +559,11 @@ def ecb():
             cm.index = cm.index.to_timestamp()
             put("curve_ea", cm, "Zinskurve 10J − 3M Euroraum (AAA)", "zinsen", "Pp.", "rate", "EZB (berechnet)", "m", 2)
     except Exception as e:  # noqa
-        note("ezb curve_ea", False, e)
+        if "curve_ea" in prev.get("series", {}):
+            series["curve_ea"] = prev["series"]["curve_ea"]
+            note("ezb curve_ea", True, f"aus letztem Lauf ({type(e).__name__})")
+        else:
+            note("ezb curve_ea", False, e)
     if ok_ < 2:
         raise RuntimeError("EZB kaum erreichbar")
 
@@ -629,11 +630,11 @@ slow("nfci", nfci, ["nfci", "anfci"])
 
 
 def oecd():
-    url = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/USA+G7+DEU+JPN+CHN+EA19+EA20+OECDE.M.LI...AA...H"
+    url = ("https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.1/USA+G7+DEU+JPN+CHN.M.LI...AA...H"
            "?startPeriod=1960-01&dimensionAtObservation=AllDimensions&format=csvfilewithlabels")
     d = pd.read_csv(io.StringIO(get(url, 90).text))
     for area, sid, name in [("USA", "cli_us", "OECD-Frühindikator USA"), ("G7", "cli_g7", "OECD-Frühindikator G7"),
-                            ("DEU", "cli_de", "OECD-Frühindikator Deutschland"), ("EA20", "cli_ea", "OECD-Frühindikator Euroraum"), ("EA19", "cli_ea", "OECD-Frühindikator Euroraum"), ("OECDE", "cli_ea", "OECD-Frühindikator Europa"),
+                            ("DEU", "cli_de", "OECD-Frühindikator Deutschland"),
                             ("JPN", "cli_jp", "OECD-Frühindikator Japan"), ("CHN", "cli_cn", "OECD-Frühindikator China")]:
         x = d[d["REF_AREA"] == area]
         if not len(x):
@@ -646,7 +647,7 @@ def oecd():
         put(sid, s, name, "konjunktur", "", "rate", "OECD", "m", 2)
 
 
-slow("oecd", oecd, ["cli_us", "cli_g7", "cli_de", "cli_ea", "cli_jp", "cli_cn"])
+slow("oecd", oecd, ["cli_us", "cli_g7", "cli_de", "cli_jp", "cli_cn"])   # Euroraum gibt es bei der OECD nicht mehr – Euro Stoxx nutzt Deutschland
 
 
 def oecd_regions():

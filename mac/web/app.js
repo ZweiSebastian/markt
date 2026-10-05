@@ -735,14 +735,15 @@ function secEinschaetzung(m) {
   const ov = document.createElement('div'); ov.className = 'card full';
   const yrs = t => { const a = +t.since.slice(0, 4), b = +t.now.month.slice(0, 4); return b - a; };
   ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes im Überblick</div><div class="sub">Klick auf eine Zeile zeigt die Einschätzung im Detail. Stand ${fmtDate(monthDay(N.day))} (Tagesmodell); Score und Wahrscheinlichkeit live mit den aktuellen Kursen.</div></div></div>
-    <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Region</th><th>Score</th><th>Lage</th><th>Wahrsch.*<br>Modell</th><th>Häufigkeit*<br>ähnl. Score</th><th>Häufigkeit*<br>Analogien</th><th>Häufigkeit*<br>normal</th><th>Trend</th><th>Daten</th></tr>
+    <table class="t ov" style="margin-top:6px"><tr><th rowspan="2">Index</th><th rowspan="2">Region</th><th rowspan="2">Score</th><th rowspan="2">Lage</th><th colspan="4" class="grp">Risiko: Rückgang um 15 % oder mehr in den nächsten 12 Monaten</th><th rowspan="2">Trend</th><th rowspan="2">Daten</th></tr>
+    <tr><th title="Vorwärts getestete Modellprognose für heute">Prognose</th><th title="Wie oft es früher passierte, wenn der Score ähnlich war">früher bei<br>gleichem Score</th><th title="Wie oft es nach den 8 ähnlichsten Momenten der Geschichte passierte">früher in<br>ähnlichen Lagen</th><th title="Wie oft es im Durchschnitt aller Monate passierte">im<br>Durchschnitt</th></tr>
     ${Object.entries(M.targets).map(([k, t]) => { const tr = (t.now.pillars.find(p => p.id === 'trend') || {}).score; const y = yrs(t);
       return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b id="ov-s-${k}">${t.now.score}</b></td>
       <td style="font-family:inherit" id="ov-l-${k}"><span class="badge ${t.now.cls === 'crit' ? 'crit' : t.now.cls}">${esc(t.now.label)}</span></td>
       <td id="ov-p-${k}">${riskCell(t.now.risk ? t.now.risk.prob : null)}${t.prob && t.prob.pooled ? '<span class="mut" title="kurze Historie – Modell vom S&P 500 übernommen">¹</span>' : ''}</td>
       <td>${riskCell(t.now.risk ? t.now.risk.band : null)}</td><td>${riskCell(t.now.risk ? t.now.risk.analog : null)}</td><td class="mut">${t.now.risk ? t.now.risk.base + ' %' : '–'}</td>
       <td>${pillarBar(tr)}</td><td style="font-family:inherit" class="${y < 25 ? '' : 'mut'}">seit ${t.since.slice(0, 4)}${y < 25 ? ' <span style="color:var(--warn)" title="Kurzer Rückblick – Prozentwerte beruhen auf wenigen Fällen">⚠</span>' : ''}</td></tr>`; }).join('')}</table>
-    <div class="note">USA und Welt nutzen US-Konjunktur, Shiller-KGV und Gewinndaten; DAX und Euro Stoxx haben eigene Konjunktur- und Zinsdaten für Deutschland bzw. den Euroraum, der Nikkei für Japan, die Schwellenländer China-Frühindikator, Dollar und Kupfer. Für sie gibt es kein frei verfügbares KGV, die Bewertung ist dort eine Näherung (Kurs ggü. 10-Jahres-Durchschnitt). ⚠ = weniger als 25 Jahre Daten. * Wahrscheinlichkeit = Modell für einen Rückgang von mindestens 15 % in den nächsten 12 Monaten, vorwärts getestet (¹ kurze Historie: am S&P 500 gelernt). Häufigkeit = wie oft das früher tatsächlich passierte: bei ähnlichem Score, in den ähnlichsten Momenten und im Schnitt. Der MSCI World in Euro enthält Dividenden (Nettoindex) – so, wie ihn ein Euro-Anleger mit einem thesaurierenden ETF erlebt.</div>`;
+    <div class="note">Lesebeispiel: „Prognose 23 % · im Durchschnitt 20 %“ heißt, ein Rückgang um 15 % oder mehr ist gerade etwas wahrscheinlicher als üblich. Die mittleren beiden Spalten zeigen, wie oft er früher in vergleichbaren Lagen tatsächlich kam. ¹ kurze Historie, Prognose am S&P 500 gelernt. ⚠ weniger als 25 Jahre Daten. MSCI World in Euro mit Dividenden (wie ein thesaurierender ETF). Für DAX, Euro Stoxx, Nikkei und Schwellenländer gibt es kein frei verfügbares KGV, die Bewertung ist dort eine Näherung.</div>`;
   ov.querySelectorAll('tr.row').forEach(r => r.onclick = () => { TGT = r.dataset.t; store('tgt', TGT); renderSection(); setTimeout(() => { const h = document.getElementById('hero'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); });
   m.appendChild(ov);
   planCard(m, M);
@@ -833,26 +834,49 @@ function secEinschaetzung(m) {
     <div class="note">Werte um ±0,1 sind Rauschen, ab etwa 0,2 ein echter, aber schwacher Zusammenhang. Bewertung wirkt typischerweise erst über Jahre, Trend und Stimmung eher kurzfristig. „Rückgang“: positiv = höherer Score, kleinere Rückgänge danach.</div>`;
   g2.appendChild(rk);
 
-  // Strategien
+  // Strategien – Startzeitpunkt frei wählbar
   sect(m, 'Regeln im Test');
   const st = document.createElement('div'); st.className = 'card full';
-  const S3 = T.strategies;
-  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)} seit ${T.since.slice(0, 4)}, wöchentlich angepasst (Entscheidung am Freitag, gilt ab Montag), nicht investiertes Geld im Geldmarkt. Tageskurse. Ohne Dividenden, Steuern und Kosten. Logarithmisch.</div></div></div>
+  const S3 = T.strategies; const SM = T.strat_months;
+  const y0 = +SM[0].slice(0, 4), y1 = +SM[SM.length - 1].slice(0, 4);
+  const presets = [1990, 2000, 2008, 2010, 2020].filter(y => y > y0 && y < y1);
+  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, wöchentlich angepasst (Entscheidung am Freitag, gilt ab Montag), nicht investiertes Geld im Geldmarkt. Ohne Dividenden, Steuern und Kosten. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
+    <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span></div>
     <div class="legend" id="slg"></div><div class="chart tall"></div>
     <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th></tr>
-    ${S3.map((x, j) => `<tr><td><i style="display:inline-block;width:12px;border-top:2px solid ${SER[j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td>${fmtPct(x.cagr)}</td><td>${fmtPct(x.mdd, 0)}</td><td>${nf(x.vol, 1)} %</td><td>${nf(x.expo, 0)} %</td></tr>`).join('')}</table>
-    <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge.</div>`;
+    ${S3.map((x, j) => `<tr><td><i style="display:inline-block;width:12px;border-top:2px solid ${SER[j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td id="sr-c${j}"></td><td id="sr-d${j}"></td><td id="sr-v${j}"></td><td id="sr-e${j}"></td></tr>`).join('')}</table>
+    <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge. Ab frei gewähltem Start rechnet die App mit Monatswerten; der größte Verlust berücksichtigt den tiefsten Tageskurs je Monat.</div>`;
   m.appendChild(st);
   queueMicrotask(() => {
     const ch = baseChart(st.querySelector('.chart'), { log: true, fmt: p => nf(p, 0) });
-    const ds = T.strat_months.map(monthDay); const lines = [];
-    S3.forEach((x, j) => { const l = ch.addLineSeries({ color: SER[j], lineWidth: 2, priceLineVisible: false, priceFormat: pf(0) });
-      l.setData(x.eq.map((v, i) => ({ time: ds[i] * DAY, value: v * 100 }))); lines.push(l); });
-    ch.timeScale().fitContent();
+    const ds = SM.map(monthDay); const lines = S3.map((x, j) => ch.addLineSeries({ color: SER[j], lineWidth: 2, priceLineVisible: false, priceFormat: pf(0) }));
+    let i0 = 0;
+    const stats = (x, i) => { const e = x.eq, n = e.length - 1 - i; if (n < 12) return null;
+      const cagr = (Math.pow(e[e.length - 1] / e[i], 12 / n) - 1) * 100;
+      let pk = e[i], mdd = 0; for (let k = i + 1; k < e.length; k++) { const lo = x.lo ? x.lo[k] : e[k]; mdd = Math.min(mdd, lo / pk - 1); pk = Math.max(pk, e[k]); }
+      const rs = []; for (let k = i + 1; k < e.length; k++) rs.push(e[k] / e[k - 1] - 1); const mu = rs.reduce((a, b) => a + b, 0) / rs.length;
+      const vol = Math.sqrt(rs.reduce((a, b) => a + (b - mu) ** 2, 0) / (rs.length - 1) * 12) * 100;
+      const ex = x.ex ? x.ex.slice(i + 1).reduce((a, b) => a + b, 0) / (e.length - 1 - i) * 100 : x.expo;
+      return { cagr, mdd: mdd * 100, vol, ex }; };
     const lg = st.querySelector('#slg');
-    const draw = t => { const i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < 0) return;
-      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${SER[j]}"></i>${esc(x.name)}<b>${nf(x.eq[i] * 100, 0)}</b></span>`).join('') + `<span class="d">${T.strat_months[i]}</span>`; };
-    draw(null); ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));
+    const draw = t => { let i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < i0) i = i0; if (i < 0) return;
+      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${SER[j]}"></i>${esc(x.name)}<b>${nf(x.eq[i] / x.eq[i0] * 100, 0)}</b></span>`).join('') + `<span class="d">${SM[i]}</span>`; };
+    const setStart = i => { i0 = Math.max(0, Math.min(ds.length - 13, i));
+      S3.forEach((x, j) => { lines[j].setData(x.eq.slice(i0).map((v, k) => ({ time: ds[i0 + k] * DAY, value: v / x.eq[i0] * 100 })));
+        const r = stats(x, i0); const set = (id, h) => { const el = st.querySelector('#' + id); if (el) el.innerHTML = h; };
+        set('sr-c' + j, r ? fmtPct(r.cagr) : '–'); set('sr-d' + j, r ? `<span style="color:${C.down}">${nf(r.mdd, 0)} %</span>` : '–');
+        set('sr-v' + j, r ? nf(r.vol, 1) + ' %' : '–'); set('sr-e' + j, r ? nf(r.ex, 0) + ' %' : '–'); });
+      ch.timeScale().fitContent();
+      st.querySelector('#ss-lbl').textContent = `ab ${fmtDate(ds[i0])} · ${nf((ds.length - 1 - i0) / 12, 1)} Jahre`;
+      st.querySelector('#ss-in').value = SM[i0].slice(0, 7);
+      st.querySelectorAll('.sstart button').forEach(b => b.classList.toggle('on', SM.findIndex(d => d >= b.dataset.y) === i0));
+      draw(null); };
+    const idxOf = ymOrY => { const k = SM.findIndex(d => d >= String(ymOrY)); return k < 0 ? 0 : k; };
+    st.querySelectorAll('.sstart button').forEach(b => b.onclick = () => setStart(idxOf(b.dataset.y)));
+    st.querySelector('#ss-in').onchange = e => { if (e.target.value) setStart(idxOf(e.target.value)); };
+    ch.subscribeClick(p => { if (p && p.time) setStart(ds.indexOf(p.time / DAY)); });
+    ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));
+    setStart(0);
   });
   m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">${esc(M.note)} Das Modell fasst Daten nach festen Regeln zusammen, es kennt deine persönliche Lage nicht und garantiert nichts. Rückblicke zeigen, was war – nicht, was kommt.</div>`);
 }
@@ -1079,7 +1103,7 @@ function drawPlan(c, M) {
       </div>
       <div>
         <div class="lbl">Fortschritt</div>
-        <div class="pbar"><i style="width:${Math.min(100, pct).toFixed(1)}%"></i></div>
+        <div class="pprog"><i style="width:${Math.min(100, pct).toFixed(1)}%"></i></div>
         <div class="pnums"><span>angelegt <b>${eur(st.done)}</b></span><span>offen <b>${eur(st.rest)}</b></span><span>${nf(pct, 0)} %</span></div>
         <div class="paddr"><input id="pl-amt" type="number" step="100" value="${Math.round(st.due || 0) || ''}" placeholder="Betrag"><input id="pl-d" type="date" value="${ymd(new Date())}"><button id="pl-add" class="pri">Als gekauft eintragen</button></div>
         ${(P.buys || []).length ? `<table class="t" style="margin-top:8px"><tr><th>Datum</th><th>Betrag</th><th></th></tr>${P.buys.slice().reverse().map((b, i) => `<tr><td>${fmtDate(monthDay(b.d))}</td><td>${eur(b.a)}</td><td><button class="x" data-i="${P.buys.length - 1 - i}" title="Eintrag entfernen">×</button></td></tr>`).join('')}</table>` : '<div class="note">Noch nichts eingetragen. Trag jede Ausführung ein – daraus rechnet der Plan, was noch offen ist.</div>'}

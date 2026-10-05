@@ -259,11 +259,19 @@ table.qt td, table.qt th { padding: 5px 6px; }
 .phead { font-size: 18px; font-weight: 650; margin: 4px 0; }
 .pwhy { color: #c9cdd6; font-size: 13px; line-height: 1.45; margin-top: 6px; }
 .plive { font-size: 12px; margin-top: 8px; }
-.pbar { width: 100%; position: relative; height: 10px; background: #1c2028; border-radius: 6px; overflow: hidden; margin-top: 6px; }
-.pbar i { position: absolute; left: 0; top: 0; margin: 0; border: 0; display: block; height: 100%; background: linear-gradient(90deg, #3987e5, #3ddc84); }
+.pprog { width: 100%; position: relative; height: 10px; background: #1c2028; border-radius: 6px; overflow: hidden; margin-top: 6px; }
+.pprog i { position: absolute; left: 0; top: 0; margin: 0; border: 0; display: block; height: 100%; background: linear-gradient(90deg, #3987e5, #3ddc84); }
 .pnums { display: flex; justify-content: space-between; font-size: 12px; color: #a2a8b6; margin-top: 6px; }
 .paddr { display: flex; gap: 6px; margin-top: 12px; }
 .paddr input { width: 120px; }
 button.x { background: none; border: none; color: #697182; cursor: pointer; font-size: 15px; }
 button.x:hover { color: #ff6b6b; }
 @media (max-width: 900px) { .plan, .pform { grid-template-columns: 1fr; } }
+
+table.ov th.grp { text-align: center; border-bottom: 1px solid var(--line, #242934); font-size: 11px; letter-spacing: .02em; }
+table.ov th[rowspan] { vertical-align: bottom; }
+
+.sstart { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 10px 0 2px; font-size: 12px; }
+.sstart button { background: #1c2028; border: 1px solid #2a303c; color: #a2a8b6; border-radius: 6px; padding: 4px 9px; font: inherit; cursor: pointer; }
+.sstart button.on, .sstart button:hover { color: #e9ebf0; border-color: #3987e5; }
+.sstart input { background: #12151b; border: 1px solid #2a303c; border-radius: 6px; color: #e9ebf0; padding: 3px 6px; font: inherit; }
