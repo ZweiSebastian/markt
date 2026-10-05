@@ -111,7 +111,7 @@ def fit_logit(X, y, lam=3.0, iters=30):
     return w
 
 
-def run(ser, markt, now, quality=None):
+def run(ser, markt, now, quality=None, prev=None):
     today = pd.Timestamp(now.date())
     days = pd.bdate_range("1950-01-02", today)
 
@@ -601,8 +601,11 @@ def run(ser, markt, now, quality=None):
             try:
                 if key == "spx" and sig_params is None:
                     above_ = (P > sma210).fillna(False)
-                    sig_params, sig_cal = sig.calibrate(score, above_, (P / P.shift(1) - 1).fillna(0), (tbill.ffill() / 100 / Y).fillna(0))
-                if sig_params is not None:
+                    cache_ = (prev or {}).get("signal_roll") if isinstance(prev, dict) else None
+                    sig_params = sig.rolling(score, above_, (P / P.shift(1) - 1).fillna(0), (tbill.ffill() / 100 / Y).fillna(0),
+                                             now.year, cache_)
+                    sig_cal = sig_params[max(sig_params, key=int)] if sig_params else None
+                if sig_params:
                     signals_out = sig.evaluate(tname, score, P, sma210, tbill, sig_params)
             except Exception as e:  # noqa
                 import traceback
@@ -809,7 +812,7 @@ def run(ser, markt, now, quality=None):
         rule["signalScore"] = markt.get("score")
     q = quality_score()
     return {"weights": WEIGHTS, "pillar_names": PILLAR_NAMES, "targets": targets, "rule": rule, "quality": q,
-            "signal_params": sig_params, "signal_cal": sig_cal,
+            "signal_params": (sig_cal or {}).get("p"), "signal_cal": sig_cal, "signal_roll": sig_params,
             "note": "Kursrenditen ohne Dividenden (außer MSCI World in Euro). Monatsdaten mit Veröffentlichungsverzögerung; "
                     "Stellenaufbau wie damals veröffentlicht (Philadelphia Fed), übrige Konjunkturdaten in heutiger Fassung. "
                     "Kein Anlagerat – ein Regelmodell."}
