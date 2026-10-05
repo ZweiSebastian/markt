@@ -1,0 +1,23 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          mkdir out && cd out
+          curl -sSL --retry 2 -m 150 -A "Mozilla/5.0" -o m2sl.csv "https://fred.stlouisfed.org/graph/fredgraph.csv?id=M2SL" && echo "ok fred" || echo "FEHL fred"
+          curl -sSL --retry 2 -m 150 -A "Mozilla/5.0" -o m2_old.csv "https://fred.stlouisfed.org/graph/fredgraph.csv?id=M2NS" || true
+          curl -sSL -m 60 -o dbn_search.json "https://api.db.nomics.world/v22/search?q=M2%20money%20stock%20United%20States&limit=20" || true
+          curl -sSL -m 60 -o dbn_fed.json "https://api.db.nomics.world/v22/datasets/FED?limit=100" || true
+          curl -sSL -m 60 -o dbn_h6.json "https://api.db.nomics.world/v22/series/FED/H6?limit=50&observations=0" || true
+          curl -sSL -m 60 -A "Mozilla/5.0" -o h6.htm "https://www.federalreserve.gov/releases/h6/current/default.htm" || true
+          ls -la; head -c 300 m2sl.csv
+          git init -q -b research-m2
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m "M2" && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-m2
