@@ -844,39 +844,41 @@ function secEinschaetzung(m) {
   const y0 = +SM[0].slice(0, 4), y1 = +SM[SM.length - 1].slice(0, 4);
   const presets = [1990, 2000, 2008, 2010, 2020].filter(y => y > y0 && y < y1);
   st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, wöchentlich angepasst (Entscheidung am Freitag, gilt ab Montag), nicht investiertes Geld im Geldmarkt. Ohne Dividenden, Steuern und Kosten. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
-    <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span></div>
+    <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span>${S3[0].eq2 ? '<span class="lev"><span class="mut">ETF:</span><button data-l="1" class="on">normal</button><button data-l="2">2x gehebelt</button></span>' : ''}</div>
     <div class="legend" id="slg"></div><div class="chart tall"></div>
     <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th></tr>
     ${S3.map((x, j) => `<tr><td><i style="display:inline-block;width:12px;border-top:2px solid ${SER[j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td id="sr-c${j}"></td><td id="sr-d${j}"></td><td id="sr-v${j}"></td><td id="sr-e${j}"></td></tr>`).join('')}</table>
-    <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge. Ab frei gewähltem Start rechnet die App mit Monatswerten; der größte Verlust berücksichtigt den tiefsten Tageskurs je Monat.</div>`;
+    <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge. Ab frei gewähltem Start rechnet die App mit Monatswerten; der größte Verlust berücksichtigt den tiefsten Tageskurs je Monat. „2x gehebelt“: dieselbe Regel, aber investiert wird in einen täglich zurückgesetzten 2x-ETF – doppelte Tagesrendite, Finanzierung zum Geldmarktzins + 0,5 % und 0,6 % Gebühr pro Jahr; nicht investiertes Geld liegt weiter im Geldmarkt.</div>`;
   m.appendChild(st);
   queueMicrotask(() => {
     const ch = baseChart(st.querySelector('.chart'), { log: true, fmt: p => nf(p, 0) });
     const ds = SM.map(monthDay); const lines = S3.map((x, j) => ch.addLineSeries({ color: SER[j], lineWidth: 2, priceLineVisible: false, priceFormat: pf(0) }));
-    let i0 = 0;
-    const stats = (x, i) => { const e = x.eq, n = e.length - 1 - i; if (n < 12) return null;
+    let i0 = 0, L2 = false;
+    const EQ = x => L2 && x.eq2 ? x.eq2 : x.eq, LO = x => L2 && x.lo2 ? x.lo2 : x.lo;
+    const stats = (x, i) => { const e = EQ(x), n = e.length - 1 - i; if (n < 12) return null;
       const cagr = (Math.pow(e[e.length - 1] / e[i], 12 / n) - 1) * 100;
-      let pk = e[i], mdd = 0; for (let k = i + 1; k < e.length; k++) { const lo = x.lo ? x.lo[k] : e[k]; mdd = Math.min(mdd, lo / pk - 1); pk = Math.max(pk, e[k]); }
+      let pk = e[i], mdd = 0; const LL = LO(x); for (let k = i + 1; k < e.length; k++) { const lo = LL ? LL[k] : e[k]; mdd = Math.min(mdd, lo / pk - 1); pk = Math.max(pk, e[k]); }
       const rs = []; for (let k = i + 1; k < e.length; k++) rs.push(e[k] / e[k - 1] - 1); const mu = rs.reduce((a, b) => a + b, 0) / rs.length;
       const vol = Math.sqrt(rs.reduce((a, b) => a + (b - mu) ** 2, 0) / (rs.length - 1) * 12) * 100;
       const ex = x.ex ? x.ex.slice(i + 1).reduce((a, b) => a + b, 0) / (e.length - 1 - i) * 100 : x.expo;
       return { cagr, mdd: mdd * 100, vol, ex }; };
     const lg = st.querySelector('#slg');
     const draw = t => { let i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < i0) i = i0; if (i < 0) return;
-      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${SER[j]}"></i>${esc(x.name)}<b>${nf(x.eq[i] / x.eq[i0] * 100, 0)}</b></span>`).join('') + `<span class="d">${SM[i]}</span>`; };
+      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${SER[j]}"></i>${esc(x.name)}<b>${nf(EQ(x)[i] / EQ(x)[i0] * 100, 0)}</b></span>`).join('') + `<span class="d">${SM[i]}${L2 ? ' · 2x' : ''}</span>`; };
     const setStart = i => { i0 = Math.max(0, Math.min(ds.length - 13, i));
-      S3.forEach((x, j) => { lines[j].setData(x.eq.slice(i0).map((v, k) => ({ time: ds[i0 + k] * DAY, value: v / x.eq[i0] * 100 })));
+      S3.forEach((x, j) => { const e = EQ(x); lines[j].setData(e.slice(i0).map((v, k) => ({ time: ds[i0 + k] * DAY, value: Math.max(v / e[i0] * 100, 0.01) })));
         const r = stats(x, i0); const set = (id, h) => { const el = st.querySelector('#' + id); if (el) el.innerHTML = h; };
         set('sr-c' + j, r ? fmtPct(r.cagr) : '–'); set('sr-d' + j, r ? `<span style="color:${C.down}">${nf(r.mdd, 0)} %</span>` : '–');
         set('sr-v' + j, r ? nf(r.vol, 1) + ' %' : '–'); set('sr-e' + j, r ? nf(r.ex, 0) + ' %' : '–'); });
       ch.timeScale().fitContent();
       st.querySelector('#ss-lbl').textContent = `ab ${fmtDate(ds[i0])} · ${nf((ds.length - 1 - i0) / 12, 1)} Jahre`;
       st.querySelector('#ss-in').value = SM[i0].slice(0, 7);
-      st.querySelectorAll('.sstart button').forEach(b => b.classList.toggle('on', SM.findIndex(d => d >= b.dataset.y) === i0));
+      st.querySelectorAll('.sstart button[data-y]').forEach(b => b.classList.toggle('on', SM.findIndex(d => d >= b.dataset.y) === i0));
       draw(null); };
     const idxOf = ymOrY => { const k = SM.findIndex(d => d >= String(ymOrY)); return k < 0 ? 0 : k; };
-    st.querySelectorAll('.sstart button').forEach(b => b.onclick = () => setStart(idxOf(b.dataset.y)));
+    st.querySelectorAll('.sstart button[data-y]').forEach(b => b.onclick = () => setStart(idxOf(b.dataset.y)));
     st.querySelector('#ss-in').onchange = e => { if (e.target.value) setStart(idxOf(e.target.value)); };
+    st.querySelectorAll('.lev button').forEach(b => b.onclick = () => { L2 = b.dataset.l === '2'; st.querySelectorAll('.lev button').forEach(x => x.classList.toggle('on', x === b)); setStart(i0); });
     ch.subscribeClick(p => { if (p && p.time) setStart(ds.indexOf(p.time / DAY)); });
     ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));
     setStart(0);

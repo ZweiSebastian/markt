@@ -50,6 +50,8 @@ TARGETS = {
 BANDS = [(0, 35, "unter 35"), (35, 45, "35–45"), (45, 55, "45–55"), (55, 65, "55–65"), (65, 101, "ab 65")]
 CRASH = 0.15
 PROB_MODE = "score"
+# Ungefähre Dividendenrendite p.a. für die 2x-Rechnung (Kursindizes); DAX und MSCI World in Euro enthalten Dividenden bereits
+DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut": 0.014, "sx5e": 0.033, "dax": 0.0, "nikkei": 0.018, "em": 0.026}
 PROB_LAM = 1.0
 POOL_MIN_YEARS = 40     # kürzere Historien nutzen das am S&P 500 gelernte Modell
 EPISODE = 0.20
@@ -585,9 +587,22 @@ def run(ser, markt, now, quality=None, prev=None):
             ret = (e * r.reindex(sidx) + (1 - e) * cash.reindex(sidx).fillna(0)).dropna()
             eq = (1 + ret).cumprod()
             yrs = len(ret) / Y
+            # gleiche Regel mit einem 2x-ETF (täglich zurückgesetzt): 2 × Tagesrendite, Finanzierung Geldmarkt + 0,5 %, Gebühr 0,6 % p.a.
+            c_ = cash.reindex(sidx).fillna(0)
+            # Die Kursreihen enthalten (außer DAX und MSCI World in Euro) keine Dividenden. Ein echter 2x-ETF bekommt die doppelte
+            # Dividende; damit der Vergleich zur 1x-Linie (ohne Dividende) fair bleibt, wird eine Dividendenrendite einmal addiert.
+            dy = DIV_YIELD.get(key, 0.02)
+            if key == "spx":
+                dm, pm = ser("div_m"), ser("spx_m")
+                if dm is not None and pm is not None:
+                    dy_s = (dm / pm).reindex(sidx, method="ffill").fillna(dy)
+                    dy = dy_s
+            r2 = (2 * r.reindex(sidx) + dy / Y - c_ - 0.005 / Y - 0.006 / Y).clip(lower=-1)
+            ret2 = (e * r2 + (1 - e) * c_).dropna()
+            eq2 = (1 + ret2).cumprod()
             return {"cagr": round((eq.iloc[-1] ** (1 / yrs) - 1) * 100, 1), "mdd": round(float((eq / eq.cummax() - 1).min()) * 100, 0),
                     "vol": round(float(ret.std() * math.sqrt(Y)) * 100, 1), "expo": round(float(e.mean() * 100), 0), "eq": eq,
-                    "_e": e.reindex(eq.index)}
+                    "_e": e.reindex(eq.index), "_eq2": eq2}
         sched = {
             "bh": ("Kaufen und halten", "immer 100 % investiert", pd.Series(1.0, index=days)),
             "trend": ("Trendregel 10 Monate", "investiert, wenn der Kurs über seiner 10-Monats-Linie liegt, sonst Geldmarkt", (P > sma210).astype(float)),
@@ -598,14 +613,17 @@ def run(ser, markt, now, quality=None, prev=None):
         strategies, eqs = [], {}
         for k_, (n_, d_, e_) in sched.items():
             S_ = strat(e_)
-            eqs[k_] = S_.pop("eq"); ex_ = S_.pop("_e")
+            eqs[k_] = S_.pop("eq"); ex_ = S_.pop("_e"); eq2_ = S_.pop("_eq2")
             ew = eqs[k_][eqs[k_].index.isin(me)]
             # je Monat: tiefster Tageswert (für den größten Verlust ab frei gewähltem Start) und mittlere Investitionsquote
             per = eqs[k_].index.to_period("M")
             lo = eqs[k_].groupby(per).min().reindex(ew.index.to_period("M")).values
             exm = ex_.groupby(per).mean().reindex(ew.index.to_period("M")).values
+            ew2 = eq2_.reindex(ew.index)
+            lo2 = eq2_.groupby(eq2_.index.to_period("M")).min().reindex(ew.index.to_period("M")).values
             strategies.append({"id": k_, "name": n_, "desc": d_, **S_, "eq": [round(float(v), 4) for v in ew.values],
-                               "lo": [round(float(v), 4) for v in lo], "ex": [round(float(v), 2) for v in np.nan_to_num(exm)]})
+                               "lo": [round(float(v), 4) for v in lo], "ex": [round(float(v), 2) for v in np.nan_to_num(exm)],
+                               "eq2": [float(f"{v:.5g}") for v in ew2.values], "lo2": [float(f"{v:.5g}") for v in lo2]})
         strat_months = [str(d.date()) for d in eqs["bh"].index[eqs["bh"].index.isin(me)]]
 
         # ---------- Ein-/Ausstiegs-Signale (Parameter nur aus S&P 500 bis 1989)
