@@ -343,14 +343,26 @@ def run(ser, markt, now, quality=None, prev=None):
             _q_cache["q"] = None
             return None
         rows, tot_w = [], 0.0
-        agg = {"cc": 0.0, "rec": 0.0, "capex": 0.0, "inv": 0.0}
+        agg = {"cc": 0.0, "rec": 0.0, "capex": 0.0, "inv": 0.0, "fin": 0.0, "nonop": 0.0}
         wsum = {k: 0.0 for k in agg}
         flags = []
         for c in quality["companies"]:
             w = c.get("mc") or 1e11
             sc = {}
-            if c.get("cash_conv") is not None:
+            if c.get("cash_op") is not None:          # operativer Cashflow ÷ operativer Gewinn (normal ~1,0–1,3)
+                sc["cc"] = float(np.interp(c["cash_op"], [0.7, 1.0, 1.2], [-1.0, 0.0, 0.3]))
+            elif c.get("cash_conv") is not None:
                 sc["cc"] = float(np.interp(c["cash_conv"], [0.6, 0.9, 1.1], [-1.0, 0.0, 0.3]))
+            if c.get("fin_ocf") is not None:          # neue Schulden + neue Aktien im Verhältnis zum Cashflow
+                sc["fin"] = float(np.interp(c["fin_ocf"], [0.0, 0.25, 0.8], [0.2, 0.0, -1.0]))
+                if c["fin_ocf"] > 0.4:
+                    flags.append(f"{c['t']}: braucht frisches Geld – {c.get('debt_iss', 0):.0f} Mrd. $ neue Schulden und {c.get('eq_iss', 0):.0f} Mrd. $ neue Aktien in 12 Monaten ({c['fin_ocf'] * 100:.0f} % des Cashflows)")
+            if c.get("nonop") is not None:            # Anteil des Vorsteuergewinns, der nicht aus dem Geschäft stammt
+                sc["nonop"] = float(np.interp(c["nonop"], [0.05, 0.15, 0.5], [0.1, 0.0, -1.0]))
+                if c["nonop"] > 0.25:
+                    flags.append(f"{c['t']}: {c['nonop'] * 100:.0f} % des Gewinns vor Steuern stammen nicht aus dem Geschäft (u. a. Buchgewinne auf Beteiligungen)")
+            if c.get("debt_g") is not None and c["debt_g"] > 0.5:
+                flags.append(f"{c['t']}: Schulden +{c['debt_g'] * 100:.0f} % in 12 Monaten (jetzt {c.get('debt') or 0:.0f} Mrd. $)")
             if c.get("rec_g") is not None and c.get("rev_g") is not None:
                 gap = c["rec_g"] - c["rev_g"]
                 sc["rec"] = float(np.interp(gap, [-0.05, 0.05, 0.25], [0.3, 0.0, -1.0]))
@@ -364,8 +376,8 @@ def run(ser, markt, now, quality=None, prev=None):
                 sc["inv"] = float(np.interp(c["inv_g"], [0.0, 0.3, 1.0], [0.0, -0.3, -1.0]))
                 if c["inv_g"] > 0.5:
                     flags.append(f"{c['t']}: Beteiligungen/Finanzanlagen +{c['inv_g'] * 100:.0f} % in 12 Monaten")
-            if c.get("cash_conv") is not None and c["cash_conv"] < 0.8:
-                flags.append(f"{c['t']}: nur {c['cash_conv'] * 100:.0f} % des Gewinns kommen als operativer Cashflow an")
+            if c.get("fcf_op") is not None and c["fcf_op"] < 0.2:
+                flags.append(f"{c['t']}: vom operativen Gewinn bleiben nur {c['fcf_op'] * 100:.0f} % als freier Cashflow")
             for k, v in sc.items():
                 agg[k] += v * w
                 wsum[k] += w
@@ -377,7 +389,8 @@ def run(ser, markt, now, quality=None, prev=None):
             _q_cache["q"] = None
             return None
         score = float(np.mean(list(parts.values())))
-        names = {"cc": "Gewinn durch Cashflow gedeckt", "rec": "Forderungen vs. Umsatz", "capex": "Investitionen vs. Cashflow", "inv": "Beteiligungen"}
+        names = {"cc": "Gewinn durch Cashflow gedeckt", "rec": "Forderungen vs. Umsatz", "capex": "Investitionen vs. Cashflow", "inv": "Beteiligungen",
+                 "fin": "Fremdfinanzierung", "nonop": "Buchgewinne"}
         txt = " · ".join(f"{names[k]} {v:+.2f}" for k, v in parts.items())
         _q_cache["q"] = {"score": score, "parts": {k: round(v, 2) for k, v in parts.items()}, "text": dez(txt), "flags": flags, "companies": rows,
                          "at": quality.get("at")}
