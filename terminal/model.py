@@ -584,7 +584,7 @@ def run(ser, markt, now, quality=None, prev=None):
 
         def strat(expo):
             e = weekly_hold(expo).reindex(sidx).fillna(0)
-            ret = (e * r.reindex(sidx) + (1 - e) * cash.reindex(sidx).fillna(0)).dropna()
+            ret = (e * (r.reindex(sidx) - 0.002 / Y) + (1 - e) * cash.reindex(sidx).fillna(0)).dropna()   # 0,2 % ETF-Gebühr p.a.
             eq = (1 + ret).cumprod()
             yrs = len(ret) / Y
             # gleiche Regel mit einem 2x-ETF (täglich zurückgesetzt): 2 × Tagesrendite, Finanzierung Geldmarkt + 0,5 %, Gebühr 0,6 % p.a.

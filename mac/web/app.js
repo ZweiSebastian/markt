@@ -843,7 +843,7 @@ function secEinschaetzung(m) {
   const S3 = T.strategies; const SM = T.strat_months;
   const y0 = +SM[0].slice(0, 4), y1 = +SM[SM.length - 1].slice(0, 4);
   const presets = [1990, 2000, 2008, 2010, 2020].filter(y => y > y0 && y < y1);
-  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, wöchentlich angepasst (Entscheidung am Freitag, gilt ab Montag), nicht investiertes Geld im Geldmarkt. Ohne Dividenden, Steuern und Kosten. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
+  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, wöchentlich angepasst (Entscheidung am Freitag, gilt ab Montag), nicht investiertes Geld im Geldmarkt. Mit ETF-Gebühr (0,2 % p.a., gehebelt 0,6 % + Finanzierung), ohne Dividenden, Steuern und Handelskosten. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
     <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span>${S3[0].eq2 ? '<span class="lev"><span class="mut">ETF:</span><button data-l="1" class="on">normal</button><button data-l="2">2x gehebelt</button></span>' : ''}</div>
     <div class="legend" id="slg"></div><div class="chart tall"></div>
     <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th></tr>
