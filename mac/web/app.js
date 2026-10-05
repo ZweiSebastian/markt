@@ -237,6 +237,23 @@ function baseChart(el, opt = {}) {
   charts.push(ch);
   return ch;
 }
+// Zwei übereinanderliegende Diagramme koppeln: gleiche Achsenbreite, gleiche Zeitachse, gemeinsames Fadenkreuz
+function linkCharts(a, sa, da, b, sb, db) {
+  [a, b].forEach(x => x.applyOptions({ rightPriceScale: { minimumWidth: 72 } }));
+  const ma = new Map(da.map(p => [p.time, p.value])), mb = new Map(db.map(p => [p.time, p.value]));
+  const t0 = Math.min(da[0].time, db[0].time), t1 = Math.max(da[da.length - 1].time, db[db.length - 1].time);
+  const fit = () => [a, b].forEach(x => { try { x.timeScale().setVisibleRange({ from: t0, to: t1 }); } catch (e) { /* */ } });
+  fit(); requestAnimationFrame(fit);
+  let lock = false;
+  const sync = (x, y) => x.timeScale().subscribeVisibleTimeRangeChange(r => { if (lock || !r) return; lock = true; try { y.timeScale().setVisibleRange(r); } catch (e) { /* */ } lock = false; });
+  sync(a, b); sync(b, a);
+  const near = (m, t) => { if (m.has(t)) return m.get(t); let best = null, bd = Infinity; for (const [k, v] of m) { const d = Math.abs(k - t); if (d < bd) { bd = d; best = v; } } return bd <= 8 * DAY ? best : null; };
+  let clock = false;
+  const cross = (y, sy, my) => p => { if (clock) return; clock = true;
+    try { if (p && p.time != null) { const v = near(my, p.time); if (v != null) y.setCrosshairPosition(v, p.time, sy); else y.clearCrosshairPosition(); } else y.clearCrosshairPosition(); } catch (e) { /* */ }
+    clock = false; };
+  a.subscribeCrosshairMove(cross(b, sb, mb)); b.subscribeCrosshairMove(cross(a, sa, ma));
+}
 function pf(dec) { return { type: 'price', precision: dec, minMove: Math.pow(10, -dec) }; }
 
 /* Karte mit Liniendiagramm.
@@ -482,21 +499,18 @@ function stressCard() {
     const ms = st.months.map(p => Math.floor(Date.UTC(+p.slice(0, 4), +p.slice(5, 7) - 1, 1) / 864e5));
     const from = 0; // ganze Historie seit 1976
     const a = baseChart(els[0], { log: true }); const sx = a.addLineSeries({ color: C.s1, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, priceFormat: pf(0) });
-    sx.setData(ms.map((d, i) => ({ time: d * DAY, value: st.spx[i] })).filter(p => p.value != null && p.time / DAY >= from));
-    a.timeScale().fitContent();
+    const dS = ms.map((d, i) => ({ time: d * DAY, value: st.spx[i] })).filter(p => p.value != null && p.time / DAY >= from);
+    sx.setData(dS);
     const b = baseChart(els[1]); const h = b.addHistogramSeries({ priceFormat: pf(0), priceLineVisible: false, lastValueVisible: false });
-    h.setData(ms.map((d, i) => ({ time: d * DAY, value: st.n[i], color: st.n[i] >= 5 ? C.serious : st.n[i] >= 3 ? C.warn : C.mut })).filter(p => p.time / DAY >= from));
-    b.timeScale().fitContent();
+    const dN = ms.map((d, i) => ({ time: d * DAY, value: st.n[i], color: st.n[i] >= 5 ? C.serious : st.n[i] >= 3 ? C.warn : C.mut })).filter(p => p.value != null && p.time / DAY >= from);
+    h.setData(dN);
     const lg = c.querySelector('.legend');
     const draw = t => {
       const i = t == null ? ms.length - 1 : ms.indexOf(t);
       lg.innerHTML = `<span><i style="border-color:${C.s1}"></i>S&P 500 (log)<b>${nf(st.spx[i], 0)}</b></span><span><i style="border-color:${C.warn}"></i>Aktive Signale<b>${st.n[i]}</b></span><span class="d">${st.months[i]}</span>`;
     };
     draw(null);
-    // gekoppelte Zeitachsen
-    let lock = false;
-    const sync = (x, y) => x.timeScale().subscribeVisibleLogicalRangeChange(() => { if (lock) return; lock = true; const r = x.timeScale().getVisibleRange(); if (r) y.timeScale().setVisibleRange(r); lock = false; });
-    sync(a, b); sync(b, a);
+    linkCharts(a, sx, dS, b, h, dN);
     const ch = p => draw(p && p.time ? p.time / DAY : null);
     a.subscribeCrosshairMove(ch); b.subscribeCrosshairMove(ch);
   });
@@ -746,21 +760,19 @@ function secEinschaetzung(m) {
     const els = vh.querySelectorAll('.chart'); const H = T.hist; const ds = H.days.map(monthDay);
     const a = baseChart(els[0], { log: true, fmt: p => nf(p, 0) });
     const ps = a.addLineSeries({ color: C.s1, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, priceFormat: pf(0) });
-    ps.setData(ds.map((d, i) => ({ time: d * DAY, value: H.price[i] })).filter(x => x.value != null));
-    a.timeScale().fitContent();
+    const dPrice = ds.map((d, i) => ({ time: d * DAY, value: H.price[i] })).filter(x => x.value != null);
+    ps.setData(dPrice);
     const b = baseChart(els[1], { fmt: p => nf(p, 0) });
     const sc = b.addBaselineSeries({ baseValue: { type: 'price', price: 50 }, lineWidth: 2, priceLineVisible: false, priceFormat: pf(0),
       topLineColor: C.s3, topFillColor1: 'rgba(25,158,112,.25)', topFillColor2: 'rgba(25,158,112,.03)',
       bottomLineColor: C.s8, bottomFillColor1: 'rgba(230,103,103,.03)', bottomFillColor2: 'rgba(230,103,103,.25)',
       autoscaleInfoProvider: () => ({ priceRange: { minValue: 15, maxValue: 85 } }) });
-    sc.setData(ds.map((d, i) => ({ time: d * DAY, value: H.score[i] })));
+    const dScore = ds.map((d, i) => ({ time: d * DAY, value: H.score[i] })).filter(x => x.value != null);
+    sc.setData(dScore);
     [35, 45, 55, 65].forEach(v => sc.createPriceLine({ price: v, color: C.mut, lineWidth: 1, lineStyle: 2, axisLabelVisible: false }));
     const pr = b.addLineSeries({ color: C.s4, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, priceFormat: pf(0) });
     pr.setData(ds.map((d, i) => ({ time: d * DAY, value: H.prob[i] })).filter(x => x.value != null));
-    b.timeScale().fitContent();
-    let lock = false;
-    const sync = (x, y) => x.timeScale().subscribeVisibleLogicalRangeChange(() => { if (lock) return; lock = true; const r = x.timeScale().getVisibleRange(); if (r) y.timeScale().setVisibleRange(r); lock = false; });
-    sync(a, b); sync(b, a);
+    linkCharts(a, ps, dPrice, b, sc, dScore);
     const lg = vh.querySelector('#vlg');
     const draw = t => { const i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < 0) return;
       lg.innerHTML = `<span><i style="border-color:${C.s1}"></i>${esc(T.name)}<b>${nf(H.price[i], 0)}</b></span><span><i style="border-color:${C.s3}"></i>Score<b>${nf(H.score[i], 0)}</b></span><span><i style="border-color:${C.s4}"></i>Wahrscheinlichkeit<b>${H.prob[i] == null ? '–' : nf(H.prob[i], 0) + ' %'}</b></span><span class="d">${fmtDate(ds[i])}</span>`; };
