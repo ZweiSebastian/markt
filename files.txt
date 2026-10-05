@@ -1,0 +1,6 @@
+total 2296
+drwxr-xr-x 2 runner runner    4096 Oct  5 10:12 .
+drwxr-xr-x 3 runner runner    4096 Oct  5 10:12 ..
+-rw-r--r-- 1 runner runner       0 Oct  5 10:12 files.txt
+-rw-r--r-- 1 runner runner   81099 Oct  5 10:12 m1.json
+-rw-r--r-- 1 runner runner 2260479 Oct  5 10:12 m2.json
