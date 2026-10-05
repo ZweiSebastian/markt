@@ -352,6 +352,12 @@ def quality():
             inc, cf, bs = tk.quarterly_income_stmt, tk.quarterly_cashflow, tk.quarterly_balance_sheet
             rev = _row(inc, ["Total Revenue", "Operating Revenue"])
             ni = _row(inc, ["Net Income", "Net Income Common Stockholders"])
+            oi = _row(inc, ["Operating Income", "Total Operating Income As Reported"])
+            pre = _row(inc, ["Pretax Income"])
+            debt = _row(bs, ["Total Debt", "Long Term Debt And Capital Lease Obligation", "Long Term Debt"])
+            iss_eq = _row(cf, ["Issuance Of Capital Stock", "Common Stock Issuance"])
+            iss_debt = _row(cf, ["Issuance Of Debt", "Long Term Debt Issuance"])
+            rep = _row(cf, ["Repurchase Of Capital Stock", "Common Stock Payments"])
             ocf = _row(cf, ["Operating Cash Flow", "Cash Flow From Continuing Operating Activities"])
             capex = _row(cf, ["Capital Expenditure"])
             rec = _row(bs, ["Accounts Receivable", "Receivables", "Gross Accounts Receivable"])
@@ -366,13 +372,29 @@ def quality():
                 x = None if x is None else x.dropna()
                 return None if x is None or len(x) < 5 or not x.iloc[-5] else float(x.iloc[-1] / x.iloc[-5] - 1)
             n_ttm, o_ttm, c_ttm, r_ttm = ttm(ni), ttm(ocf), ttm(capex), ttm(rev)
+            oi_ttm, pre_ttm = ttm(oi), ttm(pre)
+            eq_ttm, dbt_ttm, rep_ttm = ttm(iss_eq) or 0.0, ttm(iss_debt) or 0.0, ttm(rep) or 0.0
+            def last(x):
+                x = None if x is None else x.dropna()
+                return None if x is None or not len(x) else float(x.iloc[-1])
+            def ago(x, k=4):
+                x = None if x is None else x.dropna()
+                return None if x is None or len(x) <= k else float(x.iloc[-1 - k])
             item = {"t": t, "mc": mc, "asof": None if rev is None or not len(rev.dropna()) else str(rev.dropna().index[-1].date()),
                     "cash_conv": None if not n_ttm or n_ttm <= 0 or o_ttm is None else round(o_ttm / n_ttm, 2),
                     "fcf_ni": None if not n_ttm or n_ttm <= 0 or o_ttm is None or c_ttm is None else round((o_ttm + c_ttm) / n_ttm, 2),
                     "capex_ocf": None if not o_ttm or o_ttm <= 0 or c_ttm is None else round(-c_ttm / o_ttm, 2),
                     "rev_g": None if yoy(rev) is None else round(yoy(rev), 3),
                     "rec_g": None if yoy(rec) is None else round(yoy(rec), 3),
-                    "inv_g": None if yoy(inv) is None else round(yoy(inv), 3)}
+                    "inv_g": None if yoy(inv) is None else round(yoy(inv), 3),
+                    # operativ statt ausgewiesener Gewinn (Buchgewinne auf Beteiligungen verzerren den Nettogewinn)
+                    "cash_op": None if not oi_ttm or oi_ttm <= 0 or o_ttm is None else round(o_ttm / oi_ttm, 2),
+                    "fcf_op": None if not oi_ttm or oi_ttm <= 0 or o_ttm is None or c_ttm is None else round((o_ttm + c_ttm) / oi_ttm, 2),
+                    "nonop": None if not pre_ttm or pre_ttm <= 0 or oi_ttm is None else round((pre_ttm - oi_ttm) / pre_ttm, 2),
+                    "fin_ocf": None if not o_ttm or o_ttm <= 0 else round((max(eq_ttm, 0) + max(dbt_ttm, 0)) / o_ttm, 2),
+                    "eq_iss": round(max(eq_ttm, 0) / 1e9, 1), "debt_iss": round(max(dbt_ttm, 0) / 1e9, 1), "buyback": round(-min(rep_ttm, 0) / 1e9, 1),
+                    "debt_g": None if not ago(debt) or last(debt) is None else round(last(debt) / ago(debt) - 1, 3),
+                    "debt": None if last(debt) is None else round(last(debt) / 1e9, 1)}
             comps.append(item)
         except Exception as e:  # noqa
             note("qualität " + t, False, e)
@@ -385,7 +407,7 @@ def quality():
 qual_out = None
 try:
     qc = cached("quality", 20)
-    if qc and prev.get("quality"):
+    if qc and prev.get("quality") and "cash_op" in (prev["quality"].get("companies") or [{}])[0]:
         qual_out = prev["quality"]
         cache_meta["quality"] = qc
         note("quality", True, "aus Cache " + qc["at"])
@@ -590,7 +612,9 @@ slow("eurostat_unemp", eurostat_unemp, ["unemp_ea"])
 
 
 # ------------------------------------------------------------------ Konjunktur (BLS, lange Historie)
-BLS = {"CUUR0000SA0": "cpi_idx", "CUUR0000SA0L1E": "core_idx", "LNS14000000": "unemp", "CES0000000001": "payrolls"}
+BLS = {"CUUR0000SA0": "cpi_idx", "CUUR0000SA0L1E": "core_idx", "LNS14000000": "unemp", "CES0000000001": "payrolls",
+       # Arbeitsmarkt jenseits der Arbeitslosenquote: Mehrfachjobs, Unterbeschäftigung, unfreiwillige Teilzeit
+       "LNS12026620": "multi_pct", "LNS13327709": "u6", "LNS12032194": "pt_econ", "LNS12000000": "employed"}
 
 
 def bls():
@@ -611,11 +635,20 @@ def bls():
     put("core", (core / core.shift(12) - 1) * 100, "US-Kerninflation (ggü. Vorjahr)", "konjunktur", "%", "rate", "BLS", "m", 2)
     put("unemp", out["unemp"], "US-Arbeitslosenquote", "konjunktur", "%", "rate", "BLS", "m", 1)
     put("payrolls", out["payrolls"].diff(), "US-Stellen (Veränderung, Tsd.)", "konjunktur", "Tsd.", "rate", "BLS", "m", 0)
+    if len(out.get("multi_pct", [])):
+        put("multi_jobs", out["multi_pct"], "Mehrfachbeschäftigte (% der Beschäftigten)", "konjunktur", "%", "rate", "BLS", "m", 1)
+    if len(out.get("u6", [])):
+        put("u6", out["u6"], "Unterbeschäftigung U-6", "konjunktur", "%", "rate", "BLS", "m", 1)
+        j_ = pd.concat([out["u6"], out["unemp"]], axis=1, join="inner").dropna()
+        put("u6_gap", j_.iloc[:, 0] - j_.iloc[:, 1], "U-6 minus Arbeitslosenquote (verdeckte Unterbeschäftigung)", "konjunktur", "Pp.", "rate", "BLS (berechnet)", "m", 1)
+    if len(out.get("pt_econ", [])) and len(out.get("employed", [])):
+        j_ = pd.concat([out["pt_econ"], out["employed"]], axis=1, join="inner").dropna()
+        put("pt_econ", j_.iloc[:, 0] / j_.iloc[:, 1] * 100, "Unfreiwillige Teilzeit (% der Beschäftigten)", "konjunktur", "%", "rate", "BLS (berechnet)", "m", 2)
     u3 = out["unemp"].rolling(3).mean()
     put("sahm", u3 - u3.shift(1).rolling(12).min(), "Sahm-Regel", "konjunktur", "Pp.", "rate", "BLS (berechnet)", "m", 2)
 
 
-slow("bls", bls, ["cpi", "core", "unemp", "payrolls", "sahm"])
+slow("bls", bls, ["cpi", "core", "unemp", "payrolls", "sahm", "multi_jobs", "u6", "u6_gap", "pt_econ"])
 
 
 # ------------------------------------------------------------------ Finanzbedingungen, Frühindikatoren, Stimmung

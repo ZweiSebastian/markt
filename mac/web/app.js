@@ -690,6 +690,9 @@ function secKonjunktur(m) {
   g.appendChild(chartCard({ ids: ['claims'], title: 'Erstanträge auf Arbeitslosenhilfe (Tsd., 4-W.-Ø)', sub: 'Wöchentlich und schnell – steigt früh, wenn Firmen entlassen (nicht saisonbereinigt)' }));
   g.appendChild(chartCard({ ids: ['unemp'], title: 'US-Arbeitslosenquote' }));
   g.appendChild(chartCard({ ids: ['sahm'], title: 'Sahm-Regel', ref: 0.5, refLabel: 'Schwelle 0,5', sub: 'Steigt der Wert über 0,5, begann bisher fast immer eine Rezession' }));
+  if (S.u6) g.appendChild(chartCard({ ids: ['u6', 'unemp'], title: 'Unterbeschäftigung U-6 vs. Arbeitslosenquote', sub: 'U-6 zählt auch unfreiwillige Teilzeit und Entmutigte mit – wer nur ein paar Stunden Gig-Arbeit findet, gilt in der normalen Quote als beschäftigt', minDays: 3653 }));
+  if (S.pt_econ) g.appendChild(chartCard({ ids: ['pt_econ'], title: 'Unfreiwillige Teilzeit', sub: 'Anteil der Beschäftigten, die gern Vollzeit arbeiten würden, aber nur Teilzeit finden', minDays: 3653 }));
+  if (S.multi_jobs) g.appendChild(chartCard({ ids: ['multi_jobs'], title: 'Mehrfachbeschäftigte', sub: 'Anteil mit zwei oder mehr Jobs. Wichtig: Die Stellenstatistik zählt Jobs, nicht Menschen – wer drei Jobs hat, zählt dort dreifach', minDays: 3653 }));
   g.appendChild(chartCard({ ids: ['payrolls'], title: 'Neue Stellen pro Monat (Tsd.)', type: 'hist' }));
   g.appendChild(chartCard({ ids: ['fedbs'], title: 'Fed-Bilanzsumme', sub: 'Steigt bei Anleihekäufen (QE), fällt beim Abbau (QT)' }));
   g.appendChild(chartCard({ ids: ['ecbbs'], title: 'EZB-Bilanzsumme' }));
@@ -931,19 +934,21 @@ function qualitySection(m, Q) {
   const cell = (v, bad, good, f) => { if (v == null) return '–'; const col = bad(v) ? C.serious : good(v) ? C.up : C.txt; return `<span style="color:${col}">${f(v)}</span>`; };
   const P = Q.parts || {};
   c.innerHTML = `<div class="hd"><div><div class="ttl">Sind die Gewinne der Tech-Riesen echt?</div>
-    <div class="sub">Kreisgeschäfte – A investiert in B, B kauft bei A, beide melden Wachstum – hinterlassen Spuren in der Bilanz: Gewinne ohne Geldzufluss, Forderungen, die schneller wachsen als der Umsatz, Investitionen, die den Cashflow auffressen, und stark steigende Beteiligungen an anderen Firmen. Genau das wird hier gemessen (letzte 12 Monate, Quartalsberichte über Yahoo Finance, Stand ${esc(Q.at || '')}).</div></div>
+    <div class="sub">Kreisgeschäfte – A investiert in B, B kauft bei A, beide melden Wachstum – hinterlassen Spuren in der Bilanz: Gewinne ohne Geldzufluss, Buchgewinne auf Beteiligungen statt Geschäftsgewinn, Forderungen, die schneller wachsen als der Umsatz, Investitionen, die den Cashflow auffressen, und frisches Geld über neue Schulden und Aktien. Gerechnet wird mit dem operativen Gewinn, weil Wertsteigerungen von Beteiligungen den ausgewiesenen Gewinn aufblähen. Genau das wird hier gemessen (letzte 12 Monate, Quartalsberichte über Yahoo Finance, Stand ${esc(Q.at || '')}).</div></div>
     <div class="big" style="font-size:20px">${Math.round(50 + 50 * Q.score)}</div></div>
-    <div class="anasum" style="grid-template-columns:repeat(4,1fr)">
-      ${[['cc', 'Gewinn durch Cashflow gedeckt'], ['rec', 'Forderungen vs. Umsatz'], ['capex', 'Investitionen vs. Cashflow'], ['inv', 'Beteiligungen']].map(([k, n]) => `<div><div class="lbl">${n}</div><div>${compBar(P[k] ?? null)}</div></div>`).join('')}
+    <div class="anasum" style="grid-template-columns:repeat(3,1fr)">
+      ${[['cc', 'Gewinn durch Cashflow gedeckt'], ['rec', 'Forderungen vs. Umsatz'], ['capex', 'Investitionen vs. Cashflow'], ['inv', 'Beteiligungen'], ['fin', 'Fremdfinanzierung'], ['nonop', 'Buchgewinne']].filter(([k]) => P[k] != null).map(([k, n]) => `<div><div class="lbl">${n}</div><div>${compBar(P[k] ?? null)}</div></div>`).join('')}
     </div>
-    <table class="t qt" style="margin-top:8px"><tr><th>Firma</th><th>Börsen&shy;wert</th><th>Cashflow<br>÷ Gewinn</th><th>freier Cashflow<br>÷ Gewinn</th><th>Investitionen<br>÷ Cashflow</th><th>Umsatz<br>ggü. Vorjahr</th><th>Forderungen<br>ggü. Vorjahr</th><th>Beteiligungen<br>ggü. Vorjahr</th><th>Quartal</th></tr>
+    <table class="t qt" style="margin-top:8px"><tr><th>Firma</th><th>Börsen&shy;wert</th><th>Cashflow<br>÷ op. Gewinn</th><th>freier Cashflow<br>÷ op. Gewinn</th><th>Investitionen<br>÷ Cashflow</th><th>Gewinn nicht<br>aus Geschäft</th><th>neue Schulden<br>+ Aktien</th><th>Schulden<br>ggü. Vorjahr</th><th>Umsatz<br>ggü. Vorjahr</th><th>Forderungen<br>ggü. Vorjahr</th><th>Quartal</th></tr>
     ${(Q.companies || []).map(x => `<tr><td>${esc(x.t)}</td><td>${x.mc ? nf(x.mc / 1e12, 2) + ' Bio.' : '–'}</td>
-      <td>${cell(x.cash_conv, v => v < 0.8, v => v >= 1.0, v => nf(v * 100, 0) + ' %')}</td>
-      <td>${cell(x.fcf_ni, v => v < 0.5, v => v >= 0.9, v => nf(v * 100, 0) + ' %')}</td>
+      <td>${x.cash_op != null ? cell(x.cash_op, v => v < 0.85, v => v >= 1.1, v => nf(v * 100, 0) + ' %') : cell(x.cash_conv, v => v < 0.8, v => v >= 1.0, v => nf(v * 100, 0) + ' %')}</td>
+      <td>${cell(x.fcf_op ?? x.fcf_ni, v => v < 0.3, v => v >= 0.8, v => nf(v * 100, 0) + ' %')}</td>
       <td>${cell(x.capex_ocf, v => v > 0.8, v => v < 0.4, v => nf(v * 100, 0) + ' %')}</td>
+      <td>${cell(x.nonop, v => v > 0.25, v => v < 0.05, v => nf(v * 100, 0) + ' %')}</td>
+      <td>${x.fin_ocf == null ? '–' : cell(x.fin_ocf, v => v > 0.4, v => v < 0.1, v => nf((x.debt_iss || 0) + (x.eq_iss || 0), 0) + ' Mrd.')}</td>
+      <td>${cell(x.debt_g, v => v > 0.5, () => false, v => (v > 0 ? '+' : '') + nf(v * 100, 0) + ' %')}</td>
       <td>${x.rev_g == null ? '–' : (x.rev_g > 0 ? '+' : '') + nf(x.rev_g * 100, 0) + ' %'}</td>
-      <td>${cell(x.rec_g, v => x.rev_g != null && v - x.rev_g > 0.15, () => false, v => (v > 0 ? '+' : '') + nf(v * 100, 0) + ' %')}</td>
-      <td>${cell(x.inv_g, v => v > 0.5, () => false, v => (v > 0 ? '+' : '') + nf(v * 100, 0) + ' %')}</td><td class="mut">${x.asof ? fmtDate(monthDay(x.asof)) : '–'}</td></tr>`).join('')}</table>
+      <td>${cell(x.rec_g, v => x.rev_g != null && v - x.rev_g > 0.15, () => false, v => (v > 0 ? '+' : '') + nf(v * 100, 0) + ' %')}</td><td class="mut">${x.asof ? fmtDate(monthDay(x.asof)) : '–'}</td></tr>`).join('')}</table>
     ${Q.flags && Q.flags.length ? `<div class="interp"><b>Auffällig:</b> ${Q.flags.map(esc).join(' · ')}</div>` : ''}
     <div class="note">Das ist ein Warnsignal, kein Beweis: Hohe Investitionen können sich auszahlen, und Forderungen steigen auch bei echtem Wachstum. Konkrete Gegengeschäfte (wer wem was zusagt) stehen nur im Fließtext der Berichte und lassen sich nicht automatisch auslesen. Die Werte fließen mit dem Gewinnwachstum in die Säule „Gewinne“ ein – nur für den aktuellen Stand, denn diese Daten gibt es nicht für frühere Jahrzehnte.</div>`;
   m.appendChild(c);
@@ -1011,7 +1016,7 @@ function updateLive() {
 }
 // ---------- Einstiegsplan: einen größeren Betrag regelbasiert anlegen (Score + Ausstiegssignal)
 let PLAN; // undefined = noch nicht geladen, null = keiner angelegt
-const PLAN_DEF = { amount: 460000, reserve: 0, target: 'world_eur', start: null, base: 12, max: 24, buys: [] };
+const PLAN_DEF = { amount: 460000, reserve: 0, target: 'world_eur', start: null, base: 12, max: 24, linePct: 0, lineMax: 36, lineBand: 5, buys: [] };
 const eur = v => nf(Math.round(v), 0) + ' €';
 const ymd = d => d.toISOString().slice(0, 10);
 function monthsBetween(a, b) { return (b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth(); }
@@ -1029,8 +1034,9 @@ function monthsOut(S, start, today) {
 function planState(P, M, liveScore) {
   const T = M.targets[P.target] || M.targets.world; const today = new Date();
   const start = P.start ? new Date(P.start + 'T12:00:00') : today;
-  const inv = Math.max(0, P.amount - (P.reserve || 0)), done = (P.buys || []).reduce((x, b) => x + b.a, 0), rest = Math.max(0, inv - done);
-  const curM = ymd(today).slice(0, 7), boughtM = (P.buys || []).filter(b => b.d.slice(0, 7) === curM).reduce((x, b) => x + b.a, 0);
+  const invAll = Math.max(0, P.amount - (P.reserve || 0)), invLine = Math.round(invAll * (P.linePct || 0) / 100), inv = invAll - invLine;
+  const nb = (P.buys || []).filter(b => b.t !== 'l'), done = nb.reduce((x, b) => x + b.a, 0), rest = Math.max(0, inv - done);
+  const curM = ymd(today).slice(0, 7), boughtM = nb.filter(b => b.d.slice(0, 7) === curM).reduce((x, b) => x + b.a, 0);
   const sig = T.signals && !T.signals.error ? T.signals.state : 1;
   const mOut = monthsOut(T.signals, start, today);
   const elapsed = Math.max(0, monthsBetween(start, today));
@@ -1046,6 +1052,29 @@ function planState(P, M, liveScore) {
   r.due = Math.max(0, Math.min(rest, target - boughtM)); r.kind = r.due > 1 ? 'rate' : 'wait';
   r.head = r.kind === 'rate' ? 'Monatsrate anlegen' : 'Rate für diesen Monat erledigt';
   r.why = `Score ${sc} (45–55): normales Umfeld – in Raten. Ziel diesen Monat ${eur(target)}${target > base + 1 ? ' (etwas mehr als ein Zwölftel, damit die Frist reicht)' : ' (ein Zwölftel)'}, davon schon ${eur(boughtM)} angelegt.`;
+  return r;
+}
+// Linien-Anteil: wartet auf die 200-Wochen-Linie (≈ 1000 Börsentage), höchstens lineMax Monate, danach in Raten
+function lineState(P, M) {
+  const T = M.targets[P.target] || M.targets.world; const today = new Date();
+  const invAll = Math.max(0, P.amount - (P.reserve || 0)), inv = Math.round(invAll * (P.linePct || 0) / 100);
+  if (!inv) return null;
+  const lb = (P.buys || []).filter(b => b.t === 'l'), done = lb.reduce((x, b) => x + b.a, 0), rest = Math.max(0, inv - done);
+  const s = S[T.sid]; let px = null, line = null;
+  if (s && s.v.length >= 1000) { px = s.v[s.v.length - 1]; let sum = 0; for (let i = s.v.length - 1000; i < s.v.length; i++) sum += s.v[i]; line = sum / 1000; }
+  const dist = px && line ? px / line - 1 : null;
+  const start = P.start ? new Date(P.start + 'T12:00:00') : today; const elapsed = Math.max(0, monthsBetween(start, today));
+  const maxM = P.lineMax || 36, band = (P.lineBand ?? 5) / 100;
+  const r = { inv, done, rest, dist, line, px, elapsed, maxM, due: 0, kind: '', head: '', why: '' };
+  if (rest <= 1) { r.kind = 'done'; r.head = 'Linien-Anteil vollständig angelegt'; return r; }
+  if (dist != null && dist <= band) { r.kind = 'all'; r.due = rest; r.head = 'Linie erreicht – Linien-Anteil anlegen';
+    r.why = `${esc(T.name)} liegt nur ${nf(dist * 100, 1)} % über seiner 200-Wochen-Linie. Darauf hat dieser Teil gewartet.`; return r; }
+  if (elapsed >= maxM) { const left = Math.max(1, maxM + 12 - elapsed), curM = ymd(today).slice(0, 7);
+    const boughtM = lb.filter(b => b.d.slice(0, 7) === curM).reduce((x, b) => x + b.a, 0);
+    r.due = Math.max(0, Math.min(rest, Math.max(inv / 12, rest / left) - boughtM)); r.kind = r.due > 1 ? 'rate' : 'wait';
+    r.head = 'Wartezeit abgelaufen – in Raten anlegen'; r.why = `Die Linie kam in ${maxM} Monaten nicht. Damit der Teil nicht ewig draußen bleibt, geht er jetzt über 12 Monate in Raten rein.`; return r; }
+  r.kind = 'pause'; r.head = 'Wartet auf die 200-Wochen-Linie';
+  r.why = dist == null ? 'Zu wenig Kursdaten für die 200-Wochen-Linie.' : `${esc(T.name)} liegt ${nf(dist * 100, 0)} % über der Linie (${nf(line, 0)}). Angelegt wird, sobald der Abstand unter ${nf(band * 100, 0)} % fällt – spätestens nach ${maxM} Monaten (noch ${Math.max(0, maxM - elapsed)}).`;
   return r;
 }
 function planLiveHint(P, M, liveScore, st) {
@@ -1074,13 +1103,16 @@ function drawPlan(c, M) {
         <label>Start<input id="pf-s" type="date" value="${P.start || ymd(new Date())}"></label>
         <label>Raten (Monate)<input id="pf-b" type="number" min="1" max="60" value="${P.base || 12}"></label>
         <label>spätestens alles nach (Monaten)<input id="pf-m" type="number" min="1" max="60" value="${P.max || 24}"></label>
+        <label>Linien-Anteil: wartet auf die 200-Wochen-Linie (%)<input id="pf-lp" type="number" min="0" max="100" step="5" value="${P.linePct || 0}"></label>
+        <label>Linien-Anteil: höchstens warten (Monate)<input id="pf-lm" type="number" min="1" max="120" value="${P.lineMax || 36}"></label>
+        <label>Linie gilt als erreicht bei Abstand unter (%)<input id="pf-lb" type="number" min="0" max="20" step="1" value="${P.lineBand ?? 5}"></label>
       </div>
       <div class="pbtn"><button id="pf-save" class="pri">Speichern</button>${PLAN ? '<button id="pf-cancel">Abbrechen</button><button id="pf-del" class="danger">Plan löschen</button>' : ''}</div>
       <div class="note">Die Reserve ist das, was du in den nächsten Jahren für den Haushalt brauchen könntest – sie gehört aufs Tagesgeld oder in einen Geldmarktfonds, nicht in Aktien. Der Plan wird nur auf diesem Mac gespeichert.</div>`;
     c.querySelector('#pf-t').value = P.target in M.targets ? P.target : 'world';
     c.querySelector('#pf-save').onclick = () => {
       const v = id => c.querySelector(id).value;
-      PLAN = Object.assign({}, P, { amount: +v('#pf-a') || 0, reserve: +v('#pf-r') || 0, target: v('#pf-t'), start: v('#pf-s'), base: Math.max(1, +v('#pf-b') || 12), max: Math.max(1, +v('#pf-m') || 24), buys: P.buys || [] });
+      PLAN = Object.assign({}, P, { amount: +v('#pf-a') || 0, reserve: +v('#pf-r') || 0, target: v('#pf-t'), start: v('#pf-s'), base: Math.max(1, +v('#pf-b') || 12), max: Math.max(1, +v('#pf-m') || 24), linePct: Math.max(0, Math.min(100, +v('#pf-lp') || 0)), lineMax: Math.max(1, +v('#pf-lm') || 36), lineBand: Math.max(0, +v('#pf-lb')), buys: P.buys || [] });
       planSave(); c.dataset.edit = '0'; drawPlan(c, M);
     };
     if (PLAN) { c.querySelector('#pf-cancel').onclick = () => { c.dataset.edit = '0'; drawPlan(c, M); };
@@ -1088,31 +1120,37 @@ function drawPlan(c, M) {
     return;
   }
   const P = PLAN; const live = liveModel(M.targets[P.target] || M.targets.world); const st = planState(P, M, live && live.score);
-  const pct = st.inv ? st.done / st.inv * 100 : 0;
-  const col = { all: C.up, rate: C.s1, wait: C.sec, pause: C.warn, done: C.up }[st.kind];
+  const ls = lineState(P, M);
+  const totInv = st.inv + (ls ? ls.inv : 0), totDone = st.done + (ls ? ls.done : 0);
+  const pct = totInv ? totDone / totInv * 100 : 0;
+  const colOf = k => ({ all: C.up, rate: C.s1, wait: C.sec, pause: C.warn, done: C.up }[k]);
+  const col = colOf(st.kind);
   c.innerHTML = `<div class="hd"><div><div class="ttl">Einstiegsplan · ${eur(P.amount)}${P.reserve ? ` <small>(${eur(P.reserve)} Reserve)</small>` : ''}</div>
       <div class="sub">Richtwert ${esc(st.T.name)} · Start ${fmtDate(monthDay(P.start))} · Monat ${st.elapsed + 1} · noch ${st.left} Monat(e) bis zur Frist${st.mOut ? ` (um ${st.mOut} verlängert wegen Ausstiegssignal)` : ''}</div></div>
       <button id="pl-edit" class="ghost">Bearbeiten</button></div>
     <div class="plan">
       <div class="pnow" style="border-color:${col}">
-        <div class="lbl">Heute</div>
+        <div class="lbl">Heute${ls ? ` · Hauptteil ${eur(st.inv)}` : ''}</div>
         <div class="phead" style="color:${col}">${st.head}</div>
         ${st.due > 1 ? `<div class="big" style="font-size:30px">${eur(st.due)}</div>` : ''}
         <div class="pwhy">${st.why}</div>
         <div class="plive" id="pl-live">${planLiveHint(P, M, live && live.score, st)}</div>
+        ${ls ? `<div class="pline" style="border-color:${colOf(ls.kind)}"><div class="lbl">Linien-Anteil · ${eur(ls.inv)} · angelegt ${eur(ls.done)}</div>
+          <div class="phead" style="color:${colOf(ls.kind)};font-size:15px">${ls.head}</div>${ls.due > 1 ? `<div class="big" style="font-size:22px">${eur(ls.due)}</div>` : ''}<div class="pwhy">${ls.why}</div></div>` : ''}
       </div>
       <div>
         <div class="lbl">Fortschritt</div>
         <div class="pprog"><i style="width:${Math.min(100, pct).toFixed(1)}%"></i></div>
-        <div class="pnums"><span>angelegt <b>${eur(st.done)}</b></span><span>offen <b>${eur(st.rest)}</b></span><span>${nf(pct, 0)} %</span></div>
-        <div class="paddr"><input id="pl-amt" type="number" step="100" value="${Math.round(st.due || 0) || ''}" placeholder="Betrag"><input id="pl-d" type="date" value="${ymd(new Date())}"><button id="pl-add" class="pri">Als gekauft eintragen</button></div>
-        ${(P.buys || []).length ? `<table class="t" style="margin-top:8px"><tr><th>Datum</th><th>Betrag</th><th></th></tr>${P.buys.slice().reverse().map((b, i) => `<tr><td>${fmtDate(monthDay(b.d))}</td><td>${eur(b.a)}</td><td><button class="x" data-i="${P.buys.length - 1 - i}" title="Eintrag entfernen">×</button></td></tr>`).join('')}</table>` : '<div class="note">Noch nichts eingetragen. Trag jede Ausführung ein – daraus rechnet der Plan, was noch offen ist.</div>'}
+        <div class="pnums"><span>angelegt <b>${eur(totDone)}</b></span><span>offen <b>${eur(totInv - totDone)}</b></span><span>${nf(pct, 0)} %</span></div>
+        <div class="paddr"><input id="pl-amt" type="number" step="100" value="${Math.round(st.due || (ls && ls.due) || 0) || ''}" placeholder="Betrag"><input id="pl-d" type="date" value="${ymd(new Date())}">${ls ? `<select id="pl-t"><option value="n">Hauptteil</option><option value="l"${!(st.due > 1) && ls.due > 1 ? ' selected' : ''}>Linien-Anteil</option></select>` : ''}<button id="pl-add" class="pri">Als gekauft eintragen</button></div>
+        ${(P.buys || []).length ? `<table class="t" style="margin-top:8px"><tr><th>Datum</th><th>Betrag</th>${ls ? '<th>Teil</th>' : ''}<th></th></tr>${P.buys.slice().reverse().map((b, i) => `<tr><td>${fmtDate(monthDay(b.d))}</td><td>${eur(b.a)}</td>${ls ? `<td class="mut">${b.t === 'l' ? 'Linie' : 'Haupt'}</td>` : ''}<td><button class="x" data-i="${P.buys.length - 1 - i}" title="Eintrag entfernen">×</button></td></tr>`).join('')}</table>` : '<div class="note">Noch nichts eingetragen. Trag jede Ausführung ein – daraus rechnet der Plan, was noch offen ist.</div>'}
       </div>
     </div>
-    <div class="note">Regel (getestet für jeden Startmonat seit 1953, 10 Jahre Horizont): Endwert im Median wie „sofort alles“ oder leicht besser, aber nur halb so oft mehr als 20 % Buchverlust in den ersten drei Jahren. Vor einem Crash <i>nach</i> dem Einstieg schützt keine Einstiegsregel – dafür ist der Ausstieg im Signale-Reiter da. Entschieden wird mit dem Schluss-Score; der Live-Score zeigt nur, was sich anbahnt. Kein Anlagerat.</div>`;
+    <div class="note">Regel (getestet für jeden Startmonat seit 1953, 10 Jahre Horizont): Endwert im Median wie „sofort alles“ oder leicht besser, aber nur halb so oft mehr als 20 % Buchverlust in den ersten drei Jahren. Vor einem Crash <i>nach</i> dem Einstieg schützt keine Einstiegsregel – dafür ist der Ausstieg im Signale-Reiter da. Entschieden wird mit dem Schluss-Score; der Live-Score zeigt nur, was sich anbahnt. ${ls ? 'Linien-Anteil: Bei hohem CAPE (über +1,5 σ) kam der Kurs seit 1900 in 8 von 9 Phasen nach 16–43 Monaten an die 200-Wochen-Linie zurück; die Ausnahme (1989–2001) dauerte 11 Jahre – deshalb die Höchstwartezeit. ' : ''}Kein Anlagerat.</div>`;
   c.querySelector('#pl-edit').onclick = () => { c.dataset.edit = '1'; drawPlan(c, M); };
   c.querySelector('#pl-add').onclick = () => { const a = +c.querySelector('#pl-amt').value, d = c.querySelector('#pl-d').value; if (!(a > 0) || !d) return;
-    P.buys = (P.buys || []).concat([{ d, a }]).sort((x, y) => x.d < y.d ? -1 : 1); planSave(); drawPlan(c, M); };
+    const tSel = c.querySelector('#pl-t'); const t = tSel ? tSel.value : 'n';
+    P.buys = (P.buys || []).concat([{ d, a, t }]).sort((x, y) => x.d < y.d ? -1 : 1); planSave(); drawPlan(c, M); };
   c.querySelectorAll('button.x').forEach(b => b.onclick = () => { P.buys.splice(+b.dataset.i, 1); planSave(); drawPlan(c, M); });
 }
 function refreshPlanLive() {
