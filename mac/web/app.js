@@ -745,6 +745,7 @@ function secEinschaetzung(m) {
     <div class="note">USA und Welt nutzen US-Konjunktur, Shiller-KGV und Gewinndaten; DAX und Euro Stoxx haben eigene Konjunktur- und Zinsdaten für Deutschland bzw. den Euroraum, der Nikkei für Japan, die Schwellenländer China-Frühindikator, Dollar und Kupfer. Für sie gibt es kein frei verfügbares KGV, die Bewertung ist dort eine Näherung (Kurs ggü. 10-Jahres-Durchschnitt). ⚠ = weniger als 25 Jahre Daten. * Wahrscheinlichkeit = Modell für einen Rückgang von mindestens 15 % in den nächsten 12 Monaten, vorwärts getestet (¹ kurze Historie: am S&P 500 gelernt). Häufigkeit = wie oft das früher tatsächlich passierte: bei ähnlichem Score, in den ähnlichsten Momenten und im Schnitt. Der MSCI World in Euro enthält Dividenden (Nettoindex) – so, wie ihn ein Euro-Anleger mit einem thesaurierenden ETF erlebt.</div>`;
   ov.querySelectorAll('tr.row').forEach(r => r.onclick = () => { TGT = r.dataset.t; store('tgt', TGT); renderSection(); setTimeout(() => { const h = document.getElementById('hero'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); });
   m.appendChild(ov);
+  planCard(m, M);
   sect(m, esc(T.name) + ' im Detail');
 
   // Kopf: Score, Ampel, Handlung, Säulen, Klartext
@@ -982,6 +983,118 @@ function updateLive() {
       const hl = document.getElementById('hs-live'); if (hl) hl.innerHTML = LIVEON ? `● live ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}` : '';
     }
   }
+  refreshPlanLive();
+}
+// ---------- Einstiegsplan: einen größeren Betrag regelbasiert anlegen (Score + Ausstiegssignal)
+let PLAN; // undefined = noch nicht geladen, null = keiner angelegt
+const PLAN_DEF = { amount: 460000, reserve: 0, target: 'world_eur', start: null, base: 12, max: 24, buys: [] };
+const eur = v => nf(Math.round(v), 0) + ' €';
+const ymd = d => d.toISOString().slice(0, 10);
+function monthsBetween(a, b) { return (b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth(); }
+async function planLoad() { if (PLAN !== undefined) return; try { const t = await bigLoad('einstiegsplan'); PLAN = t ? JSON.parse(t) : null; } catch (e) { PLAN = null; } }
+function planSave() { bigSave('einstiegsplan', JSON.stringify(PLAN)); }
+// Monate seit Start, in denen das Ausstiegssignal am Monatsende auf „draußen“ stand (verlängern die Frist)
+function monthsOut(S, start, today) {
+  if (!S || !S.trades) return 0;
+  const tr = S.trades.slice().sort((a, b) => a.d < b.d ? -1 : 1); let n = 0;
+  for (let d = new Date(start.getFullYear(), start.getMonth() + 1, 0); d < today; d = new Date(d.getFullYear(), d.getMonth() + 2, 0)) {
+    const last = tr.filter(x => x.d <= ymd(d)).pop(); if (last && last.k === 'aus') n++;
+  }
+  return n;
+}
+function planState(P, M, liveScore) {
+  const T = M.targets[P.target] || M.targets.world; const today = new Date();
+  const start = P.start ? new Date(P.start + 'T12:00:00') : today;
+  const inv = Math.max(0, P.amount - (P.reserve || 0)), done = (P.buys || []).reduce((x, b) => x + b.a, 0), rest = Math.max(0, inv - done);
+  const curM = ymd(today).slice(0, 7), boughtM = (P.buys || []).filter(b => b.d.slice(0, 7) === curM).reduce((x, b) => x + b.a, 0);
+  const sig = T.signals && !T.signals.error ? T.signals.state : 1;
+  const mOut = monthsOut(T.signals, start, today);
+  const elapsed = Math.max(0, monthsBetween(start, today));
+  const left = Math.max(1, (P.max || 24) + mOut - elapsed);          // Monate inkl. laufendem bis zur Frist
+  const sc = T.now.score; const base = inv / (P.base || 12);
+  const r = { T, inv, done, rest, boughtM, sig, mOut, elapsed, left, sc, base, due: 0, kind: '', head: '', why: '' };
+  if (rest <= 1) { r.kind = 'done'; r.head = 'Plan erfüllt – alles angelegt'; r.why = 'Ab jetzt entscheidet nur noch der Signale-Reiter, ob du draußen bleibst oder wieder einsteigst.'; return r; }
+  if (sig === 0) { r.kind = 'pause'; r.head = 'Pause: Ausstiegssignal aktiv'; r.why = `Der Signale-Reiter steht für ${esc(T.name)} auf „draußen“. Solange das so ist, wird nichts angelegt – die Frist verlängert sich um jeden solchen Monat.`; return r; }
+  if (sc >= 55) { r.kind = 'all'; r.due = rest; r.head = 'Rest jetzt anlegen'; r.why = `Score ${sc} liegt bei 55 oder darüber: Das Crash-Risiko ist unterdurchschnittlich – historisch war es dann am besten, den Rest auf einmal anzulegen.`; return r; }
+  if (left <= 1) { r.kind = 'all'; r.due = rest; r.head = 'Frist erreicht – Rest anlegen'; r.why = `Die ${P.max || 24}-Monats-Frist ist erreicht. Länger zu warten hat historisch mehr gekostet als genützt.`; return r; }
+  if (sc < 45) { r.kind = 'pause'; r.head = 'Pause: Score unter 45'; r.why = `Score ${sc}: erhöhtes Crash-Risiko. Diesen Monat nichts anlegen – noch ${left} Monate bis zur Frist, danach wird der Rest in jedem Fall angelegt.`; return r; }
+  const target = Math.max(base, rest / left);
+  r.due = Math.max(0, Math.min(rest, target - boughtM)); r.kind = r.due > 1 ? 'rate' : 'wait';
+  r.head = r.kind === 'rate' ? 'Monatsrate anlegen' : 'Rate für diesen Monat erledigt';
+  r.why = `Score ${sc} (45–55): normales Umfeld – in Raten. Ziel diesen Monat ${eur(target)}${target > base + 1 ? ' (etwas mehr als ein Zwölftel, damit die Frist reicht)' : ' (ein Zwölftel)'}, davon schon ${eur(boughtM)} angelegt.`;
+  return r;
+}
+function planLiveHint(P, M, liveScore, st) {
+  if (liveScore == null || st.kind === 'done' || st.sig === 0) return '';
+  const zone = s => s >= 55 ? 'all' : s < 45 ? 'pause' : 'rate'; const a = zone(st.sc), b = zone(Math.round(liveScore));
+  if (a === b) return `<span class="mut">Live-Score ${Math.round(liveScore)} – keine Änderung absehbar.</span>`;
+  const txt = { all: 'dann wäre morgen der Rest dran', pause: 'dann wäre morgen Pause', rate: 'dann gälte morgen wieder die Monatsrate' }[b];
+  return `<span style="color:var(--warn)">Live-Score ${Math.round(liveScore)}: Hält das bis Börsenschluss, ${txt}. Entschieden wird mit dem Schlusswert.</span>`;
+}
+function planCard(m, M) {
+  sect(m, 'Dein Einstiegsplan');
+  const c = document.createElement('div'); c.className = 'card full'; c.id = 'plancard'; m.appendChild(c);
+  if (PLAN === undefined) { c.innerHTML = '<div class="note">Lade Plan …</div>'; planLoad().then(() => drawPlan(c, M)); }
+  else drawPlan(c, M);
+}
+function drawPlan(c, M) {
+  const opts = Object.entries(M.targets).map(([k, t]) => `<option value="${k}">${esc(t.name)}</option>`).join('');
+  if (!PLAN || c.dataset.edit === '1') {
+    const P = PLAN || Object.assign({}, PLAN_DEF, { start: ymd(new Date()) });
+    c.innerHTML = `<div class="hd"><div><div class="ttl">${PLAN ? 'Plan bearbeiten' : 'Einstiegsplan anlegen'}</div>
+      <div class="sub">Für einen größeren Betrag, der nach und nach in den Markt soll. Die Regel kommt aus dem Test seit 1953: Score ab 55 → Rest sofort, 45–55 → Monatsraten, unter 45 → Pause, Ausstiegssignal aktiv → Pause; spätestens nach der Frist ist alles angelegt.</div></div></div>
+      <div class="pform">
+        <label>Gesamtbetrag (€)<input id="pf-a" type="number" step="1000" value="${P.amount}"></label>
+        <label>davon Reserve, wird nicht angelegt (€)<input id="pf-r" type="number" step="1000" value="${P.reserve || 0}"></label>
+        <label>Richtwert (Score und Signal von)<select id="pf-t">${opts}</select></label>
+        <label>Start<input id="pf-s" type="date" value="${P.start || ymd(new Date())}"></label>
+        <label>Raten (Monate)<input id="pf-b" type="number" min="1" max="60" value="${P.base || 12}"></label>
+        <label>spätestens alles nach (Monaten)<input id="pf-m" type="number" min="1" max="60" value="${P.max || 24}"></label>
+      </div>
+      <div class="pbtn"><button id="pf-save" class="pri">Speichern</button>${PLAN ? '<button id="pf-cancel">Abbrechen</button><button id="pf-del" class="danger">Plan löschen</button>' : ''}</div>
+      <div class="note">Die Reserve ist das, was du in den nächsten Jahren für den Haushalt brauchen könntest – sie gehört aufs Tagesgeld oder in einen Geldmarktfonds, nicht in Aktien. Der Plan wird nur auf diesem Mac gespeichert.</div>`;
+    c.querySelector('#pf-t').value = P.target in M.targets ? P.target : 'world';
+    c.querySelector('#pf-save').onclick = () => {
+      const v = id => c.querySelector(id).value;
+      PLAN = Object.assign({}, P, { amount: +v('#pf-a') || 0, reserve: +v('#pf-r') || 0, target: v('#pf-t'), start: v('#pf-s'), base: Math.max(1, +v('#pf-b') || 12), max: Math.max(1, +v('#pf-m') || 24), buys: P.buys || [] });
+      planSave(); c.dataset.edit = '0'; drawPlan(c, M);
+    };
+    if (PLAN) { c.querySelector('#pf-cancel').onclick = () => { c.dataset.edit = '0'; drawPlan(c, M); };
+      c.querySelector('#pf-del').onclick = () => { if (c.dataset.del !== '1') { c.dataset.del = '1'; c.querySelector('#pf-del').textContent = 'Wirklich löschen?'; return; } PLAN = null; planSave(); c.dataset.edit = '0'; c.dataset.del = '0'; drawPlan(c, M); }; }
+    return;
+  }
+  const P = PLAN; const live = liveModel(M.targets[P.target] || M.targets.world); const st = planState(P, M, live && live.score);
+  const pct = st.inv ? st.done / st.inv * 100 : 0;
+  const col = { all: C.up, rate: C.s1, wait: C.sec, pause: C.warn, done: C.up }[st.kind];
+  c.innerHTML = `<div class="hd"><div><div class="ttl">Einstiegsplan · ${eur(P.amount)}${P.reserve ? ` <small>(${eur(P.reserve)} Reserve)</small>` : ''}</div>
+      <div class="sub">Richtwert ${esc(st.T.name)} · Start ${fmtDate(monthDay(P.start))} · Monat ${st.elapsed + 1} · noch ${st.left} Monat(e) bis zur Frist${st.mOut ? ` (um ${st.mOut} verlängert wegen Ausstiegssignal)` : ''}</div></div>
+      <button id="pl-edit" class="ghost">Bearbeiten</button></div>
+    <div class="plan">
+      <div class="pnow" style="border-color:${col}">
+        <div class="lbl">Heute</div>
+        <div class="phead" style="color:${col}">${st.head}</div>
+        ${st.due > 1 ? `<div class="big" style="font-size:30px">${eur(st.due)}</div>` : ''}
+        <div class="pwhy">${st.why}</div>
+        <div class="plive" id="pl-live">${planLiveHint(P, M, live && live.score, st)}</div>
+      </div>
+      <div>
+        <div class="lbl">Fortschritt</div>
+        <div class="pbar"><i style="width:${Math.min(100, pct).toFixed(1)}%"></i></div>
+        <div class="pnums"><span>angelegt <b>${eur(st.done)}</b></span><span>offen <b>${eur(st.rest)}</b></span><span>${nf(pct, 0)} %</span></div>
+        <div class="paddr"><input id="pl-amt" type="number" step="100" value="${Math.round(st.due || 0) || ''}" placeholder="Betrag"><input id="pl-d" type="date" value="${ymd(new Date())}"><button id="pl-add" class="pri">Als gekauft eintragen</button></div>
+        ${(P.buys || []).length ? `<table class="t" style="margin-top:8px"><tr><th>Datum</th><th>Betrag</th><th></th></tr>${P.buys.slice().reverse().map((b, i) => `<tr><td>${fmtDate(monthDay(b.d))}</td><td>${eur(b.a)}</td><td><button class="x" data-i="${P.buys.length - 1 - i}" title="Eintrag entfernen">×</button></td></tr>`).join('')}</table>` : '<div class="note">Noch nichts eingetragen. Trag jede Ausführung ein – daraus rechnet der Plan, was noch offen ist.</div>'}
+      </div>
+    </div>
+    <div class="note">Regel (getestet für jeden Startmonat seit 1953, 10 Jahre Horizont): Endwert im Median wie „sofort alles“ oder leicht besser, aber nur halb so oft mehr als 20 % Buchverlust in den ersten drei Jahren. Vor einem Crash <i>nach</i> dem Einstieg schützt keine Einstiegsregel – dafür ist der Ausstieg im Signale-Reiter da. Entschieden wird mit dem Schluss-Score; der Live-Score zeigt nur, was sich anbahnt. Kein Anlagerat.</div>`;
+  c.querySelector('#pl-edit').onclick = () => { c.dataset.edit = '1'; drawPlan(c, M); };
+  c.querySelector('#pl-add').onclick = () => { const a = +c.querySelector('#pl-amt').value, d = c.querySelector('#pl-d').value; if (!(a > 0) || !d) return;
+    P.buys = (P.buys || []).concat([{ d, a }]).sort((x, y) => x.d < y.d ? -1 : 1); planSave(); drawPlan(c, M); };
+  c.querySelectorAll('button.x').forEach(b => b.onclick = () => { P.buys.splice(+b.dataset.i, 1); planSave(); drawPlan(c, M); });
+}
+function refreshPlanLive() {
+  const el = document.getElementById('pl-live'); const M = DATA && DATA.model; if (!el || !PLAN || !M) return;
+  const live = liveModel(M.targets[PLAN.target] || M.targets.world); const st = planState(PLAN, M, live && live.score);
+  el.innerHTML = planLiveHint(PLAN, M, live && live.score, st);
 }
 function riskCell(v) {
   if (v == null) return '–';
