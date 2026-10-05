@@ -1076,7 +1076,7 @@ except Exception as e:  # noqa
 model_out = None
 try:
     import model as mdl
-    model_out = mdl.run(ser, markt, NOW, qual_out)
+    model_out = mdl.run(ser, markt, NOW, qual_out, prev.get("model"))
     if qual_out is not None and model_out.get("quality"):
         h_ = [x for x in (qual_out.get("hist") or []) if x.get("d") != NOW.strftime("%Y-%m-%d")]
         h_.append({"d": NOW.strftime("%Y-%m-%d"), "s": round(model_out["quality"]["score"], 3)})

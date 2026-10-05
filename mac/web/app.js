@@ -1208,21 +1208,25 @@ function ruleCard(M) {
 // ---------- Signale (Ein-/Ausstieg, eigener Reiter zum Vergleich mit der Einschätzung)
 function secSignale(m) {
   const M = DATA.model;
-  head(m, 'Signale', 'Klare Ein- und Ausstiegssignale statt Score. Sicherheit hat Vorrang: raus erst bei Bestätigung, wieder rein bewusst spät. Die Regeln wurden nur mit dem S&P 500 bis 1989 festgelegt und danach unverändert getestet – an 1990 bis heute und an allen anderen Indizes.');
+  head(m, 'Signale', 'Klare Ein- und Ausstiegssignale statt Score. Sicherheit hat Vorrang: raus erst bei Bestätigung, wieder rein bewusst spät. Die Regel wird jedes Jahr neu festgelegt – nur mit den jeweils letzten 35 Jahren S&P 500 – und gilt dann unverändert für dieses Jahr. Alles ab 1990 ist damit ein echter Vorwärtstest.');
   if (!M || !M.signal_params || !M.targets) { m.insertAdjacentHTML('beforeend', '<div class="card"><div class="note">Signale werden mit der nächsten Datenaktualisierung berechnet.</div></div>'); return; }
   if (!M.targets[TGT] || !M.targets[TGT].signals || M.targets[TGT].signals.error) TGT = 'world';
   const Pp = M.signal_params, Cal = M.signal_cal || {};
   const rule = `<b>Aussteigen</b>, wenn der Score an ${Pp.exit_n} Börsentagen in Folge unter ${Pp.exit_s} liegt${Pp.exit_trend ? ' und der Kurs unter seiner 10-Monats-Linie' : ''}. <b>Wieder einsteigen</b>, wenn der Score an ${Pp.entry_n} Börsentagen in Folge mindestens ${Pp.entry_s} erreicht und der Kurs über seiner 10-Monats-Linie liegt. Nach jedem Wechsel mindestens 20 Börsentage Pause.`;
   const rc = document.createElement('div'); rc.className = 'card full';
   rc.innerHTML = `<div class="hd"><div><div class="ttl">Die Regel</div><div class="sub">${rule}</div></div></div>
-    <div class="note">Ausgewählt aus ${Cal.n_tested || '–'} Varianten mit dem S&P 500 ${Cal.from ? Cal.from.slice(0, 4) : ''}–${Cal.to ? Cal.to.slice(0, 4) : ''}: kleinster größter Verlust bei höchstens 2,5 Ausstiegen pro Jahrzehnt und höchstens 1 Prozentpunkt weniger Rendite als Kaufen und Halten. In diesem Zeitraum: ${fmtPct(Cal.cagr)} p.a. bei höchstens ${fmtPct(Cal.mdd, 0)} Verlust – Kaufen und Halten ${fmtPct(Cal.bh_cagr)} p.a. bei ${fmtPct(Cal.bh_mdd, 0)}. Alles danach hat die Regel nie gesehen.</div>`;
+    <div class="note">Aktuelle Regel, ausgewählt aus ${Cal.n_tested || '–'} Varianten mit dem S&P 500 ${Cal.from ? Cal.from.slice(0, 4) : ''}–${Cal.to ? Cal.to.slice(0, 4) : ''}: kleinster größter Verlust bei höchstens 2,5 Ausstiegen pro Jahrzehnt und höchstens 1 Prozentpunkt weniger Rendite als Kaufen und Halten.</div>
+    ${M.signal_roll ? `<details class="roll"><summary>Wie sich die Regel über die Jahre verändert hat</summary><table class="t" style="margin-top:6px"><tr><th>gültig</th><th>gelernt aus</th><th>Ausstieg</th><th>Wiedereinstieg</th></tr>${(() => {
+      const ks = Object.keys(M.signal_roll).sort(); const rows = []; let cur = null;
+      ks.forEach(k => { const p = M.signal_roll[k].p; const sig_ = JSON.stringify(p); if (!cur || cur.sig !== sig_) { cur = { sig: sig_, a: k, b: k, p, from: M.signal_roll[k].from }; rows.push(cur); } else cur.b = k; });
+      return rows.map(r => `<tr><td>${r.a}${r.b !== r.a ? '–' + r.b : ''}</td><td class="mut">35 Jahre davor</td><td>Score &lt; ${r.p.exit_s}, ${r.p.exit_n} Tage${r.p.exit_trend ? ' + unter Linie' : ''}</td><td>Score ≥ ${r.p.entry_s}, ${r.p.entry_n} Tage + über Linie</td></tr>`).join(''); })()}</table></details>` : ''}</div>`;
   m.appendChild(rc);
 
   const ov = document.createElement('div'); ov.className = 'card full';
   const condTxt = (S) => S.state === 1
     ? `Ausstieg erst nach ${S.need} Tagen Score &lt; ${Pp.exit_s}${Pp.exit_trend ? ' + Kurs unter Linie' : ''} – erfüllt seit ${S.run} Tagen`
     : `Wiedereinstieg erst nach ${S.need} Tagen Score ≥ ${Pp.entry_s} + Kurs über Linie – erfüllt seit ${S.run} Tagen`;
-  ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes</div><div class="sub">Stand nach dem letzten Tagesschluss. Kennzahlen ab 1990 – also außerhalb des Zeitraums, mit dem die Regel festgelegt wurde. Klick auf eine Zeile zeigt Details.</div></div></div>
+  ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes</div><div class="sub">Stand nach dem letzten Tagesschluss. Kennzahlen ab 1990 – jedes Jahr mit der Regel, die damals aus den 35 Jahren davor festgelegt worden wäre. Klick auf eine Zeile zeigt Details.</div></div></div>
     <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Signal</th><th>seit</th><th>Score</th><th>Bedingung</th><th>Rendite p.a.<br>Signal / Halten</th><th>größter Verlust<br>Signal / Halten</th><th>Ausstiege<br>pro Jahrzehnt</th><th>davon<br>teurer zurück</th></tr>
     ${Object.entries(M.targets).filter(([k, t]) => t.signals && !t.signals.error).map(([k, t]) => { const S = t.signals, O = S.oos || S.all;
       return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td>
@@ -1242,8 +1246,8 @@ function secSignale(m) {
   ch.innerHTML = `<div class="hd"><div><div class="ttl">${esc(T.name)} mit allen Ein- und Ausstiegen seit ${S.all.from.slice(0, 4)}</div><div class="sub">Rot ▼ = Ausstieg, grün ▲ = Wiedereinstieg. Logarithmisch, Wochenwerte. Darunter: was aus 100 geworden wäre.</div></div></div>
     <div class="legend" id="sglg"></div><div class="chart tall"></div><div class="chart" style="height:220px"></div>
     <table class="t" style="margin-top:8px"><tr><th>Zeitraum</th><th>Rendite p.a. Signal</th><th>Halten</th><th>größter Verlust Signal</th><th>Halten</th><th>Ausstiege</th><th>Ø investiert</th></tr>
-    ${[['Festlegung (bis 1989)', S.is], ['Test (ab 1990)', S.oos], ['gesamt', Object.assign({ exits: S.n_trades ? Math.ceil(S.n_trades / 2) : 0 }, S.all)]].filter(x => x[1]).map(([n, O]) =>
-      `<tr class="${n.startsWith('Test') ? 'hl' : ''}"><td>${n} <span class="mut">${O.from ? O.from.slice(0, 4) : ''}${O.to ? '–' + O.to.slice(0, 4) : ''}</span></td><td>${fmtPct(O.cagr)}</td><td>${fmtPct(O.bh_cagr)}</td><td>${fmtPct(O.mdd, 0)}</td><td>${fmtPct(O.bh_mdd, 0)}</td><td>${O.exits ?? '–'}</td><td>${O.invested} %</td></tr>`).join('')}</table>
+    ${[['vor 1990 (Regel von 1990)', S.is], ['Vorwärtstest (ab 1990)', S.oos], ['gesamt', Object.assign({ exits: S.n_trades ? Math.ceil(S.n_trades / 2) : 0 }, S.all)]].filter(x => x[1]).map(([n, O]) =>
+      `<tr class="${n.startsWith('Vorwärts') ? 'hl' : ''}"><td>${n} <span class="mut">${O.from ? O.from.slice(0, 4) : ''}${O.to ? '–' + O.to.slice(0, 4) : ''}</span></td><td>${fmtPct(O.cagr)}</td><td>${fmtPct(O.bh_cagr)}</td><td>${fmtPct(O.mdd, 0)}</td><td>${fmtPct(O.bh_mdd, 0)}</td><td>${O.exits ?? '–'}</td><td>${O.invested} %</td></tr>`).join('')}</table>
     <div class="note">Kursrenditen ohne Dividenden, nicht investiertes Geld im Geldmarkt, ohne Steuern und Kosten. Wichtig: Jeder Ausstieg ist in Deutschland ein steuerpflichtiger Verkauf – bei wenigen Wechseln pro Jahrzehnt fällt das weniger ins Gewicht, verschwindet aber nicht.</div>`;
   m.appendChild(ch);
   queueMicrotask(() => {

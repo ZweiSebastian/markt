@@ -10,9 +10,11 @@ sondern bestätigt reagiert:
 - Nach jedem Wechsel mindestens 20 Börsentage Ruhe (kein Hin und Her).
 Entscheidung zum Tagesschluss, gilt ab dem nächsten Tag.
 
-Kalibrierung: Die Regelparameter werden NUR mit dem S&P 500 von 1953 bis 1989 gewählt (Ziel: möglichst kleiner
-größter Verlust, höchstens 2,5 Umschichtungen pro Jahrzehnt, Rendite höchstens 1 Prozentpunkt unter Kaufen und
-Halten). Danach werden sie unverändert auf 1990–2026 und alle anderen Indizes angewendet – das ist der ehrliche Test.
+Kalibrierung, rollierend: Für jedes Jahr ab 1990 werden die Regelparameter NUR mit den jeweils letzten 35 Jahren des
+S&P 500 gewählt (Ziel: möglichst kleiner größter Verlust, höchstens 2,5 Umschichtungen pro Jahrzehnt, Rendite höchstens
+1 Prozentpunkt unter Kaufen und Halten) und gelten dann unverändert für dieses Jahr. So arbeitet die Regel immer mit der
+jüngeren Marktgeschichte, und jedes Jahr ab 1990 ist ein echter Vorwärtstest. Vor 1990 gelten die Parameter von 1990
+(dort also nicht vorwärts getestet).
 """
 import itertools
 import math
@@ -30,34 +32,60 @@ GRID = {
     "entry_n": [10, 20, 40],
 }
 HOLD_MIN = 20
+WINDOW = 35
+ROLL_FROM = 1990
 
 
-def simulate(s, above, r, cash, p):
-    """s: Score (np, nan = keine Aussage), above: Kurs über 10-M.-Linie (bool), r/cash: Tagesrenditen.
-    Gibt Positionsreihe (0/1, gilt am jeweiligen Tag) und Wechsel zurück."""
+try:   # schneller Kern, falls numba installiert ist (rollierende Kalibrierung rechnet ~5000 Läufe)
+    from numba import njit
+except Exception:  # noqa
+    def njit(*a, **k):
+        return (lambda f: f) if not (a and callable(a[0])) else a[0]
+
+
+@njit(cache=True)
+def _core(s, above, xs, xn, xt, es, en, hold_min):
     n = len(s)
     pos = np.ones(n)
-    state, cnt_out, cnt_in, since = 1, 0, 0, HOLD_MIN
-    switches = []
+    sw_t = np.empty(n, np.int64)
+    sw_k = np.empty(n, np.int64)
+    m = 0
+    state, cnt_out, cnt_in, since = 1, 0, 0, hold_min
     for t in range(n):
-        pos[t] = state                       # Position am Tag t (Entscheidung vom Vortag)
+        pos[t] = state
         st = s[t]
         if np.isnan(st):
             continue
         if state == 1:
-            cond = st < p["exit_s"] and (not p["exit_trend"] or not above[t])
+            cond = st < xs[t] and (xt[t] == 0 or not above[t])
             cnt_out = cnt_out + 1 if cond else 0
-            if cnt_out >= p["exit_n"] and since >= HOLD_MIN:
+            if cnt_out >= xn[t] and since >= hold_min:
                 state, since, cnt_out, cnt_in = 0, 0, 0, 0
-                switches.append((t, 0))
+                sw_t[m] = t; sw_k[m] = 0; m += 1
         else:
-            cond = st >= p["entry_s"] and above[t]
+            cond = st >= es[t] and above[t]
             cnt_in = cnt_in + 1 if cond else 0
-            if cnt_in >= p["entry_n"] and since >= HOLD_MIN:
+            if cnt_in >= en[t] and since >= hold_min:
                 state, since, cnt_out, cnt_in = 1, 0, 0, 0
-                switches.append((t, 1))
+                sw_t[m] = t; sw_k[m] = 1; m += 1
         since += 1
-    return pos, switches
+    return pos, sw_t[:m], sw_k[:m]
+
+
+def simulate(s, above, r, cash, p):
+    """s: Score (np, nan = keine Aussage), above: Kurs über 10-M.-Linie (bool), r/cash: Tagesrenditen.
+    p: Parameter (dict) oder Liste von Parametern je Tag. Gibt Positionsreihe (0/1, gilt am jeweiligen Tag) und Wechsel zurück."""
+    n = len(s)
+    if isinstance(p, list):
+        xs = np.array([q["exit_s"] for q in p], float); xn = np.array([q["exit_n"] for q in p], np.int64)
+        xt = np.array([1 if q["exit_trend"] else 0 for q in p], np.int64)
+        es = np.array([q["entry_s"] for q in p], float); en = np.array([q["entry_n"] for q in p], np.int64)
+    else:
+        xs = np.full(n, float(p["exit_s"])); xn = np.full(n, int(p["exit_n"]), np.int64)
+        xt = np.full(n, 1 if p["exit_trend"] else 0, np.int64)
+        es = np.full(n, float(p["entry_s"])); en = np.full(n, int(p["entry_n"]), np.int64)
+    pos, st_, sk_ = _core(np.asarray(s, float), np.asarray(above, bool), xs, xn, xt, es, en, HOLD_MIN)
+    return pos, [(int(a), int(b)) for a, b in zip(st_, sk_)]
 
 
 def perf(pos, r, cash):
@@ -70,9 +98,12 @@ def perf(pos, r, cash):
     return eq, cagr, mdd
 
 
-def calibrate(score, above, r, cash):
-    """Parameter nur aus Daten bis CAL_END."""
-    m = (score.index <= CAL_END) & score.notna().values
+def calibrate(score, above, r, cash, start=None, end=None):
+    """Parameter nur aus Daten im Fenster [start, end] (Standard: bis CAL_END)."""
+    end = CAL_END if end is None else end
+    m = (score.index <= end) & score.notna().values
+    if start is not None:
+        m = m & (score.index >= start)
     idx = np.where(m)[0]
     if len(idx) < 10 * Y:
         return None, None
@@ -103,6 +134,28 @@ def calibrate(score, above, r, cash):
     return best[0], info
 
 
+def rolling(score, above, r, cash, last_year, cache=None):
+    """Je Jahr ab ROLL_FROM: Parameter aus den WINDOW Jahren davor. cache: früher berechnete Jahre (unverändert)."""
+    out = {}
+    for Y in range(ROLL_FROM, last_year + 1):
+        k = str(Y)
+        if cache and k in cache and cache[k].get("p"):
+            out[k] = cache[k]
+            continue
+        p, info = calibrate(score, above, r, cash, pd.Timestamp(f"{Y - WINDOW}-01-01"), pd.Timestamp(f"{Y - 1}-12-31"))
+        if p is None:
+            continue
+        out[k] = {"p": p, **info}
+    return out
+
+
+def schedule(index, roll):
+    """Parameter je Tag aus dem Jahresplan (vor dem ersten Jahr: erstes Jahr, danach: letztes)."""
+    ys = sorted(int(k) for k in roll)
+    first, last = ys[0], ys[-1]
+    return [roll[str(min(max(d.year, first), last))]["p"] for d in index]
+
+
 def evaluate(name, score, P, sma210, cash_rate, params, episodes_min=0.20):
     """Signale für einen Index mit festen Parametern; Kennzahlen vor/nach 1990, Bilanz je Einbruch."""
     days = score.index
@@ -116,7 +169,12 @@ def evaluate(name, score, P, sma210, cash_rate, params, episodes_min=0.20):
     sel = days >= first
     d = days[sel]
     s_, ab_, r_, c_ = score.values[sel], above.values[sel], r.values[sel], cash.values[sel]
-    pos, sw = simulate(s_, ab_, r_, c_, params)
+    if isinstance(params, dict) and "exit_s" not in params:      # rollierender Jahresplan
+        plist = schedule(d, params)
+        pcur = plist[-1]
+    else:
+        plist, pcur = params, params
+    pos, sw = simulate(s_, ab_, r_, c_, plist)
     eq, cagr, mdd = perf(pos, r_, c_)
     eqbh, bcagr, bmdd = perf(np.ones(len(pos)), r_, c_)
     pos_s = pd.Series(pos, index=d)
@@ -191,12 +249,13 @@ def evaluate(name, score, P, sma210, cash_rate, params, episodes_min=0.20):
     ab_now = bool(above.iloc[-1])
     run = 0
     for v, a_ in zip(score.dropna().values[::-1], above.loc[score.dropna().index].values[::-1]):
-        cond = (v < params["exit_s"] and (not params["exit_trend"] or not a_)) if st == 1 else (v >= params["entry_s"] and a_)
+        cond = (v < pcur["exit_s"] and (not pcur["exit_trend"] or not a_)) if st == 1 else (v >= pcur["entry_s"] and a_)
         if not cond:
             break
         run += 1
     # die heutige Entscheidung gilt ab morgen – der Zustand nach heutigem Schluss:
-    pos_next, _ = simulate(np.append(s_, np.nan), np.append(ab_, False), np.append(r_, 0), np.append(c_, 0), params)
+    pl2 = plist + [pcur] if isinstance(plist, list) else plist
+    pos_next, _ = simulate(np.append(s_, np.nan), np.append(ab_, False), np.append(r_, 0), np.append(c_, 0), pl2)
     st_next = int(pos_next[-1])
     eqm = pd.Series(eq, index=d)
     eqbm = pd.Series(eqbh, index=d)
@@ -204,7 +263,7 @@ def evaluate(name, score, P, sma210, cash_rate, params, episodes_min=0.20):
     return {
         "state": st_next, "since": last_sw["d"] if last_sw else str(d[0].date()),
         "score": round(s_now), "above": ab_now, "run": run,
-        "need": params["exit_n"] if st_next == 1 else params["entry_n"],
+        "need": pcur["exit_n"] if st_next == 1 else pcur["entry_n"],
         "all": {"cagr": round(cagr * 100, 1), "mdd": round(mdd * 100, 0), "bh_cagr": round(bcagr * 100, 1), "bh_mdd": round(bmdd * 100, 0),
                 "invested": round(float(pos.mean() * 100), 0), "from": str(d[0].date())},
         "is": is_, "oos": oos, "trades": trades[-60:], "n_trades": len(trades), "pairs": pairs[-40:],
