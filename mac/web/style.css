@@ -280,3 +280,5 @@ details.roll { margin-top: 8px; font-size: 12.5px; } details.roll summary { curs
 
 .pline { border-left: 3px solid; padding: 4px 0 4px 14px; margin-top: 16px; }
 .paddr select { background: #12151b; border: 1px solid #2a303c; border-radius: 7px; color: #e9ebf0; padding: 7px 6px; font: inherit; font-size: 13px; }
+
+.sstart .lev { margin-left: auto; display: flex; gap: 6px; align-items: center; }
