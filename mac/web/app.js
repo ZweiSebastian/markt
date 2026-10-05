@@ -235,7 +235,36 @@ function baseChart(el, opt = {}) {
     localization: { locale: 'de-DE', dateFormat: 'dd.MM.yy', priceFormatter: opt.fmt || (p => nf(p, Math.abs(p) >= 1000 ? 0 : Math.abs(p) >= 10 ? 1 : 2)) },
   });
   charts.push(ch);
+  addZoom(el, ch);
   return ch;
+}
+// Zoom: ⌘/⌥ + Scrollen oder Zwei-Finger-Zoom auf dem Trackpad, Knöpfe +/−/⟲; Ziehen verschiebt
+function zoomChart(ch, f, x) {
+  const ts = ch.timeScale(), r = ts.getVisibleLogicalRange(); if (!r) return;
+  const c = x != null ? (ts.coordinateToLogical(x) ?? (r.from + r.to) / 2) : (r.from + r.to) / 2;
+  let from = c - (c - r.from) * f, to = c + (r.to - c) * f;
+  if (to - from < 10) return;
+  ts.setVisibleLogicalRange({ from, to });
+}
+function addZoom(el, ch) {
+  el.style.position = 'relative';
+  el.addEventListener('wheel', e => {
+    if (!(e.metaKey || e.altKey || e.ctrlKey)) return;          // normales Scrollen bleibt Seiten-Scrollen
+    e.preventDefault();
+    const rect = el.getBoundingClientRect();
+    zoomChart(ch, Math.exp(Math.max(-0.5, Math.min(0.5, e.deltaY * 0.01))), e.clientX - rect.left);
+  }, { passive: false });
+  let g0 = 1;
+  el.addEventListener('gesturestart', e => { e.preventDefault(); g0 = 1; });
+  el.addEventListener('gesturechange', e => { e.preventDefault(); const rect = el.getBoundingClientRect();
+    zoomChart(ch, g0 / e.scale, e.clientX - rect.left); g0 = e.scale; });
+  const bar = document.createElement('div'); bar.className = 'zbar';
+  bar.innerHTML = '<button title="Hineinzoomen">+</button><button title="Herauszoomen">−</button><button title="Alles anzeigen">⟲</button>';
+  const [bi, bo, br] = bar.querySelectorAll('button');
+  bi.onclick = e => { e.stopPropagation(); zoomChart(ch, 0.6); };
+  bo.onclick = e => { e.stopPropagation(); zoomChart(ch, 1 / 0.6); };
+  br.onclick = e => { e.stopPropagation(); if (ch._reset) ch._reset(); else ch.timeScale().fitContent(); };
+  el.appendChild(bar);
 }
 // Zwei übereinanderliegende Diagramme koppeln: gleiche Achsenbreite, gleiche Zeitachse, gemeinsames Fadenkreuz
 function linkCharts(a, sa, da, b, sb, db) {
@@ -243,7 +272,7 @@ function linkCharts(a, sa, da, b, sb, db) {
   const ma = new Map(da.map(p => [p.time, p.value])), mb = new Map(db.map(p => [p.time, p.value]));
   const t0 = Math.min(da[0].time, db[0].time), t1 = Math.max(da[da.length - 1].time, db[db.length - 1].time);
   const fit = () => [a, b].forEach(x => { try { x.timeScale().setVisibleRange({ from: t0, to: t1 }); } catch (e) { /* */ } });
-  fit(); requestAnimationFrame(fit);
+  fit(); requestAnimationFrame(fit); a._reset = b._reset = fit;
   let lock = false;
   const sync = (x, y) => x.timeScale().subscribeVisibleTimeRangeChange(r => { if (lock || !r) return; lock = true; try { y.timeScale().setVisibleRange(r); } catch (e) { /* */ } lock = false; });
   sync(a, b); sync(b, a);

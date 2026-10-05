@@ -238,3 +238,9 @@ table.ov th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
 table.qt th { white-space: normal; line-height: 1.25; vertical-align: bottom; }
 table.qt td, table.qt th { padding: 5px 6px; }
 .probbox .big + .mut { margin-left: 6px; }
+
+/* Zoom-Knöpfe in Diagrammen */
+.zbar { position: absolute; top: 4px; left: 6px; z-index: 5; display: flex; gap: 3px; opacity: 0; transition: opacity .15s; }
+.chart:hover .zbar { opacity: 1; }
+.zbar button { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line, #242934); background: rgba(20,23,30,.85); color: #a2a8b6; font-size: 13px; line-height: 1; cursor: pointer; padding: 0; }
+.zbar button:hover { color: #e9ebf0; border-color: #3a4150; }
