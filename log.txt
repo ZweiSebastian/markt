@@ -1,0 +1,31 @@
+OK   vorheriger Lauf  2026-10-06T11:44:30Z
+OK   Tages-Archiv  89 Reihen
+OK   yahoo  56/56 Ticker (Ergänzung)
+OK   quality  aus Cache 2026-10-05T21:18:59Z
+OK   zinsen  aus Cache 2026-10-06T10:22:45Z
+OK   y10m  aus Cache 2026-10-06T10:22:45Z
+OK   z1  aus Cache 2026-10-06T10:22:45Z
+OK   g7  aus Cache 2026-10-06T11:18:40Z
+OK   fedfunds  aus Cache 2026-10-06T10:22:45Z
+OK   ezb  aus Cache 2026-10-06T10:22:45Z
+OK   eurostat_unemp  aus Cache 2026-10-06T10:22:45Z
+OK   bls  aus Cache 2026-10-06T10:22:45Z
+OK   nfci  aus Cache 2026-10-06T10:22:45Z
+OK   oecd  aus Cache 2026-10-06T10:22:45Z
+OK   payrolls_rt  aus Cache 2026-10-05T19:13:43Z
+OK   claims  aus Cache 2026-10-06T10:22:45Z
+OK   aaii2  aus Cache 2026-10-06T10:22:45Z
+OK   msci_eur  aus Cache 2026-10-06T10:22:45Z
+OK   gdp  aus Cache 2026-10-06T10:22:45Z
+OK   freddie  aus Cache 2026-10-06T10:22:45Z
+OK   eia  aus Cache 2026-10-06T10:22:45Z
+OK   h41  aus Cache 2026-10-06T10:22:45Z
+OK   shiller  aus Cache 2026-10-05T19:13:43Z
+OK   markt.json  2026-10-02
+OK   stress  jetzt 6 Signale
+OK   modell  world: 49 · world_eur: 50 · spx: 49 · ndx: 48 · rut: 47 · sx5e: 56 · dax: 51 · nikkei: 56 · em: 50
+OK   protokoll  9 Einträge
+FEHL rss Yahoo Finance  HTTPError: 404 Client Error: Not Found for url: https://finance.yahoo.com/news/rssindex
+OK   news  122 Meldungen
+OK   Tages-Archiv: 89 Reihen, 5.88 MB
+OK   fertig: 122 Reihen, 5.12 MB
