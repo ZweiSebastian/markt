@@ -856,18 +856,37 @@ function secEinschaetzung(m) {
   const S3 = T.strategies; const SM = T.strat_months;
   const y0 = +SM[0].slice(0, 4), y1 = +SM[SM.length - 1].slice(0, 4);
   const presets = [1990, 2000, 2008, 2010, 2020].filter(y => y > y0 && y < y1);
-  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, monatlich angepasst (Entscheidung am letzten Handelstag, gilt ab dem nächsten Monat), nicht investiertes Geld im Geldmarkt. Mit ETF-Gebühr (0,2 % p.a., gehebelt 0,6 % + Finanzierung), ohne Dividenden, Steuern und Handelskosten. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
-    <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span>${S3[0].eq2 ? '<span class="lev"><span class="mut">ETF:</span><button data-l="1" class="on">normal</button><button data-l="2">2x gehebelt</button></span>' : ''}</div>
+  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, monatlich angepasst (Entscheidung am letzten Handelstag, gilt ab dem nächsten Monat), nicht investiertes Geld im Geldmarkt. Mit ETF-Gebühr (0,2 % p.a., gehebelt 0,6 % + Finanzierung), ohne Dividenden und Handelskosten, Steuern zuschaltbar. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
+    <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span>${S3[0].eq2 ? '<span class="lev"><span class="mut">ETF:</span><button data-l="1" class="on">normal</button><button data-l="2">2x gehebelt</button>' : '<span class="lev">'}${T.cash_m ? '<span class="mut" style="margin-left:10px">Steuern:</span><button data-x="0" class="on">vor</button><button data-x="1">nach</button>' : ''}</span></div>
     <div class="legend" id="slg"></div><div class="chart tall"></div>
     <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th></tr>
     ${S3.map((x, j) => `<tr><td><i style="display:inline-block;width:12px;border-top:2px solid ${SER[j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td id="sr-c${j}"></td><td id="sr-d${j}"></td><td id="sr-v${j}"></td><td id="sr-e${j}"></td></tr>`).join('')}</table>
-    <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge. Ab frei gewähltem Start rechnet die App mit Monatswerten; der größte Verlust berücksichtigt den tiefsten Tageskurs je Monat. „2x gehebelt“: dieselbe Regel, aber investiert wird in einen täglich zurückgesetzten 2x-ETF – doppelte Tagesrendite, Finanzierung zum Geldmarktzins + 0,5 % und 0,6 % Gebühr pro Jahr; nicht investiertes Geld liegt weiter im Geldmarkt.</div>`;
+    <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge. Ab frei gewähltem Start rechnet die App mit Monatswerten; der größte Verlust berücksichtigt den tiefsten Tageskurs je Monat. „2x gehebelt“: dieselbe Regel, aber investiert wird in einen täglich zurückgesetzten 2x-ETF – doppelte Tagesrendite, Finanzierung zum Geldmarktzins + 0,5 % und 0,6 % Gebühr pro Jahr; nicht investiertes Geld liegt weiter im Geldmarkt. „Nach Steuern“: Wert, wenn man zum jeweiligen Zeitpunkt alles verkauft und versteuert – 26,375 % Abgeltungsteuer inkl. Soli, bei Aktien-ETFs 30 % Teilfreistellung (effektiv 18,5 % auf Kursgewinne; auch für die 2x-ETFs angenommen). Jeder Teilverkauf einer Regel versteuert den anteiligen Gewinn sofort, Verluste gehen in den Verlusttopf und werden mit späteren Gewinnen verrechnet, Geldmarktzinsen voll steuerpflichtig. Nicht berücksichtigt: Sparerpauschbetrag (1.000 €, verheiratet 2.000 € pro Jahr), Kirchensteuer, Vorabpauschale (wird beim Verkauf angerechnet, verschiebt also nur den Zeitpunkt) und die genaue FIFO-Reihenfolge.</div>`;
   m.appendChild(st);
   queueMicrotask(() => {
     const ch = baseChart(st.querySelector('.chart'), { log: true, fmt: p => nf(p, 0) });
     const ds = SM.map(monthDay); const lines = S3.map((x, j) => ch.addLineSeries({ color: SER[j], lineWidth: 2, priceLineVisible: false, priceFormat: pf(0) }));
-    let i0 = 0, L2 = false;
-    const EQ = x => L2 && x.eq2 ? x.eq2 : x.eq, LO = x => L2 && x.lo2 ? x.lo2 : x.lo;
+    let i0 = 0, L2 = false, TX = false;
+    const EQ0 = x => L2 && x.eq2 ? x.eq2 : x.eq, LO0 = x => L2 && x.lo2 ? x.lo2 : x.lo;
+    // Steuern (Deutschland, vereinfacht): 26,375 % Abgeltungsteuer + Soli, bei Aktien-ETFs 30 % Teilfreistellung;
+    // Gewinne werden bei jedem Verkauf fällig (Durchschnittskosten), Verluste in den Verlusttopf, Geldmarktzinsen voll steuerpflichtig.
+    // Kurve = Wert, wenn man zu diesem Zeitpunkt alles verkauft und versteuert.
+    const KS = 0.26375, TFS = 0.7;
+    const taxF = (x, i) => { const B = EQ0(S3[0]), cm = T.cash_m || [], ex = x.ex || [], n = B.length, out = new Array(n).fill(1);
+      let V = 0, K = 100, cb = 0, L = 0, P = 100;
+      const pay = g => { if (g < 0) { L -= g; return 0; } const u = Math.min(L, g); L -= u; return (g - u) * KS; };
+      for (let k = i + 1; k < n; k++) { const e = Math.max(0, Math.min(1, ex[k] ?? 1)), W = V + K, tgt = e * W;
+        if (tgt < V - 1e-9) { const sl = V - tgt, g = sl * (1 - cb / V); cb *= tgt / V; V = tgt; K += sl; K -= pay(g * TFS); }
+        else if (tgt > V + 1e-9) { const b = Math.min(tgt - V, K); V += b; cb += b; K -= b; }
+        const R = B[k] / B[k - 1] - 1, c = cm[k] || 0; V *= 1 + R; const it = K * c; K += it; K -= pay(it);
+        P *= 1 + e * R + (1 - e) * c;
+        const g = (V - cb) * TFS, tx = g > 0 ? Math.max(0, g - L) * KS : 0;
+        out[k] = (V + K - tx) / P; }
+      return out; };
+    let CUR = [];
+    const calc = () => { CUR = S3.map(x => { const e = EQ0(x), lo = LO0(x); if (!TX) return { e, lo };
+      const f = taxF(x, i0); return { e: e.map((v, k) => v * f[k]), lo: lo ? lo.map((v, k) => v * f[k]) : null }; }); };
+    const EQ = x => CUR[S3.indexOf(x)].e, LO = x => CUR[S3.indexOf(x)].lo;
     const stats = (x, i) => { const e = EQ(x), n = e.length - 1 - i; if (n < 12) return null;
       const cagr = (Math.pow(e[e.length - 1] / e[i], 12 / n) - 1) * 100;
       let pk = e[i], mdd = 0; const LL = LO(x); for (let k = i + 1; k < e.length; k++) { const lo = LL ? LL[k] : e[k]; mdd = Math.min(mdd, lo / pk - 1); pk = Math.max(pk, e[k]); }
@@ -877,8 +896,8 @@ function secEinschaetzung(m) {
       return { cagr, mdd: mdd * 100, vol, ex }; };
     const lg = st.querySelector('#slg');
     const draw = t => { let i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < i0) i = i0; if (i < 0) return;
-      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${SER[j]}"></i>${esc(x.name)}<b>${nf(EQ(x)[i] / EQ(x)[i0] * 100, 0)}</b></span>`).join('') + `<span class="d">${SM[i]}${L2 ? ' · 2x' : ''}</span>`; };
-    const setStart = i => { i0 = Math.max(0, Math.min(ds.length - 13, i));
+      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${SER[j]}"></i>${esc(x.name)}<b>${nf(EQ(x)[i] / EQ(x)[i0] * 100, 0)}</b></span>`).join('') + `<span class="d">${SM[i]}${L2 ? ' · 2x' : ''}${TX ? ' · nach Steuern' : ''}</span>`; };
+    const setStart = i => { i0 = Math.max(0, Math.min(ds.length - 13, i)); calc();
       S3.forEach((x, j) => { const e = EQ(x); lines[j].setData(e.slice(i0).map((v, k) => ({ time: ds[i0 + k] * DAY, value: Math.max(v / e[i0] * 100, 0.01) })));
         const r = stats(x, i0); const set = (id, h) => { const el = st.querySelector('#' + id); if (el) el.innerHTML = h; };
         set('sr-c' + j, r ? fmtPct(r.cagr) : '–'); set('sr-d' + j, r ? `<span style="color:${C.down}">${nf(r.mdd, 0)} %</span>` : '–');
@@ -891,7 +910,8 @@ function secEinschaetzung(m) {
     const idxOf = ymOrY => { const k = SM.findIndex(d => d >= String(ymOrY)); return k < 0 ? 0 : k; };
     st.querySelectorAll('.sstart button[data-y]').forEach(b => b.onclick = () => setStart(idxOf(b.dataset.y)));
     st.querySelector('#ss-in').onchange = e => { if (e.target.value) setStart(idxOf(e.target.value)); };
-    st.querySelectorAll('.lev button').forEach(b => b.onclick = () => { L2 = b.dataset.l === '2'; st.querySelectorAll('.lev button').forEach(x => x.classList.toggle('on', x === b)); setStart(i0); });
+    st.querySelectorAll('.lev button[data-l]').forEach(b => b.onclick = () => { L2 = b.dataset.l === '2'; st.querySelectorAll('.lev button[data-l]').forEach(x => x.classList.toggle('on', x === b)); setStart(i0); });
+    st.querySelectorAll('.lev button[data-x]').forEach(b => b.onclick = () => { TX = b.dataset.x === '1'; st.querySelectorAll('.lev button[data-x]').forEach(x => x.classList.toggle('on', x === b)); setStart(i0); });
     ch.subscribeClick(p => { if (p && p.time) setStart(ds.indexOf(p.time / DAY)); });
     ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));
     setStart(0);
