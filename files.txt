@@ -1,0 +1,21 @@
+total 1876
+drwxr-xr-x 2 runner runner    4096 Oct  6 15:02 .
+drwxr-xr-x 3 runner runner    4096 Oct  6 15:02 ..
+-rw-r--r-- 1 runner runner       0 Oct  6 15:02 files.txt
+-rw-r--r-- 1 runner runner 1359994 Oct  6 15:02 r_IPO-Statistics.pdf
+-rw-r--r-- 1 runner runner      27 Oct  6 15:02 r_IPO-monthly.xls
+-rw-r--r-- 1 runner runner      27 Oct  6 15:02 r_IPOALL_2024.xlsx
+-rw-r--r-- 1 runner runner      27 Oct  6 15:02 r_IPOs-monthly.xlsx
+-rw-r--r-- 1 runner runner      27 Oct  6 15:02 r_Number-of-IPOs-by-month.xlsx
+-rw-r--r-- 1 runner runner   62418 Oct  6 15:02 r_page.html
+-rw-r--r-- 1 runner runner     417 Oct  6 15:02 s_cc.json
+-rw-r--r-- 1 runner runner     419 Oct  6 15:02 s_ccd.json
+-rw-r--r-- 1 runner runner     426 Oct  6 15:02 s_save.json
+-rw-r--r-- 1 runner runner   53277 Oct  6 15:02 z_FL153020005.json
+-rw-r--r-- 1 runner runner   53483 Oct  6 15:02 z_FL153030005.json
+-rw-r--r-- 1 runner runner   52874 Oct  6 15:02 z_FL153034005.json
+-rw-r--r-- 1 runner runner   53762 Oct  6 15:02 z_FL154090005.json
+-rw-r--r-- 1 runner runner   53683 Oct  6 15:02 z_FL894104005.json
+-rw-r--r-- 1 runner runner   53537 Oct  6 15:02 z_LM153064105.json
+-rw-r--r-- 1 runner runner   53302 Oct  6 15:02 z_LM153064205.json
+-rw-r--r-- 1 runner runner   53600 Oct  6 15:02 z_LM893064105.json
