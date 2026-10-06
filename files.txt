@@ -1,0 +1,14 @@
+total 900
+drwxr-xr-x 2 runner runner   4096 Oct  6 10:59 .
+drwxr-xr-x 3 runner runner   4096 Oct  6 10:59 ..
+-rw-r--r-- 1 runner runner  27700 Oct  6 10:59 buba_gold.json
+-rw-r--r-- 1 runner runner   8450 Oct  6 10:59 buba_usd.json
+-rw-r--r-- 1 runner runner      0 Oct  6 10:59 files.txt
+-rw-r--r-- 1 runner runner  26969 Oct  6 10:59 imf_gold.json
+-rw-r--r-- 1 runner runner 125637 Oct  6 10:59 oecdk_CAN.json
+-rw-r--r-- 1 runner runner 121289 Oct  6 10:59 oecdk_DEU.json
+-rw-r--r-- 1 runner runner 123179 Oct  6 10:59 oecdk_FRA.json
+-rw-r--r-- 1 runner runner 119872 Oct  6 10:59 oecdk_GBR.json
+-rw-r--r-- 1 runner runner 108912 Oct  6 10:59 oecdk_ITA.json
+-rw-r--r-- 1 runner runner 109579 Oct  6 10:59 oecdk_JPN.json
+-rw-r--r-- 1 runner runner 121230 Oct  6 10:59 oecdk_USA.json
