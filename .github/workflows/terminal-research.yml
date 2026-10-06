@@ -1,0 +1,27 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e; mkdir out && cd out
+          curl -sSL -m 90 -o jp_mof.csv "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/jgbcme.csv"
+          curl -sSL -m 90 -o jp_mof_all.csv "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/historical/jgbcme_all.csv"
+          curl -sSL -m 90 -o ca_boc.json "https://www.bankofcanada.ca/valet/observations/BD.CDN.10YR.DQ.YLD/json?start_date=2024-01-01"
+          curl -sSL -m 90 -A "Mozilla/5.0" -o uk_boe.csv "https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp?csv.x=yes&Datefrom=01/Jan/2024&Dateto=now&SeriesCodes=IUDMNZC&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N"
+          curl -sSL -m 90 -o de_bbk.csv "https://api.statistiken.bundesbank.de/rest/data/BBSIS/D.I.ZST.ZI.EUR.S1311.B.A604.R10XX.R.A.A._Z._Z.A?format=csv&lang=en&startPeriod=2024-01-01"
+          for c in DE FR IT; do curl -sSL -m 90 -o ecb_fm_$c.csv "https://data-api.ecb.europa.eu/service/data/FM/M.$c.EUR.4F.BB.${c}10YT_RR.YLD?startPeriod=2024-01&format=csvdata"; done
+          for c in DE FR IT; do curl -sSL -m 90 -o ecb_fmd_$c.csv "https://data-api.ecb.europa.eu/service/data/FM/D.$c.EUR.4F.BB.${c}10YT_RR.YLD?startPeriod=2026-06-01&format=csvdata"; done
+          for c in FR DE IT; do curl -sSL -m 90 -o ecb_irs_$c.csv "https://data-api.ecb.europa.eu/service/data/IRS/M.$c.L.L40.CI.0000.EUR.N.Z?startPeriod=2025-06&format=csvdata"; done
+          curl -sSL -m 90 -o yc_ea.csv "https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_10Y?startPeriod=2026-08-01&format=csvdata"
+          for t in "%5ETNX" "%5EIRX" "FR10Y.BOND" "DE10Y.BOND"; do curl -sSL -m 60 -A "Mozilla/5.0" -o yh_$t.json "https://query1.finance.yahoo.com/v8/finance/chart/$t?range=1mo&interval=1d"; done
+          ls -la > files.txt 2>&1; set -e
+          git init -q -b research-yields
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m "yields" && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-yields
