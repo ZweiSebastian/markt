@@ -714,7 +714,20 @@ function secBewertung(m) {
 let TGT = load('tgt') || 'world';
 const BANDC = [[0, 35, C.crit], [35, 45, C.warn], [45, 65, '#5b6170'], [65, 100, C.good]];
 function monthDay(p) { return Math.floor(Date.UTC(+p.slice(0, 4), +p.slice(5, 7) - 1, p.length > 7 ? +p.slice(8, 10) : 1) / 864e5); }
-function gaugeHTML(score) {
+// Rang 0–100 statt Rohscore: Anteil aller bisherigen Tage (dieses Index) mit niedrigerem Score
+function RK(T, s) {
+  if (s == null || !isFinite(s)) return null; const m = T && T.smap; if (!m || m.length < 2) return Math.round(s);
+  if (s <= m[0]) return 0; if (s >= m[m.length - 1]) return 100;
+  let lo = 0, hi = m.length - 1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (m[mid] <= s) lo = mid; else hi = mid; }
+  const f = m[hi] > m[lo] ? (s - m[lo]) / (m[hi] - m[lo]) : 0; return Math.round(lo + f);
+}
+function gaugeHTML(T, raw) {
+  const score = RK(T, raw); const BR = BANDC.map(([a, b, c]) => [RK(T, a), RK(T, b), c]);
+  const segs = BR.map(([a, b, c]) => `<div style="left:${a}%;width:${b - a}%;background:${c}"></div>`).join('');
+  return `<div class="gauge">${segs}<i style="left:calc(${Math.max(0, Math.min(100, score))}% - 2px)"></i></div>
+    <div class="gscale">${[0, RK(T, 35), RK(T, 45), RK(T, 65), 100].map(v => `<span style="left:${v}%">${v}</span>`).join('')}</div>`;
+}
+function gaugeHTML_old(score) {
   const segs = BANDC.map(([a, b, c]) => `<div style="left:${a}%;width:${b - a}%;background:${c}"></div>`).join('');
   return `<div class="gauge">${segs}<i style="left:calc(${Math.max(0, Math.min(100, score))}% - 2px)"></i></div>
     <div class="gscale">${[0, 35, 45, 65, 100].map(v => `<span style="left:${v}%">${v}</span>`).join('')}</div>`;
@@ -737,11 +750,11 @@ function secEinschaetzung(m) {
   // Übersicht aller Indizes – zugleich Auswahl
   const ov = document.createElement('div'); ov.className = 'card full';
   const yrs = t => { const a = +t.since.slice(0, 4), b = +t.now.month.slice(0, 4); return b - a; };
-  ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes im Überblick</div><div class="sub">Klick auf eine Zeile zeigt die Einschätzung im Detail. Stand ${fmtDate(monthDay(N.day))} (Tagesmodell); Score und Wahrscheinlichkeit live mit den aktuellen Kursen.</div></div></div>
-    <table class="t ov" style="margin-top:6px"><tr><th rowspan="2">Index</th><th rowspan="2">Region</th><th rowspan="2">Score</th><th rowspan="2">Lage</th><th colspan="4" class="grp">Risiko: Rückgang um 15 % oder mehr in den nächsten 12 Monaten</th><th rowspan="2">Trend</th><th rowspan="2">Daten</th></tr>
+  ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes im Überblick</div><div class="sub">Klick auf eine Zeile zeigt die Einschätzung im Detail. Stand ${fmtDate(monthDay(N.day))} (Tagesmodell); Rang und Wahrscheinlichkeit live mit den aktuellen Kursen.</div></div></div>
+    <table class="t ov" style="margin-top:6px"><tr><th rowspan="2">Index</th><th rowspan="2">Region</th><th rowspan="2" title="Rang 0–100: günstiger als an X % aller Tage seit Beginn der Daten. 50 = typischer Tag.">Rang</th><th rowspan="2">Lage</th><th colspan="4" class="grp">Risiko: Rückgang um 15 % oder mehr in den nächsten 12 Monaten</th><th rowspan="2">Trend</th><th rowspan="2">Daten</th></tr>
     <tr><th title="Vorwärts getestete Modellprognose für heute">Prognose</th><th title="Wie oft es früher passierte, wenn der Score ähnlich war">früher bei<br>gleichem Score</th><th title="Wie oft es nach den 8 ähnlichsten Momenten der Geschichte passierte">früher in<br>ähnlichen Lagen</th><th title="Wie oft es im Durchschnitt aller Monate passierte">im<br>Durchschnitt</th></tr>
     ${Object.entries(M.targets).map(([k, t]) => { const tr = (t.now.pillars.find(p => p.id === 'trend') || {}).score; const y = yrs(t);
-      return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b id="ov-s-${k}">${t.now.score}</b></td>
+      return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b id="ov-s-${k}">${RK(t, t.now.score)}</b></td>
       <td style="font-family:inherit" id="ov-l-${k}"><span class="badge ${t.now.cls === 'crit' ? 'crit' : t.now.cls}">${esc(t.now.label)}</span></td>
       <td id="ov-p-${k}">${riskCell(t.now.risk ? t.now.risk.prob : null)}${t.prob && t.prob.pooled ? '<span class="mut" title="kurze Historie – Modell vom S&P 500 übernommen">¹</span>' : ''}</td>
       <td>${riskCell(t.now.risk ? t.now.risk.band : null)}</td><td>${riskCell(t.now.risk ? t.now.risk.analog : null)}</td><td class="mut">${t.now.risk ? t.now.risk.base + ' %' : '–'}</td>
@@ -756,9 +769,9 @@ function secEinschaetzung(m) {
   const hero = document.createElement('div'); hero.className = 'card hero'; hero.id = 'hero';
   hero.innerHTML = `<div class="hgrid">
     <div>
-      <div class="lbl">Gesamtscore ${esc(T.name)}</div>
-      <div class="hscore"><span class="big" id="hs-score">${N.score}</span><span class="mut"> / 100</span> <span id="hs-badge"><span class="badge ${N.cls === 'crit' ? 'crit' : N.cls}">${esc(N.label)}</span></span><span class="livetag" id="hs-live"></span></div>
-      ${gaugeHTML(N.score)}
+      <div class="lbl">Rang ${esc(T.name)} <span class="mut">– günstiger als an so viel % aller Tage seit ${T.since.slice(0, 4)} (Score ${N.score})</span></div>
+      <div class="hscore"><span class="big" id="hs-score">${RK(T, N.score)}</span><span class="mut"> / 100</span> <span id="hs-badge"><span class="badge ${N.cls === 'crit' ? 'crit' : N.cls}">${esc(N.label)}</span></span><span class="livetag" id="hs-live"></span></div>
+      ${gaugeHTML(T, N.score)}
       <div class="action"><span class="mut">Modell sagt:</span> <b id="hs-action">${esc(N.action)}</b></div>
       ${N.risk ? `<div class="probbox"><div class="lbl">Wahrscheinlichkeit für einen Rückgang von mindestens ${Math.round(T.crash * 100)} % in den nächsten 12 Monaten</div>
         <div><span class="big" id="hs-prob" style="font-size:30px">${N.risk.prob ?? '–'} %</span> <span class="mut">normal: ${N.risk.base} %</span>${T.prob && T.prob.pooled ? ' <span class="mut">· am S&P 500 gelernt (kurze Historie)</span>' : ''}</div>
@@ -787,7 +800,7 @@ function secEinschaetzung(m) {
   // Verlauf
   sect(m, 'Verlauf');
   const vh = document.createElement('div'); vh.className = 'card full';
-  vh.innerHTML = `<div class="hd"><div><div class="ttl">${esc(T.name)}, Score und Wahrscheinlichkeit seit ${T.since.slice(0, 4)}</div><div class="sub">Oben der Index (logarithmisch), unten Score (Fläche) und Crash-Wahrscheinlichkeit in % (orange, ab ${T.prob && T.prob.oos_from ? T.prob.oos_from.slice(0, 4) : '–'} vorwärts getestet). Wochenwerte, gestrichelt 35 / 45 / 55 / 65.</div></div></div>
+  vh.innerHTML = `<div class="hd"><div><div class="ttl">${esc(T.name)}, Score und Wahrscheinlichkeit seit ${T.since.slice(0, 4)}</div><div class="sub">Oben der Index (logarithmisch), unten der Rang (Fläche, 50 = typischer Tag) und Crash-Wahrscheinlichkeit in % (orange, ab ${T.prob && T.prob.oos_from ? T.prob.oos_from.slice(0, 4) : '–'} vorwärts getestet). Wochenwerte, gestrichelt die Grenzen der Lagen (Gefahrenzone, Gegenwind, Rückenwind).</div></div></div>
     <div class="legend" id="vlg"></div><div class="chart" style="height:260px"></div><div class="chart" style="height:170px"></div>`;
   m.appendChild(vh);
   queueMicrotask(() => {
@@ -800,16 +813,16 @@ function secEinschaetzung(m) {
     const sc = b.addBaselineSeries({ baseValue: { type: 'price', price: 50 }, lineWidth: 2, priceLineVisible: false, priceFormat: pf(0),
       topLineColor: C.s3, topFillColor1: 'rgba(25,158,112,.25)', topFillColor2: 'rgba(25,158,112,.03)',
       bottomLineColor: C.s8, bottomFillColor1: 'rgba(230,103,103,.03)', bottomFillColor2: 'rgba(230,103,103,.25)',
-      autoscaleInfoProvider: () => ({ priceRange: { minValue: 15, maxValue: 85 } }) });
-    const dScore = ds.map((d, i) => ({ time: d * DAY, value: H.score[i] })).filter(x => x.value != null);
+      autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) });
+    const dScore = ds.map((d, i) => ({ time: d * DAY, value: RK(T, H.score[i]) })).filter(x => x.value != null);
     sc.setData(dScore);
-    [35, 45, 55, 65].forEach(v => sc.createPriceLine({ price: v, color: C.mut, lineWidth: 1, lineStyle: 2, axisLabelVisible: false }));
+    [35, 45, 55, 65].forEach(v => sc.createPriceLine({ price: RK(T, v), color: C.mut, lineWidth: 1, lineStyle: 2, axisLabelVisible: false }));
     const pr = b.addLineSeries({ color: C.s4, lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, priceFormat: pf(0) });
     pr.setData(ds.map((d, i) => ({ time: d * DAY, value: H.prob[i] })).filter(x => x.value != null));
     linkCharts(a, ps, dPrice, b, sc, dScore);
     const lg = vh.querySelector('#vlg');
     const draw = t => { const i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < 0) return;
-      lg.innerHTML = `<span><i style="border-color:${C.s1}"></i>${esc(T.name)}<b>${nf(H.price[i], 0)}</b></span><span><i style="border-color:${C.s3}"></i>Score<b>${nf(H.score[i], 0)}</b></span><span><i style="border-color:${C.s4}"></i>Wahrscheinlichkeit<b>${H.prob[i] == null ? '–' : nf(H.prob[i], 0) + ' %'}</b></span><span class="d">${fmtDate(ds[i])}</span>`; };
+      lg.innerHTML = `<span><i style="border-color:${C.s1}"></i>${esc(T.name)}<b>${nf(H.price[i], 0)}</b></span><span><i style="border-color:${C.s3}"></i>Rang<b>${nf(RK(T, H.score[i]), 0)}</b></span><span><i style="border-color:${C.s4}"></i>Wahrscheinlichkeit<b>${H.prob[i] == null ? '–' : nf(H.prob[i], 0) + ' %'}</b></span><span class="d">${fmtDate(ds[i])}</span>`; };
     draw(null);
     const ch = p => draw(p && p.time ? p.time / DAY : null); a.subscribeCrosshairMove(ch); b.subscribeCrosshairMove(ch);
   });
@@ -822,9 +835,9 @@ function secEinschaetzung(m) {
   const g2 = grid(m, 'wide');
   const bt = document.createElement('div'); bt.className = 'card';
   const cur = T.bands.find(b => N.score >= b.lo && N.score < b.hi);
-  bt.innerHTML = `<div class="hd"><div><div class="ttl">Renditen nach Score-Bereich</div><div class="sub">${esc(T.name)}, Monate seit ${T.since.slice(0, 4)}. Kursrendite ohne Dividenden, Median.</div></div></div>
-    <table class="t" style="margin-top:6px"><tr><th>Score</th><th>Monate</th><th>Rückgang ≥ ${Math.round(T.crash * 100)} % im 1. J.</th><th>tiefster Stand im 1. J.</th><th>1 J.</th><th>im Plus</th><th>schlechtester 1 J.</th><th>3 J. p.a.</th><th>5 J. p.a.</th></tr>
-    ${T.bands.map(b => `<tr class="${b === cur ? 'hl' : ''}"><td>${b.band}${b === cur ? ' ◀' : ''}</td><td>${b.n}</td><td>${riskCell(b.crash12)}</td><td>${fmtPct(b.dd12)}</td><td>${fmtPct(b.f12)}</td><td>${b.pos12 == null ? '–' : nf(b.pos12, 0) + ' %'}</td><td>${fmtPct(b.worst12, 0)}</td><td>${fmtPct(b.f36)}</td><td>${fmtPct(b.f60)}</td></tr>`).join('')}
+  bt.innerHTML = `<div class="hd"><div><div class="ttl">Renditen nach Rang-Bereich</div><div class="sub">${esc(T.name)}, Monate seit ${T.since.slice(0, 4)}. Kursrendite ohne Dividenden, Median.</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th>Rang</th><th>Monate</th><th>Rückgang ≥ ${Math.round(T.crash * 100)} % im 1. J.</th><th>tiefster Stand im 1. J.</th><th>1 J.</th><th>im Plus</th><th>schlechtester 1 J.</th><th>3 J. p.a.</th><th>5 J. p.a.</th></tr>
+    ${T.bands.map(b => `<tr class="${b === cur ? 'hl' : ''}"><td>${b.rlo != null ? b.rlo + '–' + b.rhi : b.band}${b === cur ? ' ◀' : ''}</td><td>${b.n}</td><td>${riskCell(b.crash12)}</td><td>${fmtPct(b.dd12)}</td><td>${fmtPct(b.f12)}</td><td>${b.pos12 == null ? '–' : nf(b.pos12, 0) + ' %'}</td><td>${fmtPct(b.worst12, 0)}</td><td>${fmtPct(b.f36)}</td><td>${fmtPct(b.f60)}</td></tr>`).join('')}
     <tr><td class="mut">alle Monate</td><td class="mut"></td><td>${T.base.crash12} %</td><td>${fmtPct(T.base.dd12)}</td><td>${fmtPct(T.base.f12)}</td><td>${nf(T.base.pos12, 0)} %</td><td></td><td>${fmtPct(T.base.f36)}</td><td></td></tr></table>
     <div class="note">Lesart: Die Spalte „Rückgang“ zeigt, wie oft es nach einem Monat in diesem Bereich innerhalb eines Jahres mindestens ${Math.round(T.crash * 100)} % nach unten ging (Monatsschlusskurse). „Tiefster Stand“ = wie weit es im Median zwischenzeitlich fiel.</div>`;
   g2.appendChild(bt);
@@ -843,7 +856,7 @@ function secEinschaetzung(m) {
   const S3 = T.strategies; const SM = T.strat_months;
   const y0 = +SM[0].slice(0, 4), y1 = +SM[SM.length - 1].slice(0, 4);
   const presets = [1990, 2000, 2008, 2010, 2020].filter(y => y > y0 && y < y1);
-  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, wöchentlich angepasst (Entscheidung am Freitag, gilt ab Montag), nicht investiertes Geld im Geldmarkt. Mit ETF-Gebühr (0,2 % p.a., gehebelt 0,6 % + Finanzierung), ohne Dividenden, Steuern und Handelskosten. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
+  st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, monatlich angepasst (Entscheidung am letzten Handelstag, gilt ab dem nächsten Monat), nicht investiertes Geld im Geldmarkt. Mit ETF-Gebühr (0,2 % p.a., gehebelt 0,6 % + Finanzierung), ohne Dividenden, Steuern und Handelskosten. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
     <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span>${S3[0].eq2 ? '<span class="lev"><span class="mut">ETF:</span><button data-l="1" class="on">normal</button><button data-l="2">2x gehebelt</button></span>' : ''}</div>
     <div class="legend" id="slg"></div><div class="chart tall"></div>
     <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th></tr>
@@ -1002,12 +1015,12 @@ function updateLive() {
   const M = DATA && DATA.model; if (!M || !M.targets || SECTION !== 'einschaetzung') return;
   for (const [k, T] of Object.entries(M.targets)) {
     const r = liveModel(T); if (!r) continue;
-    const sc = Math.round(r.score), lb = labelOf(sc);
-    const e1 = document.getElementById('ov-s-' + k); if (e1) e1.textContent = sc;
+    const sc = Math.round(r.score), lb = labelOf(sc), rkv = RK(T, r.score);
+    const e1 = document.getElementById('ov-s-' + k); if (e1) e1.textContent = rkv;
     const e2 = document.getElementById('ov-l-' + k); if (e2) e2.innerHTML = `<span class="badge ${lb[1]}">${lb[0]}</span>`;
     const e3 = document.getElementById('ov-p-' + k); if (e3 && r.prob != null) e3.innerHTML = riskCell(Math.round(r.prob)) + (T.prob && T.prob.pooled ? '<span class="mut">¹</span>' : '');
     if (k === TGT) {
-      const h = document.getElementById('hs-score'); if (h) h.textContent = sc;
+      const h = document.getElementById('hs-score'); if (h) h.textContent = rkv;
       const hb = document.getElementById('hs-badge'); if (hb) hb.innerHTML = `<span class="badge ${lb[1]}">${lb[0]}</span>`;
       const ha = document.getElementById('hs-action'); if (ha) ha.textContent = lb[2];
       const hp = document.getElementById('hs-prob'); if (hp && r.prob != null) hp.textContent = Math.round(r.prob) + ' %';
@@ -1047,13 +1060,13 @@ function planState(P, M, liveScore) {
   const r = { T, inv, done, rest, boughtM, sig, mOut, elapsed, left, sc, base, due: 0, kind: '', head: '', why: '' };
   if (rest <= 1) { r.kind = 'done'; r.head = 'Plan erfüllt – alles angelegt'; r.why = 'Ab jetzt entscheidet nur noch der Signale-Reiter, ob du draußen bleibst oder wieder einsteigst.'; return r; }
   if (sig === 0) { r.kind = 'pause'; r.head = 'Pause: Ausstiegssignal aktiv'; r.why = `Der Signale-Reiter steht für ${esc(T.name)} auf „draußen“. Solange das so ist, wird nichts angelegt – die Frist verlängert sich um jeden solchen Monat.`; return r; }
-  if (sc >= 55) { r.kind = 'all'; r.due = rest; r.head = 'Rest jetzt anlegen'; r.why = `Score ${sc} liegt bei 55 oder darüber: Das Crash-Risiko ist unterdurchschnittlich – historisch war es dann am besten, den Rest auf einmal anzulegen.`; return r; }
+  if (sc >= 55) { r.kind = 'all'; r.due = rest; r.head = 'Rest jetzt anlegen'; r.why = `Rang ${RK(T, sc)} (Score ${sc}) liegt im günstigen Bereich (ab Rang ${RK(T, 55)}): Das Crash-Risiko ist unterdurchschnittlich – historisch war es dann am besten, den Rest auf einmal anzulegen.`; return r; }
   if (left <= 1) { r.kind = 'all'; r.due = rest; r.head = 'Frist erreicht – Rest anlegen'; r.why = `Die ${P.max || 24}-Monats-Frist ist erreicht. Länger zu warten hat historisch mehr gekostet als genützt.`; return r; }
-  if (sc < 45) { r.kind = 'pause'; r.head = 'Pause: Score unter 45'; r.why = `Score ${sc}: erhöhtes Crash-Risiko. Diesen Monat nichts anlegen – noch ${left} Monate bis zur Frist, danach wird der Rest in jedem Fall angelegt.`; return r; }
+  if (sc < 45) { r.kind = 'pause'; r.head = `Pause: Rang unter ${RK(T, 45)}`; r.why = `Rang ${RK(T, sc)}: erhöhtes Crash-Risiko. Diesen Monat nichts anlegen – noch ${left} Monate bis zur Frist, danach wird der Rest in jedem Fall angelegt.`; return r; }
   const target = Math.max(base, rest / left);
   r.due = Math.max(0, Math.min(rest, target - boughtM)); r.kind = r.due > 1 ? 'rate' : 'wait';
   r.head = r.kind === 'rate' ? 'Monatsrate anlegen' : 'Rate für diesen Monat erledigt';
-  r.why = `Score ${sc} (45–55): normales Umfeld – in Raten. Ziel diesen Monat ${eur(target)}${target > base + 1 ? ' (etwas mehr als ein Zwölftel, damit die Frist reicht)' : ' (ein Zwölftel)'}, davon schon ${eur(boughtM)} angelegt.`;
+  r.why = `Rang ${RK(T, sc)} (Bereich ${RK(T, 45)}–${RK(T, 55)}): normales Umfeld – in Raten. Ziel diesen Monat ${eur(target)}${target > base + 1 ? ' (etwas mehr als ein Zwölftel, damit die Frist reicht)' : ' (ein Zwölftel)'}, davon schon ${eur(boughtM)} angelegt.`;
   return r;
 }
 // Linien-Anteil: wartet auf die 200-Wochen-Linie (≈ 1000 Börsentage), höchstens lineMax Monate, danach in Raten
@@ -1082,9 +1095,10 @@ function lineState(P, M) {
 function planLiveHint(P, M, liveScore, st) {
   if (liveScore == null || st.kind === 'done' || st.sig === 0) return '';
   const zone = s => s >= 55 ? 'all' : s < 45 ? 'pause' : 'rate'; const a = zone(st.sc), b = zone(Math.round(liveScore));
-  if (a === b) return `<span class="mut">Live-Score ${Math.round(liveScore)} – keine Änderung absehbar.</span>`;
+  const TT = M.targets[P.target] || M.targets.world;
+  if (a === b) return `<span class="mut">Live-Rang ${RK(TT, liveScore)} – keine Änderung absehbar.</span>`;
   const txt = { all: 'dann wäre morgen der Rest dran', pause: 'dann wäre morgen Pause', rate: 'dann gälte morgen wieder die Monatsrate' }[b];
-  return `<span style="color:var(--warn)">Live-Score ${Math.round(liveScore)}: Hält das bis Börsenschluss, ${txt}. Entschieden wird mit dem Schlusswert.</span>`;
+  return `<span style="color:var(--warn)">Live-Rang ${RK(TT, liveScore)}: Hält das bis Börsenschluss, ${txt}. Entschieden wird mit dem Schlusswert.</span>`;
 }
 function planCard(m, M) {
   sect(m, 'Dein Einstiegsplan');
@@ -1097,7 +1111,7 @@ function drawPlan(c, M) {
   if (!PLAN || c.dataset.edit === '1') {
     const P = PLAN || Object.assign({}, PLAN_DEF, { start: ymd(new Date()) });
     c.innerHTML = `<div class="hd"><div><div class="ttl">${PLAN ? 'Plan bearbeiten' : 'Einstiegsplan anlegen'}</div>
-      <div class="sub">Für einen größeren Betrag, der nach und nach in den Markt soll. Die Regel kommt aus dem Test seit 1953: Score ab 55 → Rest sofort, 45–55 → Monatsraten, unter 45 → Pause, Ausstiegssignal aktiv → Pause; spätestens nach der Frist ist alles angelegt.</div></div></div>
+      <div class="sub">Für einen größeren Betrag, der nach und nach in den Markt soll. Die Regel kommt aus dem Test seit 1953: günstige Lage (Rang ab etwa 43) → Rest sofort, mittlere Lage → Monatsraten, erhöhtes Risiko (Rang unter etwa 18) → Pause, Ausstiegssignal aktiv → Pause; spätestens nach der Frist ist alles angelegt.</div></div></div>
       <div class="pform">
         <label>Gesamtbetrag (€)<input id="pf-a" type="number" step="1000" value="${P.amount}"></label>
         <label>davon Reserve, wird nicht angelegt (€)<input id="pf-r" type="number" step="1000" value="${P.reserve || 0}"></label>
@@ -1180,9 +1194,9 @@ function analogSection(m, T) {
       <div><div class="lbl">Rückgang ≥ ${Math.round(T.crash * 100)} % im 1. Jahr</div><div class="big" style="font-size:22px">${riskCell(A.crash12)}</div><div class="mut" style="font-size:11px">normal: ${A.crash_base} %</div></div>
     </div>
     <div class="legend" id="alg"></div><div class="chart tall" id="ach"></div>
-    <table class="t ana" style="margin-top:10px"><tr><th>Monat</th><th>Ähnlichkeit</th><th>Score</th>${Object.keys(PN).map(k => `<th>${PN[k]}</th>`).join('')}<th>6 M.</th><th>12 M.</th><th>24 M.</th><th>tiefster Stand 12 M.</th><th>24 M.</th></tr>
-    <tr class="hl"><td>heute</td><td></td><td>${T.now.score}</td>${Object.keys(PN).map(k => `<td>${NOWP[k] ?? '–'}</td>`).join('')}<td colspan="5" class="mut" style="font-family:inherit">?</td></tr>
-    ${A.items.map((a, i) => `<tr class="row" data-i="${i}"><td><i class="sw" style="background:${SER[i % 8]}"></i>${esc(a.name)}</td><td>${a.sim} %</td><td>${a.score}</td>${Object.keys(PN).map(k => `<td>${a.pillars[k] ?? '–'}</td>`).join('')}<td>${fmtPct(a.f6)}</td><td>${fmtPct(a.f12)}</td><td>${fmtPct(a.f24)}</td><td>${fmtPct(a.dd12)}</td><td>${fmtPct(a.dd24)}</td></tr>`).join('')}</table>
+    <table class="t ana" style="margin-top:10px"><tr><th>Monat</th><th>Ähnlichkeit</th><th>Rang</th>${Object.keys(PN).map(k => `<th>${PN[k]}</th>`).join('')}<th>6 M.</th><th>12 M.</th><th>24 M.</th><th>tiefster Stand 12 M.</th><th>24 M.</th></tr>
+    <tr class="hl"><td>heute</td><td></td><td>${RK(T, T.now.score)}</td>${Object.keys(PN).map(k => `<td>${NOWP[k] ?? '–'}</td>`).join('')}<td colspan="5" class="mut" style="font-family:inherit">?</td></tr>
+    ${A.items.map((a, i) => `<tr class="row" data-i="${i}"><td><i class="sw" style="background:${SER[i % 8]}"></i>${esc(a.name)}</td><td>${a.sim} %</td><td>${RK(T, a.score)}</td>${Object.keys(PN).map(k => `<td>${a.pillars[k] ?? '–'}</td>`).join('')}<td>${fmtPct(a.f6)}</td><td>${fmtPct(a.f12)}</td><td>${fmtPct(a.f24)}</td><td>${fmtPct(a.dd12)}</td><td>${fmtPct(a.dd24)}</td></tr>`).join('')}</table>
     <div class="note">Säulenwerte 0–100, 50 = neutral. Eine Analogie ist kein Fahrplan: Ähnliche Ausgangslagen entwickelten sich oft sehr unterschiedlich – entscheidend ist die Streuung, nicht der Durchschnitt. Klick auf eine Zeile hebt ihren Verlauf hervor.</div>`;
   m.appendChild(c);
   queueMicrotask(() => {
@@ -1251,27 +1265,27 @@ function secSignale(m) {
   head(m, 'Signale', 'Klare Ein- und Ausstiegssignale statt Score. Sicherheit hat Vorrang: raus erst bei Bestätigung, wieder rein bewusst spät. Die Regel wird jedes Jahr neu festgelegt – nur mit den jeweils letzten 35 Jahren S&P 500 – und gilt dann unverändert für dieses Jahr. Alles ab 1990 ist damit ein echter Vorwärtstest.');
   if (!M || !M.signal_params || !M.targets) { m.insertAdjacentHTML('beforeend', '<div class="card"><div class="note">Signale werden mit der nächsten Datenaktualisierung berechnet.</div></div>'); return; }
   if (!M.targets[TGT] || !M.targets[TGT].signals || M.targets[TGT].signals.error) TGT = 'world';
-  const Pp = M.signal_params, Cal = M.signal_cal || {};
-  const rule = `<b>Aussteigen</b>, wenn der Score an ${Pp.exit_n} Börsentagen in Folge unter ${Pp.exit_s} liegt${Pp.exit_trend ? ' und der Kurs unter seiner 10-Monats-Linie' : ''}. <b>Wieder einsteigen</b>, wenn der Score an ${Pp.entry_n} Börsentagen in Folge mindestens ${Pp.entry_s} erreicht und der Kurs über seiner 10-Monats-Linie liegt. Nach jedem Wechsel mindestens 20 Börsentage Pause.`;
+  const Pp = M.signal_params, Cal = M.signal_cal || {}; const TR = M.targets[TGT] || M.targets.world;
+  const rule = `<b>Aussteigen</b>, wenn der Rang an ${Pp.exit_n} Börsentagen in Folge unter ${RK(TR, Pp.exit_s)} liegt (Score ${Pp.exit_s})${Pp.exit_trend ? ' und der Kurs unter seiner 10-Monats-Linie' : ''}. <b>Wieder einsteigen</b>, wenn der Rang an ${Pp.entry_n} Börsentagen in Folge mindestens ${RK(TR, Pp.entry_s)} erreicht (Score ${Pp.entry_s}) und der Kurs über seiner 10-Monats-Linie liegt. Nach jedem Wechsel mindestens 20 Börsentage Pause.`;
   const rc = document.createElement('div'); rc.className = 'card full';
   rc.innerHTML = `<div class="hd"><div><div class="ttl">Die Regel</div><div class="sub">${rule}</div></div></div>
     <div class="note">Aktuelle Regel, ausgewählt aus ${Cal.n_tested || '–'} Varianten mit dem S&P 500 ${Cal.from ? Cal.from.slice(0, 4) : ''}–${Cal.to ? Cal.to.slice(0, 4) : ''}: kleinster größter Verlust bei höchstens 2,5 Ausstiegen pro Jahrzehnt und höchstens 1 Prozentpunkt weniger Rendite als Kaufen und Halten.</div>
     ${M.signal_roll ? `<details class="roll"><summary>Wie sich die Regel über die Jahre verändert hat</summary><table class="t" style="margin-top:6px"><tr><th>gültig</th><th>gelernt aus</th><th>Ausstieg</th><th>Wiedereinstieg</th></tr>${(() => {
       const ks = Object.keys(M.signal_roll).sort(); const rows = []; let cur = null;
       ks.forEach(k => { const p = M.signal_roll[k].p; const sig_ = JSON.stringify(p); if (!cur || cur.sig !== sig_) { cur = { sig: sig_, a: k, b: k, p, from: M.signal_roll[k].from }; rows.push(cur); } else cur.b = k; });
-      return rows.map(r => `<tr><td>${r.a}${r.b !== r.a ? '–' + r.b : ''}</td><td class="mut">35 Jahre davor</td><td>Score &lt; ${r.p.exit_s}, ${r.p.exit_n} Tage${r.p.exit_trend ? ' + unter Linie' : ''}</td><td>Score ≥ ${r.p.entry_s}, ${r.p.entry_n} Tage + über Linie</td></tr>`).join(''); })()}</table></details>` : ''}</div>`;
+      return rows.map(r => `<tr><td>${r.a}${r.b !== r.a ? '–' + r.b : ''}</td><td class="mut">35 Jahre davor</td><td>Rang &lt; ${RK(TR, r.p.exit_s)}, ${r.p.exit_n} Tage${r.p.exit_trend ? ' + unter Linie' : ''}</td><td>Rang ≥ ${RK(TR, r.p.entry_s)}, ${r.p.entry_n} Tage + über Linie</td></tr>`).join(''); })()}</table></details>` : ''}</div>`;
   m.appendChild(rc);
 
   const ov = document.createElement('div'); ov.className = 'card full';
-  const condTxt = (S) => S.state === 1
-    ? `Ausstieg erst nach ${S.need} Tagen Score &lt; ${Pp.exit_s}${Pp.exit_trend ? ' + Kurs unter Linie' : ''} – erfüllt seit ${S.run} Tagen`
-    : `Wiedereinstieg erst nach ${S.need} Tagen Score ≥ ${Pp.entry_s} + Kurs über Linie – erfüllt seit ${S.run} Tagen`;
+  const condTxt = (S, T_) => S.state === 1
+    ? `Raus: ${S.need} T. Rang &lt; ${Math.max(1, RK(T_, Pp.exit_s))}${Pp.exit_trend ? ' &amp; unter Linie' : ''}<br>erfüllt: ${S.run} von ${S.need} T.`
+    : `Rein: ${S.need} T. Rang ≥ ${RK(T_, Pp.entry_s)} &amp; über Linie<br>erfüllt: ${S.run} von ${S.need} T.`;
   ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes</div><div class="sub">Stand nach dem letzten Tagesschluss. Kennzahlen ab 1990 – jedes Jahr mit der Regel, die damals aus den 35 Jahren davor festgelegt worden wäre. Klick auf eine Zeile zeigt Details.</div></div></div>
-    <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Signal</th><th>seit</th><th>Score</th><th>Bedingung</th><th>Rendite p.a.<br>Signal / Halten</th><th>größter Verlust<br>Signal / Halten</th><th>Ausstiege<br>pro Jahrzehnt</th><th>davon<br>teurer zurück</th></tr>
+    <table class="t ov" style="margin-top:6px"><tr><th>Index</th><th>Signal</th><th>seit</th><th>Rang</th><th>Bedingung</th><th>Rendite p.a.<br>Signal / Halten</th><th>größter Verlust<br>Signal / Halten</th><th>Ausstiege<br>pro Jahrzehnt</th><th>davon<br>teurer zurück</th></tr>
     ${Object.entries(M.targets).filter(([k, t]) => t.signals && !t.signals.error).map(([k, t]) => { const S = t.signals, O = S.oos || S.all;
       return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td>
       <td style="font-family:inherit">${S.state === 1 ? '<span class="badge good">Investiert</span>' : '<span class="badge crit">Draußen</span>'}</td>
-      <td>${fmtDate(monthDay(S.since))}</td><td>${S.score}</td><td style="font-family:inherit;white-space:normal;font-size:11.5px;color:var(--sec);max-width:260px">${condTxt(S)}</td>
+      <td>${fmtDate(monthDay(S.since))}</td><td>${RK(t, S.score)}</td><td style="font-family:inherit;white-space:nowrap;font-size:11.5px;color:var(--sec);text-align:left">${condTxt(S, t)}</td>
       <td>${fmtPct(O.cagr)} / ${fmtPct(O.bh_cagr)}</td><td>${fmtPct(O.mdd, 0)} / ${fmtPct(O.bh_mdd, 0)}</td><td>${nf(O.per_decade ?? 0, 1)}</td>
       <td>${S.false} von ${S.false + S.useful}</td></tr>`; }).join('')}</table>
     <div class="note">„Teurer zurück“ = Ausstieg, nach dem der Wiedereinstieg teurer war als der Ausstieg – echte Fehlalarme, aber auch richtige Ausstiege mit spätem Wiedereinstieg (z. B. 2020). Das Signal wird mit den Tagesdaten der Pipeline berechnet (alle 30 Minuten während der US-Handelszeit), nicht mit jedem Live-Kurs – ein Wechsel braucht ohnehin mehrere Tage Bestätigung.</div>`;

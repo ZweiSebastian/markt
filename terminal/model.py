@@ -50,6 +50,8 @@ TARGETS = {
 BANDS = [(0, 35, "unter 35"), (35, 45, "35–45"), (45, 55, "45–55"), (55, 65, "55–65"), (65, 101, "ab 65")]
 CRASH = 0.15
 PROB_MODE = "score"
+STRAT_FREQ = "M"       # Entscheidungsrhythmus der Regeln im Test: letzter Handelstag des Monats (getestet: besser als wöchentlich)
+TREND_N = 210          # Trendlinie in Börsentagen (210 ≈ 10 Monate)
 # Ungefähre Dividendenrendite p.a. für die 2x-Rechnung (Kursindizes); DAX und MSCI World in Euro enthalten Dividenden bereits
 DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut": 0.014, "sx5e": 0.033, "dax": 0.0, "nikkei": 0.018, "em": 0.026}
 PROB_LAM = 1.0
@@ -452,7 +454,7 @@ def run(ser, markt, now, quality=None, prev=None):
             comp_sentiment(C, us=False)
 
         # Preisbasierte Komponenten (live in der App nachgerechnet)
-        sma210 = P.rolling(210, min_periods=210).mean()
+        sma210 = P.rolling(TREND_N, min_periods=TREND_N).mean()
         d10 = P / sma210 - 1
         C["sma10"] = ("trend", f"{tname} ggü. 10-Monats-Linie", clip(d10 / 0.05), d10 * 100, lambda v: f"{v:+.1f} %")
         mom = P / P.shift(Y) - 1 - tbill.fillna(0) / 100
@@ -499,13 +501,17 @@ def run(ser, markt, now, quality=None, prev=None):
         df = pd.DataFrame({"s": score[me], "f12": fut[Y][me], "f36": (1 + fut[3 * Y][me]) ** (1 / 3) - 1, "f60": (1 + fut[5 * Y][me]) ** (1 / 5) - 1,
                            "dd": fmin[me]})
         crash_base = float((df.dd.dropna() <= -CRASH).mean() * 100)
+        # Rang 0–100: Anteil aller bisherigen Tage mit niedrigerem Score (nur zur Anzeige; Regeln rechnen mit dem Score)
+        smap = np.nanpercentile(score.dropna().values, np.arange(101))
+        def rk(v):
+            return int(round(float(np.interp(v, smap, np.arange(101)))))
         bands = []
         for lo, hi, name in BANDS:
             g = df[(df.s >= lo) & (df.s < hi)]
             g12 = g.dropna(subset=["f12"])
             gd = g.dropna(subset=["dd"])
             bands.append({
-                "band": name, "lo": lo, "hi": hi, "n": int(len(gd)), "share": round(len(g) / max(1, len(df)) * 100, 1),
+                "band": name, "lo": lo, "hi": hi, "rlo": rk(lo), "rhi": rk(min(hi, 100)), "n": int(len(gd)), "share": round(len(g) / max(1, len(df)) * 100, 1),
                 "f12": None if not len(g12) else round(float(g12.f12.median() * 100), 1),
                 "pos12": None if not len(g12) else round(float((g12.f12 > 0).mean() * 100), 0),
                 "worst12": None if not len(g12) else round(float(g12.f12.min() * 100), 0),
@@ -571,15 +577,15 @@ def run(ser, markt, now, quality=None, prev=None):
         w_now = coefs.get(today.year)
         prob_now = None if pd.isna(prob.get(last_i)) else round(float(prob[last_i]) * 100, 0)
 
-        # ---------- Regeln im Test (wöchentlich angepasst, Entscheidung mit dem Score vom Vortag)
+        # ---------- Regeln im Test (monatlich angepasst, Entscheidung mit dem Score vom letzten Handelstag)
         r = P / P.shift(1) - 1
         cash = (tbill.ffill() / 100 / Y)
         sidx = score.dropna().index
 
         def weekly_hold(expo):
             e = expo.copy()
-            # Entscheidung am letzten Handelstag der Woche, gilt die ganze folgende Woche
-            wk = e.where(e.index.isin(e.groupby(e.index.to_period("W-FRI")).tail(1).index)).ffill()
+            # Entscheidung am letzten Handelstag der Periode, gilt die ganze folgende Periode
+            wk = e.where(e.index.isin(e.groupby(e.index.to_period(STRAT_FREQ)).tail(1).index)).ffill()
             return wk.shift(1)
 
         def strat(expo):
@@ -606,8 +612,8 @@ def run(ser, markt, now, quality=None, prev=None):
         sched = {
             "bh": ("Kaufen und halten", "immer 100 % investiert", pd.Series(1.0, index=days)),
             "trend": ("Trendregel 10 Monate", "investiert, wenn der Kurs über seiner 10-Monats-Linie liegt, sonst Geldmarkt", (P > sma210).astype(float)),
-            "score": ("Modell-Quote", "Score 50 = 50 % investiert, ab 65 = 100 %, bis 35 = 0 %; Rest Geldmarkt", ((score - 50) / 30 + 0.5).clip(0, 1)),
-            "schutz": ("Schutzregel", "voll investiert, außer der Score fällt: unter 45 nur 50 %, unter 35 raus",
+            "score": ("Modell-Quote", f"Rang {rk(50)} = 50 % investiert, ab Rang {rk(65)} = 100 %, bis Rang {rk(35)} = 0 %, dazwischen fließend; Rest Geldmarkt", ((score - 50) / 30 + 0.5).clip(0, 1)),
+            "schutz": ("Schutzregel", f"voll investiert, außer der Rang fällt: unter {rk(45)} nur 50 %, unter {rk(35)} raus",
                        pd.Series(np.select([score >= 45, score >= 35], [1.0, 0.5], 0.0), index=days).where(score.notna())),
         }
         strategies, eqs = [], {}
@@ -765,7 +771,7 @@ def run(ser, markt, now, quality=None, prev=None):
             return "stark positiv" if s >= 70 else "positiv" if s >= 58 else "neutral" if s > 42 else "negativ" if s > 30 else "stark negativ"
         pos = [x for x in pil_now if x["score"] is not None and x["score"] >= 58]
         neg = [x for x in pil_now if x["score"] is not None and x["score"] <= 42]
-        sent = [f"{tname}: Score {now_score:.0f} von 100 ({lab[0]})" + (f", Wahrscheinlichkeit für einen Rückgang von mindestens {CRASH * 100:.0f} % in den nächsten 12 Monaten {prob_now:.0f} % (im Schnitt {crash_base:.0f} %)." if prob_now is not None else ".")]
+        sent = [f"{tname}: Rang {rk(now_score)} von 100 ({lab[0]}) – die Lage ist günstiger als an {rk(now_score)} % aller Tage seit {first.year}" + (f", Wahrscheinlichkeit für einen Rückgang von mindestens {CRASH * 100:.0f} % in den nächsten 12 Monaten {prob_now:.0f} % (im Schnitt {crash_base:.0f} %)." if prob_now is not None else ".")]
         if pos:
             sent.append("Dafür spricht: " + ", ".join(f"{x['name']} ({word(x['score'])})" for x in pos) + ".")
         if neg:
@@ -775,14 +781,14 @@ def run(ser, markt, now, quality=None, prev=None):
                         f"stand der Index ein Jahr später im Median {ana['f12']:+.1f} %; in {ana['crash12']} % kam es zu einem Rückgang von mindestens {CRASH * 100:.0f} %.")
         cb = [x for x in bands if x["n"]]
         if cb:
-            sent.append(f"Je niedriger der Score, desto häufiger folgte ein Rückgang von {CRASH * 100:.0f} % oder mehr ("
-                        + "; ".join(f"{x['band']}: {x['crash12']:.0f} %" for x in cb) + ").")
+            sent.append(f"Je niedriger der Rang, desto häufiger folgte ein Rückgang von {CRASH * 100:.0f} % oder mehr ("
+                        + "; ".join(f"Rang {x['rlo']}–{x['rhi']}: {x['crash12']:.0f} %" for x in cb) + ").")
         if skill is not None:
             sent.append(f"Die Wahrscheinlichkeit wurde Jahr für Jahr nur mit damals bekannten Daten berechnet und ist "
                         + ("besser als der bloße Durchschnitt" if skill > 0 else "nicht besser als der bloße Durchschnitt")
                         + f" (Brier-Skill {skill:+.0f} %).")
         if episodes:
-            sent.append(f"Von den {len(episodes)} Einbrüchen von mindestens {EPISODE * 100:.0f} % seit {first.year} zeigte der Score bei {len(warned)} spätestens bis zum Tief Gegenwind.")
+            sent.append(f"Von den {len(episodes)} Einbrüchen von mindestens {EPISODE * 100:.0f} % seit {first.year} zeigte das Modell bei {len(warned)} spätestens bis zum Tief Gegenwind.")
         sb = next(x for x in strategies if x["id"] == "bh")
         ss = next(x for x in strategies if x["id"] == "score")
         sent.append(f"Als Regel (Modell-Quote): {ss['cagr']:+.1f} % p.a. bei höchstens {ss['mdd']:.0f} % Verlust – Kaufen und Halten: {sb['cagr']:+.1f} % p.a. bei {sb['mdd']:.0f} %.")
@@ -815,7 +821,7 @@ def run(ser, markt, now, quality=None, prev=None):
             "name": tname, "region": region, "sid": sid,
             "now": {"score": int(now_score), "day": str(last_i.date()), "month": str(last_i.date())[:7], "label": lab[0], "cls": lab[1],
                     "action": lab[2], "pillars": pil_now, "text": sent, "risk": risk},
-            "hist": hist, "bands": bands, "base": base, "rank": rank, "since": str(first.date()),
+            "hist": hist, "bands": bands, "base": base, "rank": rank, "since": str(first.date()), "smap": [round(float(v), 2) for v in smap],
             "strategies": strategies, "strat_months": strat_months, "episodes": episodes, "analogs": ana,
             "prob": {"now": prob_now, "calib": calib, "pooled": bool(use_pool), "brier": None if brier is None else round(brier, 4),
                      "brier_ref": None if brier_ref is None else round(brier_ref, 4), "skill": skill,
