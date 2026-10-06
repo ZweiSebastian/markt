@@ -11,14 +11,8 @@ jobs:
     steps:
       - run: |
           set +e; mkdir out && cd out
-          for s in PCOPP PGOLD; do curl -sSL -m 90 -o imf_$s.json "https://api.db.nomics.world/v22/series/IMF/PCPS/M.W00.$s.USD?observations=1&format=json"; done
-          for s in FL154190005 FA086902005 FA106130001 FA316130001; do curl -sSL -m 90 -o z_$s.json "https://api.db.nomics.world/v22/series/FED/Z1/$s.Q?observations=1&format=json"; done
-          curl -sSL -m 90 -o bea_t30200.json "https://api.db.nomics.world/v22/series/BEA/NIPA-T30200?observations=1&format=json&limit=80"
-          curl -sSL -m 90 -o s_sent.json "https://api.db.nomics.world/v22/search?q=consumer%20sentiment&limit=20"
-          curl -sSL -m 90 -o s_lab.json "https://api.db.nomics.world/v22/search?q=labor%20share&limit=20"
-          for y in 1947 1957 1967 1977 1987 1997 2007 2017; do e=$((y+9)); curl -sSL -m 60 -o bls_$y.json "https://api.bls.gov/publicAPI/v1/timeseries/data/PRS85006173?startyear=$y&endyear=$e"; sleep 2; done
-          curl -sSL -m 60 -A "Mozilla/5.0" -o umich.csv "https://www.sca.isr.umich.edu/files/tbmics.csv"
+          curl -sSL -m 90 -o bea_t11400.json "https://api.db.nomics.world/v22/series/BEA/NIPA-T11400?observations=1&format=json&limit=100"
           ls -la > files.txt 2>&1; set -e
-          git init -q -b research-r2
+          git init -q -b research-r2b
           git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
-          git add . && git commit -q -m r2 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r2
+          git add . && git commit -q -m r2 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r2b
