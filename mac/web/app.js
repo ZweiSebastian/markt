@@ -1036,7 +1036,7 @@ function liveModel(T) {
   if (!den) return null;
   const tot = num / den; const t = tot / L.sd;
   const score = Math.max(0, Math.min(100, 50 + 15 * t));
-  const prob = L.coef ? 100 / (1 + Math.exp(-(L.coef[0] + L.coef[1] * t))) : null;
+  const prob = L.coef ? 100 / (1 + Math.exp(-(L.coef[0] + L.coef[1] * t + (L.coef.length > 2 && L.px != null ? L.coef[2] * L.px : 0)))) : null;
   return { score, prob, day: dNow };
 }
 function labelOf(sc) { return sc >= 65 ? ['Rückenwind', 'good', 'Kaufen – auch größere Beträge'] : sc >= 45 ? ['Neutral', 'neutral', 'Normal investieren (Sparplan oder in Raten)'] : sc >= 35 ? ['Gegenwind', 'warn', 'Nur in Raten investieren, keine großen Einmalbeträge'] : ['Gefahrenzone', 'crit', 'Abwarten – historisch folgten hier meist Verluste']; }
