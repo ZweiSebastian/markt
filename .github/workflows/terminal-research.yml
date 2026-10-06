@@ -1,0 +1,23 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e; mkdir out && cd out
+          for s in LM153064105 LM153064205 FL154090005 FL153034005 FL153020005 FL153030005 LM893064105 FL894104005; do curl -sSL -m 90 -o z_$s.json "https://api.db.nomics.world/v22/series/FED/Z1/$s.Q?observations=1&format=json"; done
+          curl -sSL -m 90 -o s_save.json "https://api.db.nomics.world/v22/search?q=personal%20saving%20rate&limit=20"
+          curl -sSL -m 90 -o s_cc.json "https://api.db.nomics.world/v22/search?q=charge-off%20credit%20card&limit=20"
+          curl -sSL -m 90 -o s_ccd.json "https://api.db.nomics.world/v22/search?q=delinquency%20credit%20cards&limit=20"
+          for u in IPO-Statistics.pdf IPOs-monthly.xlsx Number-of-IPOs-by-month.xlsx IPOALL_2024.xlsx IPO-monthly.xls; do curl -sSL -m 60 -A "Mozilla/5.0" -o "r_$u" "https://site.warrington.ufl.edu/ritter/files/$u"; done
+          curl -sSL -m 60 -A "Mozilla/5.0" -o r_page.html "https://site.warrington.ufl.edu/ritter/ipo-data/"
+          ls -la > files.txt 2>&1; set -e
+          git init -q -b research-r1
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m r1 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r1
