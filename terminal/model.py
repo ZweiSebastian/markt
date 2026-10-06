@@ -58,6 +58,10 @@ PROB_LAM = 1.0
 FBUY_MODE = "on"      # Auslandskäufe US-Aktien in der Säule Stimmung
 FBUY_ALL = False
 FBUY_DIV = 2.0
+# Rang 0–100 auf einer gemeinsamen Skala für alle Indizes: Perzentile der Scores aller 9 Indizes (je Index gleich gewichtet,
+# Stand Okt. 2026, fest – damit bedeutet derselbe Rang überall dasselbe und verschiebt sich nicht mit der Zeit)
+GLOBAL_RANK = True
+GLOBAL_SMAP = [5.8, 22.9, 26.6, 29.5, 31.4, 33.3, 35.2, 36.6, 37.7, 38.69, 39.6, 40.4, 41.2, 41.8, 42.6, 43.2, 43.9, 44.6, 45.1, 45.8, 46.4, 47.0, 47.5, 48.1, 48.6, 49.1, 49.5, 49.97, 50.4, 50.9, 51.3, 51.7, 52.1, 52.6, 53.0, 53.5, 53.8, 54.2, 54.5, 54.9, 55.2, 55.5, 55.9, 56.2, 56.5, 56.8, 57.2, 57.5, 57.8, 58.1, 58.4, 58.6, 58.9, 59.2, 59.44, 59.7, 60.0, 60.2, 60.5, 60.7, 61.0, 61.2, 61.5, 61.7, 62.0, 62.24, 62.5, 62.8, 63.0, 63.3, 63.6, 63.88, 64.1, 64.4, 64.6, 64.9, 65.2, 65.5, 65.8, 66.1, 66.4, 66.7, 67.0, 67.3, 67.6, 68.0, 68.3, 68.6, 68.9, 69.3, 69.7, 70.2, 70.7, 71.4, 72.1, 72.8, 73.8, 75.3, 76.7, 78.6, 87.4]
 G7_CAPE_Z = 1.0     # G7-Zinsanstieg zählt nur bei US-Bewertung über +1σ
 DIR_N = 63             # Richtung des Scores: Veränderung über 3 Monate (63 Börsentage)
 POOL_MIN_YEARS = 40     # kürzere Historien nutzen das am S&P 500 gelernte Modell
@@ -550,7 +554,7 @@ def run(ser, markt, now, quality=None, prev=None):
                            "dd": fmin[me]})
         crash_base = float((df.dd.dropna() <= -CRASH).mean() * 100)
         # Rang 0–100: Anteil aller bisherigen Tage mit niedrigerem Score (nur zur Anzeige; Regeln rechnen mit dem Score)
-        smap = np.nanpercentile(score.dropna().values, np.arange(101))
+        smap = np.array(GLOBAL_SMAP) if GLOBAL_RANK else np.nanpercentile(score.dropna().values, np.arange(101))
         def rk(v):
             return int(round(float(np.interp(v, smap, np.arange(101)))))
         bands = []
@@ -863,7 +867,7 @@ def run(ser, markt, now, quality=None, prev=None):
             return "stark positiv" if s >= 70 else "positiv" if s >= 58 else "neutral" if s > 42 else "negativ" if s > 30 else "stark negativ"
         pos = [x for x in pil_now if x["score"] is not None and x["score"] >= 58]
         neg = [x for x in pil_now if x["score"] is not None and x["score"] <= 42]
-        sent = [f"{tname}: Rang {rk(now_score)} von 100 ({lab[0]}) – die Lage ist günstiger als an {rk(now_score)} % aller Tage seit {first.year}" + (f", Wahrscheinlichkeit für einen Rückgang von mindestens {CRASH * 100:.0f} % in den nächsten 12 Monaten {prob_now:.0f} % (im Schnitt {crash_base:.0f} %)." if prob_now is not None else ".")]
+        sent = [f"{tname}: Rang {rk(now_score)} von 100 ({lab[0]}) – die Lage ist günstiger als an {rk(now_score)} % aller bisherigen Tage (alle 9 Indizes zusammen, gleiche Skala)" + (f", Wahrscheinlichkeit für einen Rückgang von mindestens {CRASH * 100:.0f} % in den nächsten 12 Monaten {prob_now:.0f} % (im Schnitt {crash_base:.0f} %)." if prob_now is not None else ".")]
         if pos:
             sent.append("Dafür spricht: " + ", ".join(f"{x['name']} ({word(x['score'])})" for x in pos) + ".")
         if neg:
