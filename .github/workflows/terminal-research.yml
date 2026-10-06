@@ -11,13 +11,11 @@ jobs:
     steps:
       - run: |
           set +e; mkdir out && cd out
-          for c in USA JPN CAN DEU FRA GBR ITA; do curl -sSL -m 90 -o oecdk_$c.json "https://api.db.nomics.world/v22/series/OECD/DSD_STES@DF_FINMARK/$c.M.IRLT.PA._Z._Z._Z._Z.N?observations=1&format=json"; done
-          curl -sSL -m 90 -o bbk_gold_usd.csv "https://api.statistiken.bundesbank.de/rest/data/BBEX3/D.XAU.USD.EA.AC.C04?format=csv&lang=en"
-          curl -sSL -m 90 -o bbk_gold_eur.csv "https://api.statistiken.bundesbank.de/rest/data/BBEX3/D.XAU.EUR.EA.AC.C04?format=csv&lang=en"
-          curl -sSL -m 90 -o search_gold.json "https://api.db.nomics.world/v22/search?q=gold%20price%20monthly&limit=30"
-          curl -sSL -m 90 -o wb_gold.json "https://api.db.nomics.world/v22/series/WB/commodity_prices/GOLD-1W?observations=1&format=json"
-          curl -sSL -m 90 -o imf_gold.json "https://api.db.nomics.world/v22/series/IMF/PCPS/M.W00.PGOLD.USD?observations=1&format=json"
+          curl -sSL -m 90 -o buba.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3?q=gold&observations=1&format=json&limit=20"
+          curl -sSL -m 90 -o insee.json "https://api.db.nomics.world/v22/series/INSEE/IPPMP?q=or&observations=1&format=json&limit=20"
+          curl -sSL -m 90 -o ifs.json "https://api.db.nomics.world/v22/series/IMF/IFS?q=gold%20price&observations=1&format=json&limit=20"
+          curl -sSL -m 90 -o tgb.json "https://api.db.nomics.world/v22/series/TGB/monthly?observations=1&format=json&limit=20"
           ls -la > files.txt 2>&1; set -e
-          git init -q -b research-flows2
+          git init -q -b research-flows3
           git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
-          git add . && git commit -q -m "gold" && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-flows2
+          git add . && git commit -q -m "gold2" && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-flows3
