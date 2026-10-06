@@ -1,0 +1,21 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e; mkdir out && cd out
+          curl -sSL -m 90 -o s_baa.json "https://api.db.nomics.world/v22/series/FED/H15?q=baa&observations=1&format=json&limit=20"
+          curl -sSL -m 90 -o s_aaa.json "https://api.db.nomics.world/v22/series/FED/H15?q=aaa&observations=1&format=json&limit=20"
+          curl -sSL -m 90 -A "Mozilla/5.0" -o nfci.csv "https://www.chicagofed.org/-/media/publications/nfci/nfci-data-series-csv.csv"
+          [ -s nfci.csv ] || curl -sSL -m 90 -A "Mozilla/5.0" -o nfci.csv "https://www.chicagofed.org/~/media/publications/nfci/nfci-data-series-csv.csv"
+          ls -la > files.txt 2>&1; set -e
+          git init -q -b research-r3
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m r3 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r3
