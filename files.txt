@@ -1,0 +1,8 @@
+total 964
+drwxr-xr-x 2 runner runner   4096 Oct  6 10:59 .
+drwxr-xr-x 3 runner runner   4096 Oct  6 10:58 ..
+-rw-r--r-- 1 runner runner 502252 Oct  6 10:58 buba.json
+-rw-r--r-- 1 runner runner      0 Oct  6 10:59 files.txt
+-rw-r--r-- 1 runner runner 265428 Oct  6 10:58 ifs.json
+-rw-r--r-- 1 runner runner 112419 Oct  6 10:58 insee.json
+-rw-r--r-- 1 runner runner  92428 Oct  6 10:59 tgb.json
