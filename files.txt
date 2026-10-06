@@ -1,0 +1,22 @@
+total 824
+drwxr-xr-x 2 runner runner   4096 Oct  6 15:08 .
+drwxr-xr-x 3 runner runner   4096 Oct  6 15:07 ..
+-rw-r--r-- 1 runner runner 496073 Oct  6 15:08 bea_t30200.json
+-rw-r--r-- 1 runner runner   1261 Oct  6 15:08 bls_1947.json
+-rw-r--r-- 1 runner runner   1260 Oct  6 15:08 bls_1957.json
+-rw-r--r-- 1 runner runner   1260 Oct  6 15:08 bls_1967.json
+-rw-r--r-- 1 runner runner   1260 Oct  6 15:08 bls_1977.json
+-rw-r--r-- 1 runner runner   1260 Oct  6 15:08 bls_1987.json
+-rw-r--r-- 1 runner runner   1260 Oct  6 15:08 bls_1997.json
+-rw-r--r-- 1 runner runner   1261 Oct  6 15:08 bls_2007.json
+-rw-r--r-- 1 runner runner   1261 Oct  6 15:08 bls_2017.json
+-rw-r--r-- 1 runner runner      0 Oct  6 15:08 files.txt
+-rw-r--r-- 1 runner runner  27071 Oct  6 15:07 imf_PCOPP.json
+-rw-r--r-- 1 runner runner  26969 Oct  6 15:08 imf_PGOLD.json
+-rw-r--r-- 1 runner runner   7504 Oct  6 15:08 s_lab.json
+-rw-r--r-- 1 runner runner   1858 Oct  6 15:08 s_sent.json
+-rw-r--r-- 1 runner runner  12246 Oct  6 15:08 umich.csv
+-rw-r--r-- 1 runner runner  53599 Oct  6 15:08 z_FA086902005.json
+-rw-r--r-- 1 runner runner  53113 Oct  6 15:08 z_FA106130001.json
+-rw-r--r-- 1 runner runner  53150 Oct  6 15:08 z_FA316130001.json
+-rw-r--r-- 1 runner runner  53550 Oct  6 15:08 z_FL154190005.json
