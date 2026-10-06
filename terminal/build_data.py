@@ -1212,6 +1212,27 @@ except Exception as e:  # noqa
     model_out = prev.get("model")
     note("modell", False, f"{type(e).__name__}: {e}")
 
+# ------------------------------------------------------------------ Prognose-Protokoll: je Monat und Index der erste Stand, wird nie überschrieben
+protocol = list(prev.get("protocol") or [])
+try:
+    if model_out and model_out.get("targets"):
+        mon = NOW.strftime("%Y-%m")
+        have = {(p.get("m"), p.get("t")) for p in protocol}
+        for k_, t_ in model_out["targets"].items():
+            if (mon, k_) in have:
+                continue
+            n_ = t_.get("now") or {}
+            r_ = n_.get("risk") or {}
+            cl_ = (t_.get("live") or {}).get("closes") or []
+            sm_ = t_.get("smap")
+            protocol.append({"m": mon, "d": NOW.strftime("%Y-%m-%d"), "t": k_, "s": n_.get("score"),
+                             "r": None if not sm_ or n_.get("score") is None else int(round(float(np.interp(n_["score"], sm_, np.arange(101))))),
+                             "l": n_.get("label"), "p": r_.get("prob"), "base": r_.get("base"), "px": cl_[-1] if cl_ else None,
+                             "v": getattr(mdl, "PROB_MODE", "")})
+        note("protokoll", True, f"{len(protocol)} Einträge")
+except Exception as e:  # noqa
+    note("protokoll", False, f"{type(e).__name__}: {e}")
+
 # ------------------------------------------------------------------ Konzentration (nur Anzeige, nicht im Score)
 konz_out = prev.get("konz")
 try:
@@ -1283,6 +1304,7 @@ out = {
     "model": model_out,
     "quality": qual_out,
     "konz": konz_out,
+    "protocol": protocol,
     "news": news[:120],
     "cache": cache_meta,
     "diag": diag,
