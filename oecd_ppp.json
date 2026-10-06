@@ -1,0 +1,1 @@
+{"_meta":{"args":{"align_periods":false,"dataset_code":"SNA_TABLE4","dimensions":{"LOCATION":["DEU","EA19"],"TRANSACT":["PPPGDP"]},"facets":false,"format":"json","limit":1000,"metadata":true,"observations":true,"offset":0,"provider_code":"OECD","q":"","series_code":null},"version":"22.1.17"},"message":"Dataset 'OECD\/SNA_TABLE4' not found"}

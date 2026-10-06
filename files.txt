@@ -1,0 +1,19 @@
+total 744
+drwxr-xr-x 2 runner runner  4096 Oct  6 14:26 .
+drwxr-xr-x 3 runner runner  4096 Oct  6 14:26 ..
+-rw-r--r-- 1 runner runner 49893 Oct  6 14:26 bis_NB_DE.json
+-rw-r--r-- 1 runner runner 49901 Oct  6 14:26 bis_NB_US.json
+-rw-r--r-- 1 runner runner 49893 Oct  6 14:26 bis_NB_XM.json
+-rw-r--r-- 1 runner runner 60507 Oct  6 14:26 bis_NN_DE.json
+-rw-r--r-- 1 runner runner 60702 Oct  6 14:26 bis_NN_US.json
+-rw-r--r-- 1 runner runner 60747 Oct  6 14:26 bis_NN_XM.json
+-rw-r--r-- 1 runner runner 50107 Oct  6 14:26 bis_RB_DE.json
+-rw-r--r-- 1 runner runner 49923 Oct  6 14:26 bis_RB_US.json
+-rw-r--r-- 1 runner runner 50099 Oct  6 14:26 bis_RB_XM.json
+-rw-r--r-- 1 runner runner 60788 Oct  6 14:26 bis_RN_DE.json
+-rw-r--r-- 1 runner runner 60443 Oct  6 14:26 bis_RN_US.json
+-rw-r--r-- 1 runner runner 60556 Oct  6 14:26 bis_RN_XM.json
+-rw-r--r-- 1 runner runner 23279 Oct  6 14:26 buba_eurusd.json
+-rw-r--r-- 1 runner runner 34945 Oct  6 14:26 buba_usddem.json
+-rw-r--r-- 1 runner runner     0 Oct  6 14:26 files.txt
+-rw-r--r-- 1 runner runner   342 Oct  6 14:26 oecd_ppp.json
