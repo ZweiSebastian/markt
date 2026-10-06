@@ -1,0 +1,6 @@
+total 532
+drwxr-xr-x 2 runner runner   4096 Oct  6 11:41 .
+drwxr-xr-x 3 runner runner   4096 Oct  6 11:41 ..
+-rw-r--r-- 1 runner runner      0 Oct  6 11:41 files.txt
+-rw-r--r-- 1 runner runner 489617 Oct  6 11:41 slt_table4.txt
+-rw-r--r-- 1 runner runner  42487 Oct  6 11:41 stksect.txt
