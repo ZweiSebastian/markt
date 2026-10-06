@@ -631,6 +631,11 @@ def run(ser, markt, now, quality=None, prev=None):
                                "lo": [round(float(v), 4) for v in lo], "ex": [round(float(v), 2) for v in np.nan_to_num(exm)],
                                "eq2": [float(f"{v:.5g}") for v in ew2.values], "lo2": [float(f"{v:.5g}") for v in lo2]})
         strat_months = [str(d.date()) for d in eqs["bh"].index[eqs["bh"].index.isin(me)]]
+        # Geldmarktrendite je Monat (für die Steuerrechnung in der App)
+        _bi = eqs["bh"].index
+        _c = cash.reindex(_bi).fillna(0)
+        cash_m = [round(float(v), 6) for v in ((1 + _c).groupby(_bi.to_period("M")).prod() - 1)
+                  .reindex(_bi[_bi.isin(me)].to_period("M")).fillna(0).values]
 
         # ---------- Ein-/Ausstiegs-Signale (Parameter nur aus S&P 500 bis 1989)
         signals_out = None
@@ -822,7 +827,7 @@ def run(ser, markt, now, quality=None, prev=None):
             "now": {"score": int(now_score), "day": str(last_i.date()), "month": str(last_i.date())[:7], "label": lab[0], "cls": lab[1],
                     "action": lab[2], "pillars": pil_now, "text": sent, "risk": risk},
             "hist": hist, "bands": bands, "base": base, "rank": rank, "since": str(first.date()), "smap": [round(float(v), 2) for v in smap],
-            "strategies": strategies, "strat_months": strat_months, "episodes": episodes, "analogs": ana,
+            "strategies": strategies, "strat_months": strat_months, "cash_m": cash_m, "episodes": episodes, "analogs": ana,
             "prob": {"now": prob_now, "calib": calib, "pooled": bool(use_pool), "brier": None if brier is None else round(brier, 4),
                      "brier_ref": None if brier_ref is None else round(brier_ref, 4), "skill": skill,
                      "oos_from": None if not len(oos) else str(oos.index[0].date())},
