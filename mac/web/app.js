@@ -838,6 +838,7 @@ function secEinschaetzung(m) {
   analogSection(m, T);
   episodeSection(m, T);
   probSection(m, T);
+  protocolSection(m, T, TGT);
   sect(m, 'Was historisch danach kam');
   const g2 = grid(m, 'wide');
   const bt = document.createElement('div'); bt.className = 'card';
@@ -999,6 +1000,30 @@ function qualitySection(m, Q) {
       <td>${cell(x.rec_g, v => x.rev_g != null && v - x.rev_g > 0.15, () => false, v => (v > 0 ? '+' : '') + nf(v * 100, 0) + ' %')}</td><td class="mut">${x.asof ? fmtDate(monthDay(x.asof)) : '–'}</td></tr>`).join('')}</table>
     ${Q.flags && Q.flags.length ? `<div class="interp"><b>Auffällig:</b> ${Q.flags.map(esc).join(' · ')}</div>` : ''}
     <div class="note">Das ist ein Warnsignal, kein Beweis: Hohe Investitionen können sich auszahlen, und Forderungen steigen auch bei echtem Wachstum. Konkrete Gegengeschäfte (wer wem was zusagt) stehen nur im Fließtext der Berichte und lassen sich nicht automatisch auslesen. Die Werte fließen mit dem Gewinnwachstum in die Säule „Gewinne“ ein – nur für den aktuellen Stand, denn diese Daten gibt es nicht für frühere Jahrzehnte.</div>`;
+  m.appendChild(c);
+}
+function protocolSection(m, T, key) {
+  const P = (DATA.protocol || []).filter(p => p.t === key).sort((a, b) => a.m < b.m ? 1 : -1);
+  sect(m, 'Prognose-Protokoll');
+  const c = document.createElement('div'); c.className = 'card full';
+  const H = T.hist, ds = H.days.map(monthDay);
+  const DAY365 = 365;
+  // Ergebnis nach 12 Monaten aus dem Kursverlauf (Wochenwerte)
+  const evalRow = p => { const d0 = monthDay(p.d); const end = d0 + DAY365; const last = ds[ds.length - 1];
+    if (!p.px) return null; if (last < end) return { open: true, months: Math.max(0, Math.floor((last - d0) / 30.4)) };
+    let lo = Infinity, endPx = null; for (let i = 0; i < ds.length; i++) { if (ds[i] > d0 && ds[i] <= end && H.price[i] != null) { lo = Math.min(lo, H.price[i]); endPx = H.price[i]; } }
+    return { open: false, dd: lo / p.px - 1, ret: endPx / p.px - 1, hit: lo / p.px - 1 <= -(T.crash || 0.15) }; };
+  const rows = P.map(p => ({ p, e: evalRow(p) }));
+  const done = rows.filter(r => r.e && !r.e.open);
+  let summ = '';
+  if (done.length) { const br = done.reduce((a, r) => a + ((r.p.p / 100) - (r.e.hit ? 1 : 0)) ** 2, 0) / done.length;
+    const bb = done.reduce((a, r) => a + (((r.p.base ?? 20) / 100) - (r.e.hit ? 1 : 0)) ** 2, 0) / done.length;
+    summ = `<div class="note">Ausgewertet: ${done.length} Monate · Rückgang eingetreten in ${done.filter(r => r.e.hit).length}${done.length >= 12 ? ` · Treffsicherheit live ${nf((1 - br / bb) * 100, 0)} % gegenüber dem bloßen Durchschnitt (Vorwärtstest: ${T.prob && T.prob.skill != null ? nf(T.prob.skill, 0) + ' %' : '–'})` : ' · eine Treffsicherheit wird ab 12 ausgewerteten Monaten angezeigt'}.</div>`; }
+  c.innerHTML = `<div class="hd"><div><div class="ttl">Was das Modell damals gesagt hat – und was passiert ist</div><div class="sub">${esc(T.name)}: Jeden Monat wird der erste Stand von Rang und Wahrscheinlichkeit festgehalten und nie mehr geändert. Nach 12 Monaten zeigt die Tabelle, ob ein Rückgang von mindestens ${Math.round((T.crash || 0.15) * 100)} % vom damaligen Kurs eingetreten ist. Das ist der ehrliche Test – ohne Rückrechnung.</div></div></div>
+    ${P.length ? `<table class="t" style="margin-top:6px"><tr><th>Monat</th><th>Rang</th><th>Lage</th><th>Wahrscheinlichkeit</th><th>Kurs</th><th>tiefster Stand in 12 M.</th><th>nach 12 M.</th><th>Rückgang ≥ ${Math.round((T.crash || 0.15) * 100)} %?</th></tr>
+    ${rows.map(({ p, e }) => `<tr><td>${esc(p.m)}</td><td>${p.r ?? '–'}</td><td style="font-family:inherit">${esc(p.l || '–')}</td><td>${p.p == null ? '–' : nf(p.p, 0) + ' %'}</td><td>${p.px == null ? '–' : nf(p.px, 0)}</td>
+      ${!e ? '<td colspan="3" class="mut">–</td>' : e.open ? `<td colspan="3" class="mut" style="font-family:inherit">läuft noch (${e.months} von 12 Monaten)</td>` : `<td>${fmtPct(e.dd * 100, 0)}</td><td>${fmtPct(e.ret * 100, 0)}</td><td style="font-family:inherit">${e.hit ? '<span class="badge crit">ja</span>' : '<span class="badge good">nein</span>'}</td>`}</tr>`).join('')}</table>${summ}`
+    : '<div class="note">Das Protokoll beginnt mit dem nächsten Datenlauf.</div>'}`;
   m.appendChild(c);
 }
 function probSection(m, T) {
