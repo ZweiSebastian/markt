@@ -1,0 +1,23 @@
+total 1400
+drwxr-xr-x 2 runner runner    4096 Oct  6 11:13 .
+drwxr-xr-x 3 runner runner    4096 Oct  6 11:13 ..
+-rw-r--r-- 1 runner runner   90034 Oct  6 11:13 ca_boc.json
+-rw-r--r-- 1 runner runner   22184 Oct  6 11:13 de_bbk.csv
+-rw-r--r-- 1 runner runner     466 Oct  6 11:13 ecb_fm_DE.csv
+-rw-r--r-- 1 runner runner     466 Oct  6 11:13 ecb_fm_FR.csv
+-rw-r--r-- 1 runner runner     466 Oct  6 11:13 ecb_fm_IT.csv
+-rw-r--r-- 1 runner runner     466 Oct  6 11:13 ecb_fmd_DE.csv
+-rw-r--r-- 1 runner runner     466 Oct  6 11:13 ecb_fmd_FR.csv
+-rw-r--r-- 1 runner runner     466 Oct  6 11:13 ecb_fmd_IT.csv
+-rw-r--r-- 1 runner runner    5754 Oct  6 11:13 ecb_irs_DE.csv
+-rw-r--r-- 1 runner runner    5727 Oct  6 11:13 ecb_irs_FR.csv
+-rw-r--r-- 1 runner runner    5731 Oct  6 11:13 ecb_irs_IT.csv
+-rw-r--r-- 1 runner runner       0 Oct  6 11:13 files.txt
+-rw-r--r-- 1 runner runner     545 Oct  6 11:13 jp_mof.csv
+-rw-r--r-- 1 runner runner 1195548 Oct  6 11:13 jp_mof_all.csv
+-rw-r--r-- 1 runner runner   13905 Oct  6 11:13 uk_boe.csv
+-rw-r--r-- 1 runner runner   26018 Oct  6 11:13 yc_ea.csv
+-rw-r--r-- 1 runner runner    3294 Oct  6 11:13 yh_%5EIRX.json
+-rw-r--r-- 1 runner runner    3266 Oct  6 11:13 yh_%5ETNX.json
+-rw-r--r-- 1 runner runner     108 Oct  6 11:13 yh_DE10Y.BOND.json
+-rw-r--r-- 1 runner runner     108 Oct  6 11:13 yh_FR10Y.BOND.json
