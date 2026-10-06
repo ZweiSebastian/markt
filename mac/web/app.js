@@ -757,7 +757,7 @@ function secEinschaetzung(m) {
   const ov = document.createElement('div'); ov.className = 'card full';
   const yrs = t => { const a = +t.since.slice(0, 4), b = +t.now.month.slice(0, 4); return b - a; };
   ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes im Überblick</div><div class="sub">Klick auf eine Zeile zeigt die Einschätzung im Detail. Stand ${fmtDate(monthDay(N.day))} (Tagesmodell); Rang und Wahrscheinlichkeit live mit den aktuellen Kursen.</div></div></div>
-    <table class="t ov" style="margin-top:6px"><tr><th rowspan="2">Index</th><th rowspan="2">Region</th><th rowspan="2" title="Rang 0–100: günstiger als an X % aller Tage seit Beginn der Daten. 50 = typischer Tag.">Rang</th><th rowspan="2">Lage</th><th colspan="4" class="grp">Risiko: Rückgang um 15 % oder mehr in den nächsten 12 Monaten</th><th rowspan="2">Trend</th><th rowspan="2">Daten</th></tr>
+    <table class="t ov" style="margin-top:6px"><tr><th rowspan="2">Index</th><th rowspan="2">Region</th><th rowspan="2" title="Rang 0–100 auf einer gemeinsamen Skala für alle Indizes: günstiger als an X % aller bisherigen Tage aller Indizes. 50 = typischer Tag. Grenzen überall gleich.">Rang</th><th rowspan="2">Lage</th><th colspan="4" class="grp">Risiko: Rückgang um 15 % oder mehr in den nächsten 12 Monaten</th><th rowspan="2">Trend</th><th rowspan="2">Daten</th></tr>
     <tr><th title="Vorwärts getestete Modellprognose für heute">Prognose</th><th title="Wie oft es früher passierte, wenn der Score ähnlich war">früher bei<br>gleichem Score</th><th title="Wie oft es nach den 8 ähnlichsten Momenten der Geschichte passierte">früher in<br>ähnlichen Lagen</th><th title="Wie oft es im Durchschnitt aller Monate passierte">im<br>Durchschnitt</th></tr>
     ${Object.entries(M.targets).map(([k, t]) => { const tr = (t.now.pillars.find(p => p.id === 'trend') || {}).score; const y = yrs(t);
       return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b id="ov-s-${k}">${RK(t, t.now.score)}</b> ${dirArrow(t)}</td>
@@ -765,7 +765,7 @@ function secEinschaetzung(m) {
       <td id="ov-p-${k}">${riskCell(t.now.risk ? t.now.risk.prob : null)}${t.prob && t.prob.pooled ? '<span class="mut" title="kurze Historie – Modell vom S&P 500 übernommen">¹</span>' : ''}</td>
       <td>${riskCell(t.now.risk ? t.now.risk.band : null)}</td><td>${riskCell(t.now.risk ? t.now.risk.analog : null)}</td><td class="mut">${t.now.risk ? t.now.risk.base + ' %' : '–'}</td>
       <td>${pillarBar(tr)}</td><td style="font-family:inherit" class="${y < 25 ? '' : 'mut'}">seit ${t.since.slice(0, 4)}${y < 25 ? ' <span style="color:var(--warn)" title="Kurzer Rückblick – Prozentwerte beruhen auf wenigen Fällen">⚠</span>' : ''}</td></tr>`; }).join('')}</table>
-    <div class="note">Lesebeispiel: „Prognose 23 % · im Durchschnitt 20 %“ heißt, ein Rückgang um 15 % oder mehr ist gerade etwas wahrscheinlicher als üblich. Die mittleren beiden Spalten zeigen, wie oft er früher in vergleichbaren Lagen tatsächlich kam. ¹ kurze Historie, Prognose am S&P 500 gelernt. ⚠ weniger als 25 Jahre Daten. MSCI World in Euro mit Dividenden (wie ein thesaurierender ETF). Für DAX, Euro Stoxx, Nikkei und Schwellenländer gibt es kein frei verfügbares KGV, die Bewertung ist dort eine Näherung.</div>`;
+    <div class="note">Rang: eine gemeinsame Skala für alle Indizes – ein Rang 30 bedeutet überall dasselbe. Grenzen: Gefahrenzone unter ${RK(Object.values(M.targets)[0], 35)}, Gegenwind unter ${RK(Object.values(M.targets)[0], 45)}, Rückenwind ab ${RK(Object.values(M.targets)[0], 65)}; der Einstiegsplan legt ab ${RK(Object.values(M.targets)[0], 55)} den Rest an. Lesebeispiel: „Prognose 23 % · im Durchschnitt 20 %“ heißt, ein Rückgang um 15 % oder mehr ist gerade etwas wahrscheinlicher als üblich. Die mittleren beiden Spalten zeigen, wie oft er früher in vergleichbaren Lagen tatsächlich kam. ¹ kurze Historie, Prognose am S&P 500 gelernt. ⚠ weniger als 25 Jahre Daten. MSCI World in Euro mit Dividenden (wie ein thesaurierender ETF). Für DAX, Euro Stoxx, Nikkei und Schwellenländer gibt es kein frei verfügbares KGV, die Bewertung ist dort eine Näherung.</div>`;
   ov.querySelectorAll('tr.row').forEach(r => r.onclick = () => { TGT = r.dataset.t; store('tgt', TGT); renderSection(); setTimeout(() => { const h = document.getElementById('hero'); if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); });
   m.appendChild(ov);
   planCard(m, M);
@@ -775,7 +775,7 @@ function secEinschaetzung(m) {
   const hero = document.createElement('div'); hero.className = 'card hero'; hero.id = 'hero';
   hero.innerHTML = `<div class="hgrid">
     <div>
-      <div class="lbl">Rang ${esc(T.name)} <span class="mut">– günstiger als an so viel % aller Tage seit ${T.since.slice(0, 4)} (Score ${N.score})</span></div>
+      <div class="lbl">Rang ${esc(T.name)} <span class="mut">– günstiger als an so viel % aller bisherigen Tage, gleiche Skala für alle Indizes (Score ${N.score})</span></div>
       <div class="hscore"><span class="big" id="hs-score">${RK(T, N.score)}</span><span class="mut"> / 100</span> <span id="hs-badge"><span class="badge ${N.cls === 'crit' ? 'crit' : N.cls}">${esc(N.label)}</span></span><span class="livetag" id="hs-live"></span></div>
       ${T.direction ? `<div class="mut" style="font-size:12px;margin:-2px 0 6px">vor 3 Monaten Rang ${T.direction.ago} ${dirArrow(T)}${T.direction.cur === 0 ? ' – der Rang fällt' : T.direction.cur === 2 ? ' – der Rang steigt' : ''}</div>` : ''}
       ${gaugeHTML(T, N.score)}
@@ -1169,7 +1169,7 @@ function drawPlan(c, M) {
   if (!PLAN || c.dataset.edit === '1') {
     const P = PLAN || Object.assign({}, PLAN_DEF, { start: ymd(new Date()) });
     c.innerHTML = `<div class="hd"><div><div class="ttl">${PLAN ? 'Plan bearbeiten' : 'Einstiegsplan anlegen'}</div>
-      <div class="sub">Für einen größeren Betrag, der nach und nach in den Markt soll. Die Regel kommt aus dem Test seit 1953: günstige Lage (Rang ab etwa 43) → Rest sofort, mittlere Lage → Monatsraten, erhöhtes Risiko (Rang unter etwa 18) → Pause, Ausstiegssignal aktiv → Pause; spätestens nach der Frist ist alles angelegt.</div></div></div>
+      <div class="sub">Für einen größeren Betrag, der nach und nach in den Markt soll. Die Regel kommt aus dem Test seit 1953: günstige Lage (Rang ab ${RK(Object.values(M.targets)[0], 55)}) → Rest sofort, mittlere Lage → Monatsraten, erhöhtes Risiko (Rang unter ${RK(Object.values(M.targets)[0], 45)}) → Pause, Ausstiegssignal aktiv → Pause; spätestens nach der Frist ist alles angelegt.</div></div></div>
       <div class="pform">
         <label>Gesamtbetrag (€)<input id="pf-a" type="number" step="1000" value="${P.amount}"></label>
         <label>davon Reserve, wird nicht angelegt (€)<input id="pf-r" type="number" step="1000" value="${P.reserve || 0}"></label>
