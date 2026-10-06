@@ -512,6 +512,15 @@ def y10_monthly():
 
 
 slow("y10m", y10_monthly, ["y10_m"])
+
+
+def z1_flows():
+    # Fed Z.1: Käufe ausländischer Anleger von US-Aktien (Transaktionen, SAAR) und BIP – quartalsweise seit 1946
+    put("row_eq_flow", dbn("FED/Z1/FA263064105.Q", "1946-01-01"), "Auslandskäufe US-Aktien (SAAR, Mio. $)", "intern", "Mio. $", "flow", "Fed Z.1", "q", 0)
+    put("gdp_z1", dbn("FED/Z1/FA086902005.Q", "1946-01-01"), "US-BIP (SAAR, Mio. $)", "intern", "Mio. $", "flow", "Fed Z.1", "q", 0)
+
+
+slow("z1", z1_flows, ["row_eq_flow", "gdp_z1"], hours=24)
 if cache_meta.get("zinsen", {}).get("at") != NOW.strftime("%Y-%m-%dT%H:%M:%SZ"):
     try:   # im Cache-Fall die letzten Tage frisch nachziehen
         tr = treasury_year(NOW.year)

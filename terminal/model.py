@@ -49,12 +49,15 @@ TARGETS = {
 }
 BANDS = [(0, 35, "unter 35"), (35, 45, "35–45"), (45, 55, "45–55"), (55, 65, "55–65"), (65, 101, "ab 65")]
 CRASH = 0.15
-PROB_MODE = "score"     # vorwärts getestet: Richtung (score_dir, score_fall, score_midfall) verbessert die Treffsicherheit nicht
+PROB_MODE = "score_fb"  # Score + Auslandskäufe US-Aktien (vorwärts getestet: deutlich besser). Richtung (score_dir, …) brachte nichts
 STRAT_FREQ = "M"       # Entscheidungsrhythmus der Regeln im Test: letzter Handelstag des Monats (getestet: besser als wöchentlich)
 TREND_N = 210          # Trendlinie in Börsentagen (210 ≈ 10 Monate)
 # Ungefähre Dividendenrendite p.a. für die 2x-Rechnung (Kursindizes); DAX und MSCI World in Euro enthalten Dividenden bereits
 DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut": 0.014, "sx5e": 0.033, "dax": 0.0, "nikkei": 0.018, "em": 0.026}
 PROB_LAM = 1.0
+FBUY_MODE = "on"      # Auslandskäufe US-Aktien in der Säule Stimmung
+FBUY_ALL = False
+FBUY_DIV = 2.0
 DIR_N = 63             # Richtung des Scores: Veränderung über 3 Monate (63 Börsentage)
 POOL_MIN_YEARS = 40     # kürzere Historien nutzen das am S&P 500 gelernte Modell
 EPISODE = 0.20
@@ -167,6 +170,17 @@ def run(ser, markt, now, quality=None, prev=None):
         c_d = D("cape")
         return c_d.where(c_d.notna(), c_m)
     cape = cape_daily()
+
+    def foreign_buying():
+        fl, gd = ser("row_eq_flow"), ser("gdp_z1")
+        if fl is None or gd is None or len(fl) < 60:
+            return None
+        fl, gd = fl.sort_index(), gd.sort_index()
+        fq = (fl.rolling(4).mean() / gd.rolling(4).mean() * 100).dropna()
+        fq.index = fq.index.to_period("Q").to_timestamp(how="end").normalize()   # Quartalsende, egal wie die Quelle datiert
+        fz = (fq - fq.rolling(40, min_periods=20).mean()) / fq.rolling(40, min_periods=20).std()
+        return place(fz, 95, 200), place(fq, 95, 200)   # Z.1 erscheint ~10–11 Wochen nach Quartalsende
+    fbz = foreign_buying()
 
     # ---------- Komponenten-Bausteine (je Region zusammengestellt)
     def comp_us_valuation(C):
@@ -332,6 +346,12 @@ def run(ser, markt, now, quality=None, prev=None):
             if aa is not None:
                 a = place(aa, 1, 21)
                 C["aaii"] = ("stimmung", "Anlegerumfrage AAII (Bullen − Bären)", interp(a, [-20, 7, 35], [0.8, 0.0, -0.6]), a, lambda v: f"{v:+.0f} Pp.")
+        if (us or FBUY_ALL) and FBUY_MODE != "off" and fbz is not None:
+            # Käufe ausländischer Anleger von US-Aktien (Fed Z.1, Quartal, SAAR) – 4 Quartale, in % des BIP,
+            # ggü. den letzten 10 Jahren. Hoch = spätzyklisch (konträr). Veröffentlichung ~10 Wochen nach Quartalsende.
+            zp, fp = fbz
+            C["fbuy"] = ("stimmung", "Auslandskäufe US-Aktien (4 Quartale, % des BIP)", clip(-zp / FBUY_DIV), fp,
+                         lambda v: f"{v:.2f} % des BIP · {zp.dropna().iloc[-1]:+.1f} σ ggü. 10 Jahren")
 
     def comp_vixterm(C):
         vt = D("vix_term")
@@ -559,10 +579,12 @@ def run(ser, markt, now, quality=None, prev=None):
                 "crash12": round(crash_base, 0)}
 
         # ---------- Wahrscheinlichkeit (Walk-forward, logistische Regression auf die Säulen)
-        if PROB_MODE == "score":
+        if PROB_MODE == "score" or (PROB_MODE == "score_fb" and fbz is None):
             Xall = pd.DataFrame({"c": 1.0, "t": (tv / sdn).fillna(0.0)}, index=days)
         elif PROB_MODE == "score_vol":
             Xall = pd.DataFrame({"c": 1.0, "t": (tv / sdn).fillna(0.0), "v": Pl["schwankung"].fillna(0), "b": Pl["bewertung"].fillna(0)}, index=days)
+        elif PROB_MODE == "score_fb" and fbz is not None:
+            Xall = pd.DataFrame({"c": 1.0, "t": (tv / sdn).fillna(0.0), "f": fbz[0].fillna(0.0)}, index=days)
         elif PROB_MODE in ("score_dir", "score_fall", "score_midfall"):
             t_ = (tv / sdn)
             d_ = (t_ - t_.shift(DIR_N)).fillna(0.0)
@@ -825,7 +847,8 @@ def run(ser, markt, now, quality=None, prev=None):
             sent.append(f"Je niedriger der Rang, desto häufiger folgte ein Rückgang von {CRASH * 100:.0f} % oder mehr ("
                         + "; ".join(f"Rang {x['rlo']}–{x['rhi']}: {x['crash12']:.0f} %" for x in cb) + ").")
         if skill is not None:
-            sent.append(f"Die Wahrscheinlichkeit wurde Jahr für Jahr nur mit damals bekannten Daten berechnet und ist "
+            sent.append(("Sie stützt sich auf den Score und die Käufe ausländischer Anleger von US-Aktien (hoch = spätzyklisch). " if PROB_MODE == "score_fb" and fbz is not None else "")
+                        + f"Die Wahrscheinlichkeit wurde Jahr für Jahr nur mit damals bekannten Daten berechnet und ist "
                         + ("besser als der bloße Durchschnitt" if skill > 0 else "nicht besser als der bloße Durchschnitt")
                         + f" (Brier-Skill {skill:+.0f} %).")
         if episodes:
@@ -847,7 +870,8 @@ def run(ser, markt, now, quality=None, prev=None):
                 "tbill": None if pd.isna(tbill.get(last_i)) else round(float(tbill[last_i]), 3),
                 "rv_med": None if pd.isna(rv_med.get(last_i)) else round(float(rv_med[last_i]), 5),
                 "sd": round(float(sdn[last_i]), 6), "fixed": live_fixed,
-                "coef": None if w_now is None else [round(float(x), 5) for x in w_now], "pillars": PILLARS, "weights": WEIGHTS}
+                "coef": None if w_now is None else [round(float(x), 5) for x in w_now], "pillars": PILLARS, "weights": WEIGHTS,
+                "px": None if "f" not in Xall.columns else round(float(Xall["f"].get(last_i, 0.0)), 4)}
 
         # Verlauf: Score/Wahrscheinlichkeit/Kurs wöchentlich, Säulen monatlich
         wk = score.dropna()
