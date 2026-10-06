@@ -721,6 +721,8 @@ function RK(T, s) {
   let lo = 0, hi = m.length - 1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (m[mid] <= s) lo = mid; else hi = mid; }
   const f = m[hi] > m[lo] ? (s - m[lo]) / (m[hi] - m[lo]) : 0; return Math.round(lo + f);
 }
+function dirArrow(t) { const D = t.direction; if (!D) return ''; const d = D.now - D.ago;
+  return d <= -10 ? `<span style="color:${C.down}" title="vor 3 Monaten Rang ${D.ago}">↓</span>` : d >= 10 ? `<span style="color:${C.up}" title="vor 3 Monaten Rang ${D.ago}">↑</span>` : ''; }
 function gaugeHTML(T, raw) {
   const score = RK(T, raw); const BR = BANDC.map(([a, b, c]) => [RK(T, a), RK(T, b), c]);
   const segs = BR.map(([a, b, c]) => `<div style="left:${a}%;width:${b - a}%;background:${c}"></div>`).join('');
@@ -754,7 +756,7 @@ function secEinschaetzung(m) {
     <table class="t ov" style="margin-top:6px"><tr><th rowspan="2">Index</th><th rowspan="2">Region</th><th rowspan="2" title="Rang 0–100: günstiger als an X % aller Tage seit Beginn der Daten. 50 = typischer Tag.">Rang</th><th rowspan="2">Lage</th><th colspan="4" class="grp">Risiko: Rückgang um 15 % oder mehr in den nächsten 12 Monaten</th><th rowspan="2">Trend</th><th rowspan="2">Daten</th></tr>
     <tr><th title="Vorwärts getestete Modellprognose für heute">Prognose</th><th title="Wie oft es früher passierte, wenn der Score ähnlich war">früher bei<br>gleichem Score</th><th title="Wie oft es nach den 8 ähnlichsten Momenten der Geschichte passierte">früher in<br>ähnlichen Lagen</th><th title="Wie oft es im Durchschnitt aller Monate passierte">im<br>Durchschnitt</th></tr>
     ${Object.entries(M.targets).map(([k, t]) => { const tr = (t.now.pillars.find(p => p.id === 'trend') || {}).score; const y = yrs(t);
-      return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b id="ov-s-${k}">${RK(t, t.now.score)}</b></td>
+      return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b id="ov-s-${k}">${RK(t, t.now.score)}</b> ${dirArrow(t)}</td>
       <td style="font-family:inherit" id="ov-l-${k}"><span class="badge ${t.now.cls === 'crit' ? 'crit' : t.now.cls}">${esc(t.now.label)}</span></td>
       <td id="ov-p-${k}">${riskCell(t.now.risk ? t.now.risk.prob : null)}${t.prob && t.prob.pooled ? '<span class="mut" title="kurze Historie – Modell vom S&P 500 übernommen">¹</span>' : ''}</td>
       <td>${riskCell(t.now.risk ? t.now.risk.band : null)}</td><td>${riskCell(t.now.risk ? t.now.risk.analog : null)}</td><td class="mut">${t.now.risk ? t.now.risk.base + ' %' : '–'}</td>
@@ -771,6 +773,7 @@ function secEinschaetzung(m) {
     <div>
       <div class="lbl">Rang ${esc(T.name)} <span class="mut">– günstiger als an so viel % aller Tage seit ${T.since.slice(0, 4)} (Score ${N.score})</span></div>
       <div class="hscore"><span class="big" id="hs-score">${RK(T, N.score)}</span><span class="mut"> / 100</span> <span id="hs-badge"><span class="badge ${N.cls === 'crit' ? 'crit' : N.cls}">${esc(N.label)}</span></span><span class="livetag" id="hs-live"></span></div>
+      ${T.direction ? `<div class="mut" style="font-size:12px;margin:-2px 0 6px">vor 3 Monaten Rang ${T.direction.ago} ${dirArrow(T)}${T.direction.cur === 0 ? ' – der Rang fällt' : T.direction.cur === 2 ? ' – der Rang steigt' : ''}</div>` : ''}
       ${gaugeHTML(T, N.score)}
       <div class="action"><span class="mut">Modell sagt:</span> <b id="hs-action">${esc(N.action)}</b></div>
       ${N.risk ? `<div class="probbox"><div class="lbl">Wahrscheinlichkeit für einen Rückgang von mindestens ${Math.round(T.crash * 100)} % in den nächsten 12 Monaten</div>
@@ -841,6 +844,12 @@ function secEinschaetzung(m) {
     <tr><td class="mut">alle Monate</td><td class="mut"></td><td>${T.base.crash12} %</td><td>${fmtPct(T.base.dd12)}</td><td>${fmtPct(T.base.f12)}</td><td>${nf(T.base.pos12, 0)} %</td><td></td><td>${fmtPct(T.base.f36)}</td><td></td></tr></table>
     <div class="note">Lesart: Die Spalte „Rückgang“ zeigt, wie oft es nach einem Monat in diesem Bereich innerhalb eines Jahres mindestens ${Math.round(T.crash * 100)} % nach unten ging (Monatsschlusskurse). „Tiefster Stand“ = wie weit es im Median zwischenzeitlich fiel.</div>`;
   g2.appendChild(bt);
+  if (T.direction) { const D = T.direction; const dc = document.createElement('div'); dc.className = 'card';
+    dc.innerHTML = `<div class="hd"><div><div class="ttl">Von oben oder von unten?</div><div class="sub">Heute Rang ${D.now}, vor 3 Monaten ${D.ago}. Nur Monate im heutigen Bereich (Rang ${D.rlo}–${D.rhi}), getrennt danach, wie sich der Rang in den 3 Monaten davor bewegt hatte.</div></div></div>
+      <table class="t" style="margin-top:6px"><tr><th>Rang kam …</th><th>Monate</th><th>Phasen</th><th>Rückgang ≥ ${Math.round(T.crash * 100)} % im 1. J.</th><th>1 J.</th><th>im Plus</th></tr>
+      ${D.rows.map((r, j) => `<tr class="${j === D.cur ? 'hl' : ''}"><td style="font-family:inherit">${esc(r.lab)}${j === D.cur ? ' ◀' : ''}</td><td>${r.n}</td><td>${r.ep}</td><td>${riskCell(r.crash12)}</td><td>${fmtPct(r.f12)}</td><td>${r.pos12 == null ? '–' : nf(r.pos12, 0) + ' %'}</td></tr>`).join('')}</table>
+      <div class="note">Rückblick, kein Vorwärtstest. „Phasen“ = zusammenhängende Zeiträume – aufeinanderfolgende Monate sind keine unabhängigen Fälle. Als Zusatz in der Wahrscheinlichkeit wurde die Richtung vorwärts getestet und hat die Treffsicherheit nicht verbessert; sie fließt deshalb nicht in Rang oder Prognose ein. Beobachtung: Im mittleren Bereich ging ein fallender Rang oft einem Rückgang voraus; ganz unten war ein schneller Fall dagegen meist schon der Rückgang selbst.</div>`;
+    g2.appendChild(dc); }
   const rk = document.createElement('div'); rk.className = 'card';
   const R = T.rank;
   rk.innerHTML = `<div class="hd"><div><div class="ttl">Welche Säule hat bisher geholfen?</div><div class="sub">Rangkorrelation mit dem, was danach kam. 0 = kein Zusammenhang, positiv = höherer Wert, besserer Verlauf.</div></div></div>

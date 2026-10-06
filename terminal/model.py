@@ -49,12 +49,13 @@ TARGETS = {
 }
 BANDS = [(0, 35, "unter 35"), (35, 45, "35–45"), (45, 55, "45–55"), (55, 65, "55–65"), (65, 101, "ab 65")]
 CRASH = 0.15
-PROB_MODE = "score"
+PROB_MODE = "score"     # vorwärts getestet: Richtung (score_dir, score_fall, score_midfall) verbessert die Treffsicherheit nicht
 STRAT_FREQ = "M"       # Entscheidungsrhythmus der Regeln im Test: letzter Handelstag des Monats (getestet: besser als wöchentlich)
 TREND_N = 210          # Trendlinie in Börsentagen (210 ≈ 10 Monate)
 # Ungefähre Dividendenrendite p.a. für die 2x-Rechnung (Kursindizes); DAX und MSCI World in Euro enthalten Dividenden bereits
 DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut": 0.014, "sx5e": 0.033, "dax": 0.0, "nikkei": 0.018, "em": 0.026}
 PROB_LAM = 1.0
+DIR_N = 63             # Richtung des Scores: Veränderung über 3 Monate (63 Börsentage)
 POOL_MIN_YEARS = 40     # kürzere Historien nutzen das am S&P 500 gelernte Modell
 EPISODE = 0.20
 Y = 252            # Börsentage pro Jahr
@@ -521,6 +522,33 @@ def run(ser, markt, now, quality=None, prev=None):
                 "crash12": None if not len(gd) else round(float((gd.dd <= -CRASH).mean() * 100), 0),
             })
 
+        # Richtung: kam der heutige Rang von oben oder von unten? (Rangänderung über 3 Monate, nur Anzeige –
+        # als Zusatz im Wahrscheinlichkeitsmodell vorwärts getestet und nicht besser, siehe PROB_MODE)
+        direction = None
+        try:
+            sd = score.dropna()
+            r_now, r_ago = rk(sd.iloc[-1]), rk(sd.iloc[-1 - DIR_N])
+            dfr = df.copy()
+            dfr["r"] = np.interp(dfr.s.values, smap, np.arange(101))
+            dfr["d3"] = dfr.r - dfr.r.shift(3)
+            bnd = next((b for b in bands if b["rlo"] <= r_now < b["rhi"] or (b["rhi"] == 100 and r_now >= b["rlo"])), None)
+            if bnd:
+                gb = dfr[(dfr.r >= bnd["rlo"]) & (dfr.r < bnd["rhi"] + (1 if bnd["rhi"] == 100 else 0))].dropna(subset=["d3"])
+                rows = []
+                for lab, g in (("fallend (Rang −10 oder mehr in 3 Monaten)", gb[gb.d3 <= -10]), ("seitwärts", gb[gb.d3.abs() < 10]),
+                               ("steigend (Rang +10 oder mehr)", gb[gb.d3 >= 10])):
+                    g12, gd = g.dropna(subset=["f12"]), g.dropna(subset=["dd"])
+                    pos = dfr.index.get_indexer(g.index)
+                    rows.append({"lab": lab, "n": int(len(gd)), "ep": int(0 if not len(pos) else 1 + (np.diff(pos) > 3).sum()),
+                                 "f12": None if not len(g12) else round(float(g12.f12.median() * 100), 1),
+                                 "pos12": None if not len(g12) else round(float((g12.f12 > 0).mean() * 100), 0),
+                                 "crash12": None if not len(gd) else round(float((gd.dd <= -CRASH).mean() * 100), 0)})
+                d_now = r_now - r_ago
+                direction = {"now": r_now, "ago": r_ago, "rlo": bnd["rlo"], "rhi": bnd["rhi"], "rows": rows,
+                             "cur": 0 if d_now <= -10 else (2 if d_now >= 10 else 1)}
+        except Exception:
+            direction = None
+
         def sp(a, b):
             x = pd.concat([a, b], axis=1).dropna()
             return None if len(x) < 60 else round(float(x.iloc[:, 0].rank().corr(x.iloc[:, 1].rank())), 2)
@@ -535,6 +563,14 @@ def run(ser, markt, now, quality=None, prev=None):
             Xall = pd.DataFrame({"c": 1.0, "t": (tv / sdn).fillna(0.0)}, index=days)
         elif PROB_MODE == "score_vol":
             Xall = pd.DataFrame({"c": 1.0, "t": (tv / sdn).fillna(0.0), "v": Pl["schwankung"].fillna(0), "b": Pl["bewertung"].fillna(0)}, index=days)
+        elif PROB_MODE in ("score_dir", "score_fall", "score_midfall"):
+            t_ = (tv / sdn)
+            d_ = (t_ - t_.shift(DIR_N)).fillna(0.0)
+            if PROB_MODE == "score_fall":
+                d_ = d_.clip(upper=0)
+            if PROB_MODE == "score_midfall":
+                d_ = d_.clip(upper=0) * ((t_ >= -1 / 3) & (t_ < 1 / 3)).astype(float)
+            Xall = pd.DataFrame({"c": 1.0, "t": t_.fillna(0.0), "d": d_}, index=days)
         else:
             Xall = Pl.fillna(0.0)
             Xall.insert(0, "c", 1.0)
@@ -827,7 +863,7 @@ def run(ser, markt, now, quality=None, prev=None):
             "now": {"score": int(now_score), "day": str(last_i.date()), "month": str(last_i.date())[:7], "label": lab[0], "cls": lab[1],
                     "action": lab[2], "pillars": pil_now, "text": sent, "risk": risk},
             "hist": hist, "bands": bands, "base": base, "rank": rank, "since": str(first.date()), "smap": [round(float(v), 2) for v in smap],
-            "strategies": strategies, "strat_months": strat_months, "cash_m": cash_m, "episodes": episodes, "analogs": ana,
+            "strategies": strategies, "strat_months": strat_months, "cash_m": cash_m, "direction": direction, "episodes": episodes, "analogs": ana,
             "prob": {"now": prob_now, "calib": calib, "pooled": bool(use_pool), "brier": None if brier is None else round(brier, 4),
                      "brier_ref": None if brier_ref is None else round(brier_ref, 4), "skill": skill,
                      "oos_from": None if not len(oos) else str(oos.index[0].date())},
