@@ -1,0 +1,20 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e; mkdir out && cd out
+          for s in IRLTLT01FRM156N IRLTLT01DEM156N IRLTLT01GBM156N IRLTLT01ITM156N IRLTLT01JPM156N IRLTLT01USM156N BOGZ1FA263064105Q BOGZ1FU263064105Q BOGZ1LM263064105Q GDP; do
+            for i in 1 2 3; do curl -sSL -m 90 -A "Mozilla/5.0" -o $s.csv "https://fred.stlouisfed.org/graph/fredgraph.csv?id=$s&cosd=1940-01-01" && head -c 20 $s.csv | grep -q observation_date && break; sleep 5; done
+          done
+          ls -la > files.txt 2>&1; set -e
+          git init -q -b research-flows
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m "flows" && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-flows
