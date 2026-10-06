@@ -1,0 +1,23 @@
+total 8248
+drwxr-xr-x 2 runner runner    4096 Oct  6 10:16 .
+drwxr-xr-x 3 runner runner    4096 Oct  6 10:15 ..
+-rw-r--r-- 1 runner runner  158796 Oct  6 10:16 ecb_de.csv
+-rw-r--r-- 1 runner runner  175502 Oct  6 10:16 ecb_fr.csv
+-rw-r--r-- 1 runner runner  153283 Oct  6 10:16 ecb_it.csv
+-rw-r--r-- 1 runner runner       0 Oct  6 10:16 files.txt
+-rw-r--r-- 1 runner runner  139102 Oct  6 10:15 oecd_de.json
+-rw-r--r-- 1 runner runner  140540 Oct  6 10:15 oecd_fr.json
+-rw-r--r-- 1 runner runner  136952 Oct  6 10:15 oecd_gb.json
+-rw-r--r-- 1 runner runner  126130 Oct  6 10:15 oecd_it.json
+-rw-r--r-- 1 runner runner  126736 Oct  6 10:15 oecd_jp.json
+-rw-r--r-- 1 runner runner  138396 Oct  6 10:15 oecd_us.json
+-rw-r--r-- 1 runner runner  121289 Oct  6 10:16 oecdk_de.json
+-rw-r--r-- 1 runner runner  123179 Oct  6 10:16 oecdk_fr.json
+-rw-r--r-- 1 runner runner  119872 Oct  6 10:16 oecdk_gb.json
+-rw-r--r-- 1 runner runner  108912 Oct  6 10:16 oecdk_it.json
+-rw-r--r-- 1 runner runner 3212186 Oct  6 10:16 tic_hist.csv
+-rw-r--r-- 1 runner runner 3212186 Oct  6 10:16 tic_s1.txt
+-rw-r--r-- 1 runner runner   53599 Oct  6 10:15 z1_gdp.json
+-rw-r--r-- 1 runner runner   52847 Oct  6 10:15 z1_row_eq_flow.json
+-rw-r--r-- 1 runner runner   52643 Oct  6 10:15 z1_row_eq_flow_nsa.json
+-rw-r--r-- 1 runner runner   53248 Oct  6 10:15 z1_row_eq_level.json
