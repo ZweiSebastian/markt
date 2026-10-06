@@ -1,0 +1,12 @@
+total 88
+drwxr-xr-x 2 runner runner  4096 Oct  6 11:00 .
+drwxr-xr-x 3 runner runner  4096 Oct  6 11:00 ..
+-rw-r--r-- 1 runner runner   322 Oct  6 11:00 b_M.DEM.USD.AA.AC.A01.json
+-rw-r--r-- 1 runner runner   322 Oct  6 11:00 b_M.DEM.USD.CA.AC.A01.json
+-rw-r--r-- 1 runner runner   322 Oct  6 11:00 b_M.DEM.USD.EA.AC.A01.json
+-rw-r--r-- 1 runner runner   322 Oct  6 11:00 b_M.USD.DEM.AA.AC.A01.json
+-rw-r--r-- 1 runner runner 34945 Oct  6 11:00 b_M.USD.DEM.AA.AC.A02.json
+-rw-r--r-- 1 runner runner   322 Oct  6 11:00 b_M.USD.DEM.CA.AC.A01.json
+-rw-r--r-- 1 runner runner   322 Oct  6 11:00 b_M.USD.DEM.EA.AC.A01.json
+-rw-r--r-- 1 runner runner 16926 Oct  6 11:00 bq.json
+-rw-r--r-- 1 runner runner     0 Oct  6 11:00 files.txt
