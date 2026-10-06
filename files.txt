@@ -1,0 +1,7 @@
+total 164
+drwxr-xr-x 2 runner runner   4096 Oct  6 15:17 .
+drwxr-xr-x 3 runner runner   4096 Oct  6 15:17 ..
+-rw-r--r-- 1 runner runner      0 Oct  6 15:17 files.txt
+-rw-r--r-- 1 runner runner 147619 Oct  6 15:17 nfci.csv
+-rw-r--r-- 1 runner runner   3606 Oct  6 15:17 s_aaa.json
+-rw-r--r-- 1 runner runner   3606 Oct  6 15:17 s_baa.json
