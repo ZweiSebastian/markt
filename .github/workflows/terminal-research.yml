@@ -11,11 +11,15 @@ jobs:
     steps:
       - run: |
           set +e; mkdir out && cd out
-          curl -sSL -m 90 -o buba_gold.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3/M.XAU.DEM.EA.AC.C02?observations=1&format=json"
-          curl -sSL -m 90 -o buba_usd.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3?q=US%20dollar%20DM&observations=1&format=json&limit=40"
-          curl -sSL -m 90 -o imf_gold.json "https://api.db.nomics.world/v22/series/IMF/PCPS/M.W00.PGOLD.USD?observations=1&format=json"
-          for c in USA JPN CAN DEU FRA GBR ITA; do curl -sSL -m 90 -o oecdk_$c.json "https://api.db.nomics.world/v22/series/OECD/DSD_STES@DF_FINMARK/$c.M.IRLT.PA._Z._Z._Z._Z.N?observations=1&format=json"; done
+          curl -sSL -m 90 -o b_M.USD.DEM.AA.AC.A01.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3/M.USD.DEM.AA.AC.A01?observations=1&format=json"
+          curl -sSL -m 90 -o b_M.DEM.USD.AA.AC.A01.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3/M.DEM.USD.AA.AC.A01?observations=1&format=json"
+          curl -sSL -m 90 -o b_M.USD.DEM.CA.AC.A01.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3/M.USD.DEM.CA.AC.A01?observations=1&format=json"
+          curl -sSL -m 90 -o b_M.DEM.USD.CA.AC.A01.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3/M.DEM.USD.CA.AC.A01?observations=1&format=json"
+          curl -sSL -m 90 -o b_M.USD.DEM.EA.AC.A01.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3/M.USD.DEM.EA.AC.A01?observations=1&format=json"
+          curl -sSL -m 90 -o b_M.DEM.USD.EA.AC.A01.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3/M.DEM.USD.EA.AC.A01?observations=1&format=json"
+          curl -sSL -m 90 -o b_M.USD.DEM.AA.AC.A02.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3/M.USD.DEM.AA.AC.A02?observations=1&format=json"
+          curl -sSL -m 90 -o bq.json "https://api.db.nomics.world/v22/series/BUBA/BBEX3?dimensions=%7B%22BBK_STD_CURRENCY%22%3A%5B%22USD%22%5D%2C%22BBK_STD_FREQ%22%3A%5B%22M%22%5D%7D&observations=0&format=json&limit=50"
           ls -la > files.txt 2>&1; set -e
-          git init -q -b research-flows4
+          git init -q -b research-flows5
           git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
-          git add . && git commit -q -m "gold2" && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-flows4
+          git add . && git commit -q -m "gold2" && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-flows5
