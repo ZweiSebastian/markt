@@ -49,7 +49,7 @@ TARGETS = {
 }
 BANDS = [(0, 35, "unter 35"), (35, 45, "35–45"), (45, 55, "45–55"), (55, 65, "55–65"), (65, 101, "ab 65")]
 CRASH = 0.15
-PROB_MODE = "score_fb"  # Score + Auslandskäufe US-Aktien (vorwärts getestet: deutlich besser). Richtung (score_dir, …) brachte nichts
+PROB_MODE = "score_fb_g7"  # Score + Auslandskäufe US-Aktien + G7-Zinsanstieg bei hoher Bewertung (beides vorwärts getestet). Richtung (score_dir, …) brachte nichts
 STRAT_FREQ = "M"       # Entscheidungsrhythmus der Regeln im Test: letzter Handelstag des Monats (getestet: besser als wöchentlich)
 TREND_N = 210          # Trendlinie in Börsentagen (210 ≈ 10 Monate)
 # Ungefähre Dividendenrendite p.a. für die 2x-Rechnung (Kursindizes); DAX und MSCI World in Euro enthalten Dividenden bereits
@@ -58,6 +58,7 @@ PROB_LAM = 1.0
 FBUY_MODE = "on"      # Auslandskäufe US-Aktien in der Säule Stimmung
 FBUY_ALL = False
 FBUY_DIV = 2.0
+G7_CAPE_Z = 1.0     # G7-Zinsanstieg zählt nur bei US-Bewertung über +1σ
 DIR_N = 63             # Richtung des Scores: Veränderung über 3 Monate (63 Börsentage)
 POOL_MIN_YEARS = 40     # kürzere Historien nutzen das am S&P 500 gelernte Modell
 EPISODE = 0.20
@@ -181,6 +182,32 @@ def run(ser, markt, now, quality=None, prev=None):
         fz = (fq - fq.rolling(40, min_periods=20).mean()) / fq.rolling(40, min_periods=20).std()
         return place(fz, 95, 200), place(fq, 95, 200)   # Z.1 erscheint ~10–11 Wochen nach Quartalsende
     fbz = foreign_buying()
+
+    def g7_rates():
+        """Lange Zinsen der G7: mittlerer Anstieg in 12 Monaten – zählt nur, wenn die US-Bewertung > 1σ über dem 20-J.-Schnitt liegt."""
+        ms = {}
+        for k in ("usa", "jpn", "can", "deu", "fra", "gbr", "ita"):
+            x = ser("lt10_" + k)
+            if x is not None and len(x) > 60:
+                x = x.sort_index()
+                x.index = x.index.to_period("M").to_timestamp()
+                ms[k] = x[~x.index.duplicated(keep="last")]
+        if len(ms) < 5:
+            return None
+        Ym = pd.DataFrame(ms)
+        d12 = Ym - Ym.shift(12)
+        avg = d12.mean(axis=1).where(d12.notna().sum(axis=1) >= 5).dropna()
+        gz = (avg - avg.expanding(60).mean()) / avg.expanding(60).std()
+        czd = (cape - cape.rolling(20 * Y, min_periods=10 * Y).mean()) / cape.rolling(20 * Y, min_periods=10 * Y).std()
+        gzp = place(gz, 33, 75)                  # Monatsdurchschnitt gilt ab kurz nach Monatsende
+        feat = (gzp * (czd > G7_CAPE_Z).astype(float)).where(czd.notna())
+        last = d12.dropna(how="all").iloc[-1]
+        info = {"avg": None if not len(avg) else round(float(avg.iloc[-1]), 2), "month": None if not len(avg) else str(avg.index[-1].date())[:7],
+                "z": None if not len(gz) else round(float(gz.iloc[-1]), 2), "cape_z": round(float(czd.dropna().iloc[-1]), 2),
+                "countries": {k: round(float(v), 2) for k, v in last.dropna().items()},
+                "active": bool(len(gz) and czd.dropna().iloc[-1] > G7_CAPE_Z and gz.iloc[-1] >= 1)}
+        return feat, info
+    g7 = g7_rates()
 
     # ---------- Komponenten-Bausteine (je Region zusammengestellt)
     def comp_us_valuation(C):
@@ -579,11 +606,13 @@ def run(ser, markt, now, quality=None, prev=None):
                 "crash12": round(crash_base, 0)}
 
         # ---------- Wahrscheinlichkeit (Walk-forward, logistische Regression auf die Säulen)
-        if PROB_MODE == "score" or (PROB_MODE == "score_fb" and fbz is None):
+        if PROB_MODE == "score" or (PROB_MODE in ("score_fb", "score_fb_g7") and fbz is None):
             Xall = pd.DataFrame({"c": 1.0, "t": (tv / sdn).fillna(0.0)}, index=days)
         elif PROB_MODE == "score_vol":
             Xall = pd.DataFrame({"c": 1.0, "t": (tv / sdn).fillna(0.0), "v": Pl["schwankung"].fillna(0), "b": Pl["bewertung"].fillna(0)}, index=days)
-        elif PROB_MODE == "score_fb" and fbz is not None:
+        elif PROB_MODE == "score_fb_g7" and fbz is not None and g7 is not None:
+            Xall = pd.DataFrame({"c": 1.0, "t": (tv / sdn).fillna(0.0), "f": fbz[0].fillna(0.0), "g": g7[0].fillna(0.0)}, index=days)
+        elif PROB_MODE in ("score_fb", "score_fb_g7") and fbz is not None:
             Xall = pd.DataFrame({"c": 1.0, "t": (tv / sdn).fillna(0.0), "f": fbz[0].fillna(0.0)}, index=days)
         elif PROB_MODE in ("score_dir", "score_fall", "score_midfall"):
             t_ = (tv / sdn)
@@ -847,7 +876,9 @@ def run(ser, markt, now, quality=None, prev=None):
             sent.append(f"Je niedriger der Rang, desto häufiger folgte ein Rückgang von {CRASH * 100:.0f} % oder mehr ("
                         + "; ".join(f"Rang {x['rlo']}–{x['rhi']}: {x['crash12']:.0f} %" for x in cb) + ").")
         if skill is not None:
-            sent.append(("Sie stützt sich auf den Score und die Käufe ausländischer Anleger von US-Aktien (hoch = spätzyklisch). " if PROB_MODE == "score_fb" and fbz is not None else "")
+            sent.append(("Sie stützt sich auf den Score, die Käufe ausländischer Anleger von US-Aktien (hoch = spätzyklisch)"
+                         + (" und – nur bei hoher Bewertung – gleichzeitig steigende Zinsen in den G7" if "g" in Xall.columns else "") + ". "
+                         if "f" in Xall.columns else "")
                         + f"Die Wahrscheinlichkeit wurde Jahr für Jahr nur mit damals bekannten Daten berechnet und ist "
                         + ("besser als der bloße Durchschnitt" if skill > 0 else "nicht besser als der bloße Durchschnitt")
                         + f" (Brier-Skill {skill:+.0f} %).")
@@ -871,7 +902,8 @@ def run(ser, markt, now, quality=None, prev=None):
                 "rv_med": None if pd.isna(rv_med.get(last_i)) else round(float(rv_med[last_i]), 5),
                 "sd": round(float(sdn[last_i]), 6), "fixed": live_fixed,
                 "coef": None if w_now is None else [round(float(x), 5) for x in w_now], "pillars": PILLARS, "weights": WEIGHTS,
-                "px": None if "f" not in Xall.columns else round(float(Xall["f"].get(last_i, 0.0)), 4)}
+                "px": None if "f" not in Xall.columns else round(float(Xall["f"].get(last_i, 0.0)), 4),
+                "px2": None if "g" not in Xall.columns else round(float(Xall["g"].get(last_i, 0.0)), 4)}
 
         # Verlauf: Score/Wahrscheinlichkeit/Kurs wöchentlich, Säulen monatlich
         wk = score.dropna()
@@ -913,7 +945,7 @@ def run(ser, markt, now, quality=None, prev=None):
     if markt:
         rule["signalScore"] = markt.get("score")
     q = quality_score()
-    return {"weights": WEIGHTS, "pillar_names": PILLAR_NAMES, "targets": targets, "rule": rule, "quality": q,
+    return {"weights": WEIGHTS, "pillar_names": PILLAR_NAMES, "targets": targets, "rule": rule, "quality": q, "g7": None if g7 is None else g7[1],
             "signal_params": (sig_cal or {}).get("p"), "signal_cal": sig_cal, "signal_roll": sig_params,
             "note": "Kursrenditen ohne Dividenden (außer MSCI World in Euro). Monatsdaten mit Veröffentlichungsverzögerung; "
                     "Stellenaufbau wie damals veröffentlicht (Philadelphia Fed), übrige Konjunkturdaten in heutiger Fassung. "

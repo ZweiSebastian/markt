@@ -721,6 +721,10 @@ function RK(T, s) {
   let lo = 0, hi = m.length - 1; while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (m[mid] <= s) lo = mid; else hi = mid; }
   const f = m[hi] > m[lo] ? (s - m[lo]) / (m[hi] - m[lo]) : 0; return Math.round(lo + f);
 }
+const G7N = { usa: 'USA', jpn: 'Japan', can: 'Kanada', deu: 'Deutschland', fra: 'Frankreich', gbr: 'UK', ita: 'Italien' };
+function g7Line(G) { if (!G || G.avg == null) return '';
+  const cs = Object.entries(G.countries || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${G7N[k] || k} ${v >= 0 ? '+' : ''}${nf(v, 1)}`).join(' · ');
+  return `<div class="mut" style="font-size:11.5px;margin-top:6px;line-height:1.45"><b style="color:${G.active ? C.down : 'inherit'}">${G.active ? '⚠ Warnsignal aktiv:' : 'Zinsen G7:'}</b> 10-J.-Renditen im Schnitt ${G.avg >= 0 ? '+' : ''}${nf(G.avg, 2)} Pp. in 12 Monaten (${cs}), US-Bewertung ${G.cape_z >= 0 ? '+' : ''}${nf(G.cape_z, 1)} σ. ${G.active ? 'Teure Aktien und weltweit gleichzeitig steigende Zinsen – früher folgte in 6 von 9 solchen Phasen ein Rückgang (1966, 1969, 1987, 1990, 2000, 2022; nicht 1968, 1994, 2023). Fließt in die Wahrscheinlichkeit ein.' : 'Zählt erst bei Bewertung über +1 σ und deutlichem gleichzeitigem Anstieg.'}</div>`; }
 function dirArrow(t) { const D = t.direction; if (!D) return ''; const d = D.now - D.ago;
   return d <= -10 ? `<span style="color:${C.down}" title="vor 3 Monaten Rang ${D.ago}">↓</span>` : d >= 10 ? `<span style="color:${C.up}" title="vor 3 Monaten Rang ${D.ago}">↑</span>` : ''; }
 function gaugeHTML(T, raw) {
@@ -778,7 +782,7 @@ function secEinschaetzung(m) {
       <div class="action"><span class="mut">Modell sagt:</span> <b id="hs-action">${esc(N.action)}</b></div>
       ${N.risk ? `<div class="probbox"><div class="lbl">Wahrscheinlichkeit für einen Rückgang von mindestens ${Math.round(T.crash * 100)} % in den nächsten 12 Monaten</div>
         <div><span class="big" id="hs-prob" style="font-size:30px">${N.risk.prob ?? '–'} %</span> <span class="mut">normal: ${N.risk.base} %</span>${T.prob && T.prob.pooled ? ' <span class="mut">· am S&P 500 gelernt (kurze Historie)</span>' : ''}</div>
-        <div class="rk"><span>So oft kam es tatsächlich vor: <b>${N.risk.band ?? '–'} %</b> bei ähnlichem Score</span><span><b>${N.risk.analog ?? '–'} %</b> in den ähnlichsten Momenten</span></div></div>` : ''}
+        <div class="rk"><span>So oft kam es tatsächlich vor: <b>${N.risk.band ?? '–'} %</b> bei ähnlichem Score</span><span><b>${N.risk.analog ?? '–'} %</b> in den ähnlichsten Momenten</span></div>${g7Line(M.g7)}</div>` : ''}
     </div>
     <div>
       <div class="lbl">Säulen <span class="mut">(50 = neutral)</span></div>
@@ -1036,7 +1040,7 @@ function liveModel(T) {
   if (!den) return null;
   const tot = num / den; const t = tot / L.sd;
   const score = Math.max(0, Math.min(100, 50 + 15 * t));
-  const prob = L.coef ? 100 / (1 + Math.exp(-(L.coef[0] + L.coef[1] * t + (L.coef.length > 2 && L.px != null ? L.coef[2] * L.px : 0)))) : null;
+  const prob = L.coef ? 100 / (1 + Math.exp(-(L.coef[0] + L.coef[1] * t + (L.coef.length > 2 && L.px != null ? L.coef[2] * L.px : 0) + (L.coef.length > 3 && L.px2 != null ? L.coef[3] * L.px2 : 0)))) : null;
   return { score, prob, day: dNow };
 }
 function labelOf(sc) { return sc >= 65 ? ['Rückenwind', 'good', 'Kaufen – auch größere Beträge'] : sc >= 45 ? ['Neutral', 'neutral', 'Normal investieren (Sparplan oder in Raten)'] : sc >= 35 ? ['Gegenwind', 'warn', 'Nur in Raten investieren, keine großen Einmalbeträge'] : ['Gefahrenzone', 'crit', 'Abwarten – historisch folgten hier meist Verluste']; }
