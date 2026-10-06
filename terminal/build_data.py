@@ -521,6 +521,88 @@ def z1_flows():
 
 
 slow("z1", z1_flows, ["row_eq_flow", "gdp_z1"], hours=24)
+
+G7_LT = {"usa": ("USA", "USA"), "jpn": ("JPN", "Japan"), "can": ("CAN", "Kanada"), "deu": ("DEU", "Deutschland"),
+         "fra": ("FRA", "Frankreich"), "gbr": ("GBR", "Großbritannien"), "ita": ("ITA", "Italien")}
+
+
+def g7_fresh():
+    """Aktuelle 10J-Renditen aus Tages-/Monatsquellen der Notenbanken (die OECD-Reihe hinkt Monate hinterher)."""
+    out = {}
+    y = ser("y10")
+    if y is not None:
+        out["usa"] = y
+    try:   # Japan: Finanzministerium (Historie + laufender Monat)
+        rows = []
+        for u in ("https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/historical/jgbcme_all.csv",
+                  "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/jgbcme.csv"):
+            txt = get(u, 60).content.decode("latin-1")
+            lines = txt.splitlines()
+            hi = next(i for i, l in enumerate(lines) if l.startswith("Date,"))
+            cols = lines[hi].split(",")
+            k = cols.index("10Y")
+            for l in lines[hi + 1:]:
+                p = l.split(",")
+                if len(p) > k and p[0][:2] in ("19", "20"):
+                    try:
+                        rows.append((pd.to_datetime(p[0], format="%Y/%m/%d"), float(p[k])))
+                    except ValueError:
+                        pass
+        if rows:
+            s = pd.Series(dict(rows)).sort_index()
+            out["jpn"] = s[s.index >= "2015-01-01"]
+    except Exception as e:  # noqa
+        note("g7 Japan", False, e)
+    try:   # Kanada: Bank of Canada
+        j = get("https://www.bankofcanada.ca/valet/observations/BD.CDN.10YR.DQ.YLD/json?start_date=2015-01-01", 60).json()
+        out["can"] = pd.Series({pd.Timestamp(o["d"]): float(o["BD.CDN.10YR.DQ.YLD"]["v"]) for o in j["observations"]
+                                if o.get("BD.CDN.10YR.DQ.YLD", {}).get("v") not in (None, "")})
+    except Exception as e:  # noqa
+        note("g7 Kanada", False, e)
+    try:   # Großbritannien: Bank of England (10J, Nullkupon nominal)
+        t = get("https://www.bankofengland.co.uk/boeapps/database/_iadb-fromshowcolumns.asp?csv.x=yes&Datefrom=01/Jan/2015"
+                "&Dateto=now&SeriesCodes=IUDMNZC&CSVF=TN&UsingCodes=Y&VPD=Y&VFD=N", 60).text
+        d = pd.read_csv(io.StringIO(t))
+        out["gbr"] = pd.Series(pd.to_numeric(d.iloc[:, 1], errors="coerce").values, index=pd.to_datetime(d.iloc[:, 0], format="%d %b %Y")).dropna()
+    except Exception as e:  # noqa
+        note("g7 UK", False, e)
+    try:   # Deutschland: Bundesbank (Zinsstruktur, 10 J.)
+        t = get("https://api.statistiken.bundesbank.de/rest/data/BBSIS/D.I.ZST.ZI.EUR.S1311.B.A604.R10XX.R.A.A._Z._Z.A"
+                "?format=csv&lang=en&startPeriod=2015-01-01", 60).content.decode("utf-8-sig")
+        rows = [l.split(",") for l in t.splitlines() if l[:2] in ("19", "20")]
+        s = pd.Series({pd.Timestamp(r[0]): r[1] for r in rows})
+        out["deu"] = pd.to_numeric(s, errors="coerce").dropna()
+    except Exception as e:  # noqa
+        note("g7 Deutschland", False, e)
+    for c, cc in (("fra", "FR"), ("ita", "IT")):   # Frankreich/Italien: EZB-Konvergenzzinsen (Monat, ~1 Monat Verzug)
+        try:
+            d = pd.read_csv(io.StringIO(get(f"https://data-api.ecb.europa.eu/service/data/IRS/M.{cc}.L.L40.CI.0000.EUR.N.Z"
+                                            f"?startPeriod=2015-01&format=csvdata", 60).text))
+            out[c] = pd.Series(d.OBS_VALUE.values, index=pd.to_datetime(d.TIME_PERIOD))
+        except Exception as e:  # noqa
+            note(f"g7 {cc}", False, e)
+    return out
+
+
+def g7_yields():
+    fresh = g7_fresh()
+    ok = []
+    for k, (code, name) in G7_LT.items():
+        m = dbn(f"OECD/DSD_STES@DF_FINMARK/{code}.M.IRLT.PA._Z._Z._Z._Z.N", "1955-01-01")
+        m.index = m.index.to_period("M").to_timestamp()
+        f = fresh.get(k)
+        if f is not None and len(f):
+            fm = f.groupby(f.index.to_period("M")).mean()
+            fm.index = fm.index.to_timestamp()
+            ov = (m - fm).dropna().tail(12)
+            off = float(ov.mean()) if len(ov) >= 3 else 0.0   # Quellen leicht unterschiedlich definiert: an OECD angleichen
+            m = pd.concat([m, fm[fm.index > m.index.max()] + off])
+            ok.append(f"{k}:{fm.index.max():%Y-%m}")
+        put(f"lt10_{k}", m, f"Staatsanleihe 10J {name} (Monats-Ø)", "intern", "%", "rate", "OECD / Notenbanken", "m", 2)
+    note("g7 aktuell", True, ", ".join(ok))
+
+
+slow("g7", g7_yields, [f"lt10_{k}" for k in G7_LT], hours=12)
 if cache_meta.get("zinsen", {}).get("at") != NOW.strftime("%Y-%m-%dT%H:%M:%SZ"):
     try:   # im Cache-Fall die letzten Tage frisch nachziehen
         tr = treasury_year(NOW.year)
