@@ -1,0 +1,18 @@
+OK   vorheriger Lauf  2026-10-10T11:15:59Z
+OK   Tages-Archiv  89 Reihen
+OK   yahoo  56/56 Ticker (Ergänzung)
+OK   quality  10 Firmen
+OK   zinsen  y3m:11276, y2:12586, y10:14184, y30:12408
+OK   g7 aktuell  usa:2026-10, jpn:2026-10, can:2026-10, deu:2026-10, fra:2026-08, gbr:2026-10, ita:2026-08
+OK   payrolls_rt  aus Cache 2026-10-10T11:15:59Z
+OK   gdp  A191RC-Q
+OK   shiller  aus Cache 2026-10-10T11:15:59Z
+OK   markt.json  2026-10-09
+OK   stress  jetzt 6 Signale
+OK   modell  world: 50 · world_eur: 51 · spx: 49 · ndx: 49 · rut: 46 · sx5e: 55 · dax: 49 · nikkei: 56 · em: 51
+OK   protokoll  9 Einträge
+OK   konzentration KGV  Index 25.2 Top10 27.0 Rest 24.2 gleich 20.8 Gewicht 39.0%
+FEHL rss Yahoo Finance  HTTPError: 404 Client Error: Not Found for url: https://finance.yahoo.com/news/rssindex
+OK   news  129 Meldungen
+OK   Tages-Archiv: 89 Reihen, 5.88 MB
+OK   fertig: 122 Reihen, 5.13 MB
