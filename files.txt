@@ -1,0 +1,13 @@
+total 840
+drwxr-xr-x 2 runner runner   4096 Oct 11 19:41 .
+drwxr-xr-x 3 runner runner   4096 Oct 11 19:41 ..
+-rw-r--r-- 1 runner runner  10415 Oct 11 19:41 bls_c_1939.json
+-rw-r--r-- 1 runner runner  10415 Oct 11 19:41 bls_c_1959.json
+-rw-r--r-- 1 runner runner  10415 Oct 11 19:41 bls_c_1979.json
+-rw-r--r-- 1 runner runner  10415 Oct 11 19:41 bls_c_1999.json
+-rw-r--r-- 1 runner runner   8301 Oct 11 19:41 bls_c_2019.json
+-rw-r--r-- 1 runner runner  84077 Oct 11 19:41 db_ces.json
+-rw-r--r-- 1 runner runner    179 Oct 11 19:41 db_permit.json
+-rw-r--r-- 1 runner runner      0 Oct 11 19:41 files.txt
+-rw-r--r-- 1 runner runner 358912 Oct 11 19:41 permits_cust.xls
+-rw-r--r-- 1 runner runner 337408 Oct 11 19:41 starts_cust.xls
