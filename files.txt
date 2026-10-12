@@ -1,0 +1,26 @@
+total 4248
+drwxr-xr-x 2 runner runner    4096 Oct 12 21:49 .
+drwxr-xr-x 3 runner runner    4096 Oct 12 21:48 ..
+-rw-r--r-- 1 runner runner  119089 Oct 12 21:48 10_Portfolios_Prior_12_2.zip
+-rw-r--r-- 1 runner runner  383407 Oct 12 21:49 25_Portfolios_BEME_OP_5x5.zip
+-rw-r--r-- 1 runner runner    1245 Oct 12 21:49 25_Portfolios_BEME_Prior_12_2.zip
+-rw-r--r-- 1 runner runner    1245 Oct 12 21:49 Developed_25_Portfolios_BE-ME_OP_5x5.zip
+-rw-r--r-- 1 runner runner    1245 Oct 12 21:49 Developed_25_Portfolios_BE-ME_Prior_12_2.zip
+-rw-r--r-- 1 runner runner    6802 Oct 12 21:48 Developed_5_Factors.zip
+-rw-r--r-- 1 runner runner   30013 Oct 12 21:48 Developed_6_Portfolios_ME_BE-ME.zip
+-rw-r--r-- 1 runner runner   29868 Oct 12 21:49 Developed_6_Portfolios_ME_INV.zip
+-rw-r--r-- 1 runner runner   29925 Oct 12 21:49 Developed_6_Portfolios_ME_OP.zip
+-rw-r--r-- 1 runner runner   30612 Oct 12 21:49 Developed_6_Portfolios_ME_Prior_12_2.zip
+-rw-r--r-- 1 runner runner    2264 Oct 12 21:48 Developed_Mom_Factor.zip
+-rw-r--r-- 1 runner runner    5600 Oct 12 21:48 F-F_Momentum_Factor.zip
+-rw-r--r-- 1 runner runner   11964 Oct 12 21:48 F-F_Research_Data_5_Factors_2x3.zip
+-rw-r--r-- 1 runner runner  219193 Oct 12 21:48 Portfolios_Formed_on_BE-ME.zip
+-rw-r--r-- 1 runner runner  164314 Oct 12 21:48 Portfolios_Formed_on_CF-P.zip
+-rw-r--r-- 1 runner runner  202266 Oct 12 21:48 Portfolios_Formed_on_D-P.zip
+-rw-r--r-- 1 runner runner  163834 Oct 12 21:48 Portfolios_Formed_on_E-P.zip
+-rw-r--r-- 1 runner runner  135628 Oct 12 21:48 Portfolios_Formed_on_INV.zip
+-rw-r--r-- 1 runner runner  200765 Oct 12 21:48 Portfolios_Formed_on_ME.zip
+-rw-r--r-- 1 runner runner  135190 Oct 12 21:48 Portfolios_Formed_on_OP.zip
+-rw-r--r-- 1 runner runner  147521 Oct 12 21:48 Portfolios_Formed_on_VAR.zip
+-rw-r--r-- 1 runner runner 2262703 Oct 12 21:49 aqr_qmj.xlsx
+-rw-r--r-- 1 runner runner       0 Oct 12 21:49 files.txt
