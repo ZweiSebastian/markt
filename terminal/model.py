@@ -703,7 +703,7 @@ def run(ser, markt, now, quality=None, prev=None):
         sched = {
             "bh": ("Kaufen und halten", "immer 100 % investiert", pd.Series(1.0, index=days)),
             "trend": ("Trendregel 10 Monate", "investiert, wenn der Kurs über seiner 10-Monats-Linie liegt, sonst Geldmarkt", (P > sma210).astype(float)),
-            "score": ("Modell-Quote", f"Rang {rk(50)} = 50 % investiert, ab Rang {rk(65)} = 100 %, bis Rang {rk(35)} = 0 %, dazwischen fließend; Rest Geldmarkt", ((score - 50) / 30 + 0.5).clip(0, 1)),
+            "score": ("Rang-Quote", f"Aktienanteil folgt dem Rang: bis Rang {rk(35)} 0 %, Rang {rk(50)} 50 %, ab Rang {rk(65)} 100 %, dazwischen stufenlos; Rest Geldmarkt", ((score - 50) / 30 + 0.5).clip(0, 1)),
             "schutz": ("Schutzregel", f"voll investiert, außer der Rang fällt: unter {rk(45)} nur 50 %, unter {rk(35)} raus",
                        pd.Series(np.select([score >= 45, score >= 35], [1.0, 0.5], 0.0), index=days).where(score.notna())),
         }
@@ -890,7 +890,7 @@ def run(ser, markt, now, quality=None, prev=None):
             sent.append(f"Von den {len(episodes)} Einbrüchen von mindestens {EPISODE * 100:.0f} % seit {first.year} zeigte das Modell bei {len(warned)} spätestens bis zum Tief Gegenwind.")
         sb = next(x for x in strategies if x["id"] == "bh")
         ss = next(x for x in strategies if x["id"] == "score")
-        sent.append(f"Als Regel (Modell-Quote): {ss['cagr']:+.1f} % p.a. bei höchstens {ss['mdd']:.0f} % Verlust – Kaufen und Halten: {sb['cagr']:+.1f} % p.a. bei {sb['mdd']:.0f} %.")
+        sent.append(f"Als Regel (Rang-Quote): {ss['cagr']:+.1f} % p.a. bei höchstens {ss['mdd']:.0f} % Verlust – Kaufen und Halten: {sb['cagr']:+.1f} % p.a. bei {sb['mdd']:.0f} %.")
         sent = [dez(x) for x in sent]
 
         cb_now = next((x for x in bands if x["lo"] <= now_score < x["hi"]), None)
