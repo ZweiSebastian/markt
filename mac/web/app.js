@@ -758,7 +758,7 @@ function secEinschaetzung(m) {
   const yrs = t => { const a = +t.since.slice(0, 4), b = +t.now.month.slice(0, 4); return b - a; };
   ov.innerHTML = `<div class="hd"><div><div class="ttl">Alle Indizes im Überblick</div><div class="sub">Klick auf eine Zeile zeigt die Einschätzung im Detail. Stand ${fmtDate(monthDay(N.day))} (Tagesmodell); Rang und Wahrscheinlichkeit live mit den aktuellen Kursen.</div></div></div>
     <table class="t ov" style="margin-top:6px"><tr><th rowspan="2">Index</th><th rowspan="2">Region</th><th rowspan="2" title="Rang 0–100 auf einer gemeinsamen Skala für alle Indizes: günstiger als an X % aller bisherigen Tage aller Indizes. 50 = typischer Tag. Grenzen überall gleich.">Rang</th><th rowspan="2">Lage</th><th colspan="4" class="grp">Risiko: Rückgang um 15 % oder mehr in den nächsten 12 Monaten</th><th rowspan="2">Trend</th><th rowspan="2">Daten</th></tr>
-    <tr><th title="Vorwärts getestete Modellprognose für heute">Prognose</th><th title="Wie oft es früher passierte, wenn der Score ähnlich war">früher bei<br>gleichem Score</th><th title="Wie oft es nach den 8 ähnlichsten Momenten der Geschichte passierte">früher in<br>ähnlichen Lagen</th><th title="Wie oft es im Durchschnitt aller Monate passierte">im<br>Durchschnitt</th></tr>
+    <tr><th title="Vorwärts getestete Modellprognose für heute">Prognose</th><th title="Wie oft es früher passierte, wenn der Rang ähnlich war">früher bei<br>gleichem Rang</th><th title="Wie oft es nach den 8 ähnlichsten Momenten der Geschichte passierte">früher in<br>ähnlichen Lagen</th><th title="Wie oft es im Durchschnitt aller Monate passierte">im<br>Durchschnitt</th></tr>
     ${Object.entries(M.targets).map(([k, t]) => { const tr = (t.now.pillars.find(p => p.id === 'trend') || {}).score; const y = yrs(t);
       return `<tr class="row ${k === TGT ? 'hl' : ''}" data-t="${k}"><td>${esc(t.name)}</td><td style="font-family:inherit" class="mut">${esc(t.region || '')}</td><td><b id="ov-s-${k}">${RK(t, t.now.score)}</b> ${dirArrow(t)}</td>
       <td style="font-family:inherit" id="ov-l-${k}"><span class="badge ${t.now.cls === 'crit' ? 'crit' : t.now.cls}">${esc(t.now.label)}</span></td>
@@ -775,14 +775,14 @@ function secEinschaetzung(m) {
   const hero = document.createElement('div'); hero.className = 'card hero'; hero.id = 'hero';
   hero.innerHTML = `<div class="hgrid">
     <div>
-      <div class="lbl">Rang ${esc(T.name)} <span class="mut">– günstiger als an so viel % aller bisherigen Tage, gleiche Skala für alle Indizes (Score ${N.score})</span></div>
+      <div class="lbl">Rang ${esc(T.name)} <span class="mut">– günstiger als an so viel % aller bisherigen Tage, gleiche Skala für alle Indizes</span></div>
       <div class="hscore"><span class="big" id="hs-score">${RK(T, N.score)}</span><span class="mut"> / 100</span> <span id="hs-badge"><span class="badge ${N.cls === 'crit' ? 'crit' : N.cls}">${esc(N.label)}</span></span><span class="livetag" id="hs-live"></span></div>
       ${T.direction ? `<div class="mut" style="font-size:12px;margin:-2px 0 6px">vor 3 Monaten Rang ${T.direction.ago} ${dirArrow(T)}${T.direction.cur === 0 ? ' – der Rang fällt' : T.direction.cur === 2 ? ' – der Rang steigt' : ''}</div>` : ''}
       ${gaugeHTML(T, N.score)}
       <div class="action"><span class="mut">Modell sagt:</span> <b id="hs-action">${esc(N.action)}</b></div>
       ${N.risk ? `<div class="probbox"><div class="lbl">Wahrscheinlichkeit für einen Rückgang von mindestens ${Math.round(T.crash * 100)} % in den nächsten 12 Monaten</div>
         <div><span class="big" id="hs-prob" style="font-size:30px">${N.risk.prob ?? '–'} %</span> <span class="mut">normal: ${N.risk.base} %</span>${T.prob && T.prob.pooled ? ' <span class="mut">· am S&P 500 gelernt (kurze Historie)</span>' : ''}</div>
-        <div class="rk"><span>So oft kam es tatsächlich vor: <b>${N.risk.band ?? '–'} %</b> bei ähnlichem Score</span><span><b>${N.risk.analog ?? '–'} %</b> in den ähnlichsten Momenten</span></div>${g7Line(M.g7)}</div>` : ''}
+        <div class="rk"><span>So oft kam es tatsächlich vor: <b>${N.risk.band ?? '–'} %</b> bei ähnlichem Rang</span><span><b>${N.risk.analog ?? '–'} %</b> in den ähnlichsten Momenten</span></div>${g7Line(M.g7)}</div>` : ''}
     </div>
     <div>
       <div class="lbl">Säulen <span class="mut">(50 = neutral)</span></div>
@@ -807,7 +807,7 @@ function secEinschaetzung(m) {
   // Verlauf
   sect(m, 'Verlauf');
   const vh = document.createElement('div'); vh.className = 'card full';
-  vh.innerHTML = `<div class="hd"><div><div class="ttl">${esc(T.name)}, Score und Wahrscheinlichkeit seit ${T.since.slice(0, 4)}</div><div class="sub">Oben der Index (logarithmisch), unten der Rang (Fläche, 50 = typischer Tag) und Crash-Wahrscheinlichkeit in % (orange, ab ${T.prob && T.prob.oos_from ? T.prob.oos_from.slice(0, 4) : '–'} vorwärts getestet). Wochenwerte, gestrichelt die Grenzen der Lagen (Gefahrenzone, Gegenwind, Rückenwind).</div></div></div>
+  vh.innerHTML = `<div class="hd"><div><div class="ttl">${esc(T.name)}, Rang und Wahrscheinlichkeit seit ${T.since.slice(0, 4)}</div><div class="sub">Oben der Index (logarithmisch), unten der Rang (Fläche, 50 = typischer Tag) und Crash-Wahrscheinlichkeit in % (orange, ab ${T.prob && T.prob.oos_from ? T.prob.oos_from.slice(0, 4) : '–'} vorwärts getestet). Wochenwerte, gestrichelt die Grenzen der Lagen (Gefahrenzone, Gegenwind, Rückenwind).</div></div></div>
     <div class="legend" id="vlg"></div><div class="chart" style="height:260px"></div><div class="chart" style="height:170px"></div>`;
   m.appendChild(vh);
   queueMicrotask(() => {
@@ -873,8 +873,9 @@ function secEinschaetzung(m) {
   st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, monatlich angepasst (Entscheidung am letzten Handelstag, gilt ab dem nächsten Monat), nicht investiertes Geld im Geldmarkt. Mit ETF-Gebühr (0,2 % p.a., gehebelt 0,6 % + Finanzierung), ohne Dividenden und Handelskosten, Steuern zuschaltbar. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
     <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span>${S3[0].eq2 ? '<span class="lev"><span class="mut">ETF:</span><button data-l="1" class="on">normal</button><button data-l="2">2x gehebelt</button>' : '<span class="lev">'}${T.cash_m ? '<span class="mut" style="margin-left:10px">Steuern:</span><button data-x="0" class="on">vor</button><button data-x="1">nach</button>' : ''}</span></div>
     <div class="legend" id="slg"></div><div class="chart tall"></div>
-    <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th></tr>
-    ${S3.map((x, j) => `<tr><td><i style="display:inline-block;width:12px;border-top:2px solid ${SER[j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td id="sr-c${j}"></td><td id="sr-d${j}"></td><td id="sr-v${j}"></td><td id="sr-e${j}"></td></tr>`).join('')}</table>
+    <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th><th>diesen Monat</th></tr>
+    ${S3.map((x, j) => `<tr><td style="white-space:normal;min-width:220px"><i style="display:inline-block;width:12px;border-top:2px solid ${SER[j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td id="sr-c${j}"></td><td id="sr-d${j}"></td><td id="sr-v${j}"></td><td id="sr-e${j}"></td><td>${(() => { const ex = x.ex || []; const v = ex.length ? Math.max(0, Math.min(1, ex[ex.length - 1])) : null; return v == null ? '–' : `<b>${nf(v * 100, 0)} %</b> Aktien<div class="mut" style="font-size:11px">${nf(100 - v * 100, 0)} % Geldmarkt</div>`; })()}</td></tr>`).join('')}</table>
+    ${stratExplain(T)}
     <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge. Ab frei gewähltem Start rechnet die App mit Monatswerten; der größte Verlust berücksichtigt den tiefsten Tageskurs je Monat. „2x gehebelt“: dieselbe Regel, aber investiert wird in einen täglich zurückgesetzten 2x-ETF – doppelte Tagesrendite, Finanzierung zum Geldmarktzins + 0,5 % und 0,6 % Gebühr pro Jahr; nicht investiertes Geld liegt weiter im Geldmarkt. „Nach Steuern“: Wert, wenn man zum jeweiligen Zeitpunkt alles verkauft und versteuert – 26,375 % Abgeltungsteuer inkl. Soli, bei Aktien-ETFs 30 % Teilfreistellung (effektiv 18,5 % auf Kursgewinne; auch für die 2x-ETFs angenommen). Jeder Teilverkauf einer Regel versteuert den anteiligen Gewinn sofort, Verluste gehen in den Verlusttopf und werden mit späteren Gewinnen verrechnet, Geldmarktzinsen voll steuerpflichtig. Nicht berücksichtigt: Sparerpauschbetrag (1.000 €, verheiratet 2.000 € pro Jahr), Kirchensteuer, Vorabpauschale (wird beim Verkauf angerechnet, verschiebt also nur den Zeitpunkt) und die genaue FIFO-Reihenfolge.</div>`;
   m.appendChild(st);
   queueMicrotask(() => {
@@ -960,7 +961,7 @@ function konzSection(m, K) {
       <div><div class="lbl">Rückstand der vielen, täglich (RSP ggü. SPY, 6 Monate, in %)</div><div class="chart kz1" style="height:170px"></div></div>
       <div><div class="lbl">KGV mitgeschrieben (ab ${esc(((K.track || [])[0] || {}).d || '–')})</div><div class="chart kz2" style="height:170px"></div></div>
     </div>
-    <div class="note">So liest du das: Hinken die vielen stark hinterher, während der Index nahe am Hoch steht, kam es seit 1963 etwa dreimal so oft zu einem Rückschlag von 15 % oder mehr – die Rendite über 12 Monate war im Mittel aber trotzdem gut, und meist liefen die Schwergewichte sogar weiter vorneweg. Es ist deshalb ein Hinweis auf <b>erhöhtes Rückschlagrisiko</b>, kein Verkaufssignal. Im Test machte es die Crash-Prognose sogar schlechter (trainiert bis 1989, geprüft ab 1990) und fließt deshalb <b>nicht</b> in den Score ein. Historie: Kenneth-French-Datenbibliothek, größere Hälfte der US-Aktien gleich gewichtet (verläuft zu 94 % wie RSP)${sa ? `; seit 1927: ${sa.rows[0].dd15} % gegenüber ${sa.base} % im Schnitt` : ''}. Ein historisches KGV ohne Top 10 gibt es nicht frei – deshalb wird es ab jetzt täglich mitgeschrieben. Die Top 10 sind die größten Positionen des SPY${P.holdings ? ' (' + P.holdings.map(h => esc(h.t)).join(', ') + ')' : ''} – Alphabet ist mit zwei Aktiengattungen doppelt vertreten. „erwartet“ = KGV auf die geschätzten Gewinne der nächsten 12 Monate (für den Gesamtindex nicht frei verfügbar).</div>`;
+    <div class="note">So liest du das: Hinken die vielen stark hinterher, während der Index nahe am Hoch steht, kam es seit 1963 etwa dreimal so oft zu einem Rückschlag von 15 % oder mehr – die Rendite über 12 Monate war im Mittel aber trotzdem gut, und meist liefen die Schwergewichte sogar weiter vorneweg. Es ist deshalb ein Hinweis auf <b>erhöhtes Rückschlagrisiko</b>, kein Verkaufssignal. Im Test machte es die Crash-Prognose sogar schlechter (trainiert bis 1989, geprüft ab 1990) und fließt deshalb <b>nicht</b> in den Rang ein. Historie: Kenneth-French-Datenbibliothek, größere Hälfte der US-Aktien gleich gewichtet (verläuft zu 94 % wie RSP)${sa ? `; seit 1927: ${sa.rows[0].dd15} % gegenüber ${sa.base} % im Schnitt` : ''}. Ein historisches KGV ohne Top 10 gibt es nicht frei – deshalb wird es ab jetzt täglich mitgeschrieben. Die Top 10 sind die größten Positionen des SPY${P.holdings ? ' (' + P.holdings.map(h => esc(h.t)).join(', ') + ')' : ''} – Alphabet ist mit zwei Aktiengattungen doppelt vertreten. „erwartet“ = KGV auf die geschätzten Gewinne der nächsten 12 Monate (für den Gesamtindex nicht frei verfügbar).</div>`;
   m.appendChild(c);
   queueMicrotask(() => {
     const e1 = c.querySelector('.kz1'), e2 = c.querySelector('.kz2');
@@ -1118,7 +1119,7 @@ function planState(P, M, liveScore) {
   const r = { T, inv, done, rest, boughtM, sig, mOut, elapsed, left, sc, base, due: 0, kind: '', head: '', why: '' };
   if (rest <= 1) { r.kind = 'done'; r.head = 'Plan erfüllt – alles angelegt'; r.why = 'Ab jetzt entscheidet nur noch der Signale-Reiter, ob du draußen bleibst oder wieder einsteigst.'; return r; }
   if (sig === 0) { r.kind = 'pause'; r.head = 'Pause: Ausstiegssignal aktiv'; r.why = `Der Signale-Reiter steht für ${esc(T.name)} auf „draußen“. Solange das so ist, wird nichts angelegt – die Frist verlängert sich um jeden solchen Monat.`; return r; }
-  if (sc >= 55) { r.kind = 'all'; r.due = rest; r.head = 'Rest jetzt anlegen'; r.why = `Rang ${RK(T, sc)} (Score ${sc}) liegt im günstigen Bereich (ab Rang ${RK(T, 55)}): Das Crash-Risiko ist unterdurchschnittlich – historisch war es dann am besten, den Rest auf einmal anzulegen.`; return r; }
+  if (sc >= 55) { r.kind = 'all'; r.due = rest; r.head = 'Rest jetzt anlegen'; r.why = `Rang ${RK(T, sc)} liegt im günstigen Bereich (ab Rang ${RK(T, 55)}): Das Crash-Risiko ist unterdurchschnittlich – historisch war es dann am besten, den Rest auf einmal anzulegen.`; return r; }
   if (left <= 1) { r.kind = 'all'; r.due = rest; r.head = 'Frist erreicht – Rest anlegen'; r.why = `Die ${P.max || 24}-Monats-Frist ist erreicht. Länger zu warten hat historisch mehr gekostet als genützt.`; return r; }
   if (sc < 45) { r.kind = 'pause'; r.head = `Pause: Rang unter ${RK(T, 45)}`; r.why = `Rang ${RK(T, sc)}: erhöhtes Crash-Risiko. Diesen Monat nichts anlegen – noch ${left} Monate bis zur Frist, danach wird der Rest in jedem Fall angelegt.`; return r; }
   const target = Math.max(base, rest / left);
@@ -1173,7 +1174,7 @@ function drawPlan(c, M) {
       <div class="pform">
         <label>Gesamtbetrag (€)<input id="pf-a" type="number" step="1000" value="${P.amount}"></label>
         <label>davon Reserve, wird nicht angelegt (€)<input id="pf-r" type="number" step="1000" value="${P.reserve || 0}"></label>
-        <label>Richtwert (Score und Signal von)<select id="pf-t">${opts}</select></label>
+        <label>Richtwert (Rang und Signal von)<select id="pf-t">${opts}</select></label>
         <label>Start<input id="pf-s" type="date" value="${P.start || ymd(new Date())}"></label>
         <label>Raten (Monate)<input id="pf-b" type="number" min="1" max="60" value="${P.base || 12}"></label>
         <label>spätestens alles nach (Monaten)<input id="pf-m" type="number" min="1" max="60" value="${P.max || 24}"></label>
@@ -1220,7 +1221,7 @@ function drawPlan(c, M) {
         ${(P.buys || []).length ? `<table class="t" style="margin-top:8px"><tr><th>Datum</th><th>Betrag</th>${ls ? '<th>Teil</th>' : ''}<th></th></tr>${P.buys.slice().reverse().map((b, i) => `<tr><td>${fmtDate(monthDay(b.d))}</td><td>${eur(b.a)}</td>${ls ? `<td class="mut">${b.t === 'l' ? 'Linie' : 'Haupt'}</td>` : ''}<td><button class="x" data-i="${P.buys.length - 1 - i}" title="Eintrag entfernen">×</button></td></tr>`).join('')}</table>` : '<div class="note">Noch nichts eingetragen. Trag jede Ausführung ein – daraus rechnet der Plan, was noch offen ist.</div>'}
       </div>
     </div>
-    <div class="note">Regel (getestet für jeden Startmonat seit 1953, 10 Jahre Horizont): Endwert im Median wie „sofort alles“ oder leicht besser, aber nur halb so oft mehr als 20 % Buchverlust in den ersten drei Jahren. Vor einem Crash <i>nach</i> dem Einstieg schützt keine Einstiegsregel – dafür ist der Ausstieg im Signale-Reiter da. Entschieden wird mit dem Schluss-Score; der Live-Score zeigt nur, was sich anbahnt. ${ls ? 'Linien-Anteil: Bei hohem CAPE (über +1,5 σ) kam der Kurs seit 1900 in 8 von 9 Phasen nach 16–43 Monaten an die 200-Wochen-Linie zurück; die Ausnahme (1989–2001) dauerte 11 Jahre – deshalb die Höchstwartezeit. ' : ''}Kein Anlagerat.</div>`;
+    <div class="note">Regel (getestet für jeden Startmonat seit 1953, 10 Jahre Horizont): Endwert im Median wie „sofort alles“ oder leicht besser, aber nur halb so oft mehr als 20 % Buchverlust in den ersten drei Jahren. Vor einem Crash <i>nach</i> dem Einstieg schützt keine Einstiegsregel – dafür ist der Ausstieg im Signale-Reiter da. Entschieden wird mit dem Schlusswert; der Live-Rang zeigt nur, was sich anbahnt. ${ls ? 'Linien-Anteil: Bei hohem CAPE (über +1,5 σ) kam der Kurs seit 1900 in 8 von 9 Phasen nach 16–43 Monaten an die 200-Wochen-Linie zurück; die Ausnahme (1989–2001) dauerte 11 Jahre – deshalb die Höchstwartezeit. ' : ''}Kein Anlagerat.</div>`;
   c.querySelector('#pl-edit').onclick = () => { c.dataset.edit = '1'; drawPlan(c, M); };
   c.querySelector('#pl-add').onclick = () => { const a = +c.querySelector('#pl-amt').value, d = c.querySelector('#pl-d').value; if (!(a > 0) || !d) return;
     const tSel = c.querySelector('#pl-t'); const t = tSel ? tSel.value : 'n';
@@ -1244,7 +1245,7 @@ function analogSection(m, T) {
   const PN = { bewertung: 'Bew.', gewinne: 'Gew.', trend: 'Trend', schwankung: 'Schw.', breite: 'Breite', konjunktur: 'Konj.', finanzen: 'Fin.', stimmung: 'Stimm.' };
   const NOWP = Object.fromEntries(T.now.pillars.map(p => [p.id, p.score]));
   c.innerHTML = `<div class="hd"><div><div class="ttl">Die ${A.n} ähnlichsten Monate seit ${T.since.slice(0, 4)}</div>
-    <div class="sub">Gesucht wird über alle Komponenten der acht Säulen gleichzeitig – nicht nur über den Score. Zwischen zwei Treffern liegen mindestens 18 Monate, damit es verschiedene Episoden sind. Darunter der Verlauf des ${esc(T.name)} in den 36 Monaten danach (Start = 100).</div></div></div>
+    <div class="sub">Gesucht wird über alle Komponenten der acht Säulen gleichzeitig – nicht nur über den Rang. Zwischen zwei Treffern liegen mindestens 18 Monate, damit es verschiedene Episoden sind. Darunter der Verlauf des ${esc(T.name)} in den 36 Monaten danach (Start = 100).</div></div></div>
     <div class="anasum">
       <div><div class="lbl">nach 12 Monaten (Median)</div><div class="big" style="font-size:22px">${fmtPct(A.f12)}</div></div>
       <div><div class="lbl">nach 24 Monaten (Median)</div><div class="big" style="font-size:22px">${fmtPct(A.f24)}</div></div>
@@ -1295,13 +1296,25 @@ function episodeSection(m, T) {
   const c = document.createElement('div'); c.className = 'card full';
   const mn = p => fmtDate(monthDay(p));
   c.innerHTML = `<div class="hd"><div><div class="ttl">Alle Rückgänge des ${esc(T.name)} von mindestens ${Math.round(T.episode * 100)} % seit ${T.since.slice(0, 4)}</div>
-    <div class="sub">Tagesschlusskurse. „Warnung“ = erster Tag ab 6 Monate vor dem Hoch bis zum Tief, an dem der Score unter 45 fiel. Rechts: größter Verlust im selben Zeitraum, wenn man der jeweiligen Regel gefolgt wäre.</div></div></div>
-    <table class="t" style="margin-top:6px"><tr><th>Hoch</th><th>Tief</th><th>Verlust</th><th>Dauer</th><th>Score am Hoch</th><th>Wahrsch. am Hoch</th><th>Warnung</th><th>da schon verloren</th><th>Modell-Quote</th><th>Trendregel</th><th>Schutzregel</th></tr>
-    ${E.map(e => `<tr><td>${mn(e.peak)}</td><td>${mn(e.trough)}</td><td>${fmtPct(e.depth, 0)}</td><td>${e.months} M.</td><td>${e.s_peak ?? '–'}</td><td>${e.p_peak == null ? '–' : e.p_peak + ' %'}</td>
+    <div class="sub">Tagesschlusskurse. „Warnung“ = erster Tag ab 6 Monate vor dem Hoch bis zum Tief, an dem der Rang unter ${RK(T, 45)} fiel. Rechts: größter Verlust im selben Zeitraum, wenn man der jeweiligen Regel gefolgt wäre.</div></div></div>
+    <table class="t" style="margin-top:6px"><tr><th>Hoch</th><th>Tief</th><th>Verlust</th><th>Dauer</th><th>Rang am Hoch</th><th>Wahrsch. am Hoch</th><th>Warnung</th><th>da schon verloren</th><th>Rang-Quote</th><th>Trendregel</th><th>Schutzregel</th></tr>
+    ${E.map(e => `<tr><td>${mn(e.peak)}</td><td>${mn(e.trough)}</td><td>${fmtPct(e.depth, 0)}</td><td>${e.months} M.</td><td>${e.s_peak == null ? '–' : RK(T, e.s_peak)}</td><td>${e.p_peak == null ? '–' : e.p_peak + ' %'}</td>
       <td style="font-family:inherit">${e.warn ? mn(e.warn) : '<span style="color:var(--serious)">keine</span>'}</td><td>${e.lost_at_warn == null ? '–' : fmtPct(e.lost_at_warn, 0)}</td>
       <td>${fmtPct(e.dd_score, 0)}</td><td>${fmtPct(e.dd_trend, 0)}</td><td>${fmtPct(e.dd_schutz, 0)}</td></tr>`).join('')}</table>
     <div class="note">Schnelle Schocks wie 1987 oder 2020 kündigen sich in Monatsdaten kaum an – das Modell hilft vor allem bei langen Abwärtsphasen wie 1973/74, 2000–2002 und 2007–2009, die den größten Schaden anrichten.</div>`;
   m.appendChild(c);
+}
+function stratExplain(T) {
+  const R = s => RK(T, s), q = s => Math.round(Math.max(0, Math.min(1, (s - 50) / 30 + 0.5)) * 100);
+  const SS = [35, 40, 45, 50, 55, 60, 65];
+  return `<details class="note" style="margin-top:10px"><summary><b>Was bedeuten die Regeln?</b></summary>
+    <p><b>Kaufen und halten:</b> immer 100 % im Index, nie verkaufen. Der Vergleichsmaßstab.</p>
+    <p><b>Trendregel 10 Monate:</b> 100 % investiert, solange der Kurs über seinem Durchschnitt der letzten 10 Monate liegt, sonst komplett im Geldmarkt. Schaut nur auf den Kurs, nicht auf den Rang.</p>
+    <p><b>Rang-Quote:</b> der Aktienanteil folgt stufenlos dem Rang – je günstiger die Lage, desto mehr Aktien, der Rest liegt im Geldmarkt. Einmal im Monat angepasst (letzter Handelstag, gilt ab dem Folgemonat):</p>
+    <table class="t" style="margin:4px 0 8px;width:auto"><tr><th>Rang</th>${SS.map(s => `<td>${s === 35 ? 'bis ' : s === 65 ? 'ab ' : ''}${R(s)}</td>`).join('')}</tr><tr><th>Aktien</th>${SS.map(s => `<td>${q(s)} %</td>`).join('')}</tr></table>
+    <p><b>Schutzregel:</b> normalerweise 100 % investiert. Fällt der Rang unter ${R(45)}, nur noch 50 %; unter ${R(35)} komplett raus in den Geldmarkt.</p>
+    <p class="mut">„diesen Monat“ zeigt die Aufteilung, die jede Regel für den laufenden Monat festgelegt hat (entschieden am letzten Handelstag des Vormonats).</p>
+  </details>`;
 }
 function fmtPct(v, d = 1) { if (v == null) return '–'; const c = v > 0 ? 'up' : v < 0 ? 'down' : 'flat'; return `<span class="${c}">${v > 0 ? '+' : ''}${nf(v, d)} %</span>`; }
 function fmtR(v) { if (v == null) return '–'; return `<span style="color:${Math.abs(v) < 0.1 ? C.mut : v > 0 ? C.up : C.down}">${v > 0 ? '+' : ''}${nf(v, 2)}</span>`; }
@@ -1320,11 +1333,11 @@ function ruleCard(M) {
 // ---------- Signale (Ein-/Ausstieg, eigener Reiter zum Vergleich mit der Einschätzung)
 function secSignale(m) {
   const M = DATA.model;
-  head(m, 'Signale', 'Klare Ein- und Ausstiegssignale statt Score. Sicherheit hat Vorrang: raus erst bei Bestätigung, wieder rein bewusst spät. Die Regel wird jedes Jahr neu festgelegt – nur mit den jeweils letzten 35 Jahren S&P 500 – und gilt dann unverändert für dieses Jahr. Alles ab 1990 ist damit ein echter Vorwärtstest.');
+  head(m, 'Signale', 'Klare Ein- und Ausstiegssignale statt Rang. Sicherheit hat Vorrang: raus erst bei Bestätigung, wieder rein bewusst spät. Die Regel wird jedes Jahr neu festgelegt – nur mit den jeweils letzten 35 Jahren S&P 500 – und gilt dann unverändert für dieses Jahr. Alles ab 1990 ist damit ein echter Vorwärtstest.');
   if (!M || !M.signal_params || !M.targets) { m.insertAdjacentHTML('beforeend', '<div class="card"><div class="note">Signale werden mit der nächsten Datenaktualisierung berechnet.</div></div>'); return; }
   if (!M.targets[TGT] || !M.targets[TGT].signals || M.targets[TGT].signals.error) TGT = 'world';
   const Pp = M.signal_params, Cal = M.signal_cal || {}; const TR = M.targets[TGT] || M.targets.world;
-  const rule = `<b>Aussteigen</b>, wenn der Rang an ${Pp.exit_n} Börsentagen in Folge unter ${RK(TR, Pp.exit_s)} liegt (Score ${Pp.exit_s})${Pp.exit_trend ? ' und der Kurs unter seiner 10-Monats-Linie' : ''}. <b>Wieder einsteigen</b>, wenn der Rang an ${Pp.entry_n} Börsentagen in Folge mindestens ${RK(TR, Pp.entry_s)} erreicht (Score ${Pp.entry_s}) und der Kurs über seiner 10-Monats-Linie liegt. Nach jedem Wechsel mindestens 20 Börsentage Pause.`;
+  const rule = `<b>Aussteigen</b>, wenn der Rang an ${Pp.exit_n} Börsentagen in Folge unter ${RK(TR, Pp.exit_s)} liegt${Pp.exit_trend ? ' und der Kurs unter seiner 10-Monats-Linie' : ''}. <b>Wieder einsteigen</b>, wenn der Rang an ${Pp.entry_n} Börsentagen in Folge mindestens ${RK(TR, Pp.entry_s)} erreicht und der Kurs über seiner 10-Monats-Linie liegt. Nach jedem Wechsel mindestens 20 Börsentage Pause.`;
   const rc = document.createElement('div'); rc.className = 'card full';
   rc.innerHTML = `<div class="hd"><div><div class="ttl">Die Regel</div><div class="sub">${rule}</div></div></div>
     <div class="note">Aktuelle Regel, ausgewählt aus ${Cal.n_tested || '–'} Varianten mit dem S&P 500 ${Cal.from ? Cal.from.slice(0, 4) : ''}–${Cal.to ? Cal.to.slice(0, 4) : ''}: kleinster größter Verlust bei höchstens 2,5 Ausstiegen pro Jahrzehnt und höchstens 1 Prozentpunkt weniger Rendite als Kaufen und Halten.</div>
