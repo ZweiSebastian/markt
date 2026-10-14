@@ -1,0 +1,21 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e; mkdir out && cd out
+          for s in FL663067003 FL153067005 FL663067005 FL664004005 LM893064105 FL663170003; do curl -sSL -m 90 -o z_$s.json "https://api.db.nomics.world/v22/series/FED/Z1/$s.Q?observations=1&format=json"; done
+          UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/124 Safari/537.36"
+          curl -sSL -m 90 -A "$UA" -o finra.xlsx "https://www.finra.org/sites/default/files/2021-03/margin-statistics.xlsx"
+          curl -sSL -m 90 -A "$UA" -o finra_page.html "https://www.finra.org/finra-data/browse-catalog/margin-statistics"
+          ls -la > files.txt 2>&1; set -e
+          git init -q -b research-r6
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m r6 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r6
