@@ -1,0 +1,12 @@
+total 424
+drwxr-xr-x 2 runner runner  4096 Oct 14 01:56 .
+drwxr-xr-x 3 runner runner  4096 Oct 14 01:55 ..
+-rw-r--r-- 1 runner runner     0 Oct 14 01:56 files.txt
+-rw-r--r-- 1 runner runner 20460 Oct 14 01:56 finra.xlsx
+-rw-r--r-- 1 runner runner 78876 Oct 14 01:56 finra_page.html
+-rw-r--r-- 1 runner runner 53000 Oct 14 01:56 z_FL153067005.json
+-rw-r--r-- 1 runner runner 53032 Oct 14 01:56 z_FL663067003.json
+-rw-r--r-- 1 runner runner 53009 Oct 14 01:56 z_FL663067005.json
+-rw-r--r-- 1 runner runner 52693 Oct 14 01:56 z_FL663170003.json
+-rw-r--r-- 1 runner runner 53196 Oct 14 01:56 z_FL664004005.json
+-rw-r--r-- 1 runner runner 53600 Oct 14 01:56 z_LM893064105.json
