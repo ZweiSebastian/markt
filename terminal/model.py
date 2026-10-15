@@ -56,6 +56,7 @@ TREND_N = 210          # Trendlinie in Börsentagen (210 ≈ 10 Monate)
 DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut": 0.014, "sx5e": 0.033, "dax": 0.0, "nikkei": 0.018, "em": 0.026}
 # Mischung in den Regeln im Test: Anteile am angelegten Geld (Basis-ETF, Momentum, 2x) und Quelle des Momentum-Vorsprungs
 MIX_W = {"base": 0.70, "mom": 0.17, "lev": 0.13}
+MIX_TREND_N = 252   # Wartelinie für 2x und Momentum: 12 Monate (getestet 8/10/12: 12 vermied den Fehlstart 2002)
 MIX_SRC = {"world": "mom_dev", "world_eur": "mom_dev", "spx": "mom_us"}
 PROB_LAM = 1.0
 FBUY_MODE = "on"      # Auslandskäufe US-Aktien in der Säule Stimmung
@@ -705,7 +706,6 @@ def run(ser, markt, now, quality=None, prev=None):
                     "_e": e.reindex(eq.index), "_eq2": eq2}
         sched = {
             "bh": ("Kaufen und halten", "immer 100 % investiert", pd.Series(1.0, index=days)),
-            "trend": ("Trendregel 10 Monate", "investiert, wenn der Kurs über seiner 10-Monats-Linie liegt, sonst Geldmarkt", (P > sma210).astype(float)),
             "score": ("Rang-Quote", f"Aktienanteil folgt dem Rang: bis Rang {rk(35)} 0 %, Rang {rk(50)} 50 %, ab Rang {rk(65)} 100 %, dazwischen stufenlos; Rest Geldmarkt", ((score - 50) / 30 + 0.5).clip(0, 1)),
             "schutz": ("Schutzregel", f"voll investiert, außer der Rang fällt: unter {rk(45)} nur 50 %, unter {rk(35)} raus",
                        pd.Series(np.select([score >= 45, score >= 35], [1.0, 0.5], 0.0), index=days).where(score.notna())),
@@ -737,7 +737,7 @@ def run(ser, markt, now, quality=None, prev=None):
         if _ms is not None and len(_ms) > 24:
             _mi = _bi[_bi.isin(me)]
             _sp = (_ms / 100).groupby(_ms.index.to_period("M")).last().reindex(_mi.to_period("M"))
-            _up = (P > sma210).reindex(_mi).fillna(False)
+            _up = (P > P.rolling(MIX_TREND_N, min_periods=MIX_TREND_N).mean()).reindex(_mi).fillna(False)
             mix = {"mom": [None if pd.isna(v) else round(float(v), 5) for v in _sp.values], "up": [int(bool(v)) for v in _up.values],
                    "src": "USA" if _msrc == "mom_us" else "Industrieländer", "w": MIX_W,
                    "from": str(_ms.index.min().date()), "to": str(_ms.index.max().date())}
