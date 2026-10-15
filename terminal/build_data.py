@@ -991,6 +991,37 @@ def shiller_long():
 slow("shiller", shiller_long, ["spx_real", "cape_long", "spx_m", "cpi_long", "div_m", "eps"], hours=20)
 
 
+def momentum_ff():
+    """Momentum-Vorsprung (große Aktien mit der stärksten 12-Monats-Rendite ggü. Gesamtmarkt), Monatswerte in %.
+    Quelle: Kenneth French (USA seit 1927, Industrieländer seit 1990). Dient der Rechnung „Mischung“ in den Regeln im Test."""
+    import konzentration as kz
+
+    def fac(text):
+        L = text.splitlines()
+        i = next(k for k, l in enumerate(L) if l.replace(" ", "").startswith(",Mkt-RF"))
+        hdr = [h.strip() for h in L[i].split(",")][1:]
+        rows = []
+        for l in L[i + 1:]:
+            p = l.split(",")
+            if len(p[0].strip()) != 6 or not p[0].strip().isdigit():
+                break
+            rows.append([p[0].strip()] + [float(x) for x in p[1:]])
+        df = pd.DataFrame(rows, columns=["d"] + hdr)
+        df.index = pd.to_datetime(df.pop("d"), format="%Y%m") + pd.offsets.MonthEnd(0)
+        return df["Mkt-RF"] + df["RF"]
+
+    for sid, pz, fz, name in (("mom_us", "6_Portfolios_ME_Prior_12_2_CSV.zip", "F-F_Research_Data_Factors_CSV.zip", "USA"),
+                              ("mom_dev", "Developed_6_Portfolios_ME_Prior_12_2_CSV.zip", "Developed_3_Factors_CSV.zip", "Industrieländer")):
+        pt = kz._section(kz._zip_text(get, pz), "Average Value Weighted Returns -- Monthly")
+        col = next(c for c in pt.columns if "BIG" in c.upper() and "HI" in c.upper())
+        mk = fac(kz._zip_text(get, fz))
+        sp = (pt[col] - mk.reindex(pt.index)).dropna()
+        put(sid, sp, f"Momentum-Vorsprung {name} (große Aktien, stärkste 12 M.)", "intern", "%", "rate", "Kenneth French", "m", 3)
+
+
+slow("momentum", momentum_ff, ["mom_us", "mom_dev"], hours=24 * 7)
+
+
 # ------------------------------------------------------------------ abgeleitete Reihen
 def align(a, b):
     x, y = ser(a), ser(b)
