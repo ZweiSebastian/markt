@@ -365,6 +365,42 @@ const tip = document.getElementById('tip');
 function showTip(e, html) { tip.innerHTML = html; tip.hidden = false; const x = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8); const y = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8); tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
 function hideTip() { tip.hidden = true; }
 
+// Kurzerklärungen der Regeln: jedes Vorkommen von „Trendregel“, „Rang-Quote“, „Schutzregel“ im Text bekommt beim Überfahren ein Fenster
+function ruleTip(k) {
+  const tg = DATA && DATA.model && DATA.model.targets, T = tg && (tg.world || Object.values(tg)[0]);
+  const R = s => T ? RK(T, s) : s;
+  return {
+    trend: '<b style="font-family:inherit">Trendregel</b><br>Voll investiert, solange der Kurs über seinem 10-Monats-Durchschnitt liegt – sonst alles im Geldmarkt. Schaut nur auf den Kurs.',
+    quote: `<b style="font-family:inherit">Rang-Quote</b><br>Aktienanteil folgt dem Rang: bis Rang ${R(35)} 0 %, Rang ${R(50)} 50 %, ab Rang ${R(65)} 100 %, dazwischen stufenlos. Rest im Geldmarkt, einmal im Monat angepasst.`,
+    schutz: `<b style="font-family:inherit">Schutzregel</b><br>Normal 100 % investiert. Rang unter ${R(45)}: nur noch 50 %. Rang unter ${R(35)}: komplett raus in den Geldmarkt.`,
+  }[k];
+}
+const RULE_RE = /Trendregel(?: 10 Monate)?|Rang-Quote|Schutzregel/g;
+function wrapRules(root) {
+  if (!root || !root.querySelectorAll) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: n => {
+    const pe = n.parentElement; if (!pe || pe.closest('script,style,textarea,option,select,#tip,.rtip,input')) return NodeFilter.FILTER_REJECT;
+    RULE_RE.lastIndex = 0; return RULE_RE.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+  const nodes = []; while (w.nextNode()) nodes.push(w.currentNode);
+  for (const n of nodes) {
+    const f = document.createDocumentFragment(), t = n.nodeValue; let last = 0, m; RULE_RE.lastIndex = 0;
+    while ((m = RULE_RE.exec(t))) {
+      if (m.index > last) f.appendChild(document.createTextNode(t.slice(last, m.index)));
+      const sp = document.createElement('span'); sp.className = 'rtip'; sp.textContent = m[0];
+      sp.dataset.rule = m[0].startsWith('Trend') ? 'trend' : m[0].startsWith('Rang') ? 'quote' : 'schutz';
+      f.appendChild(sp); last = m.index + m[0].length; }
+    if (last < t.length) f.appendChild(document.createTextNode(t.slice(last)));
+    n.parentNode.replaceChild(f, n); }
+}
+document.addEventListener('mouseover', e => { const r = e.target.closest && e.target.closest('.rtip'); if (r) showTip(e, ruleTip(r.dataset.rule)); });
+document.addEventListener('mousemove', e => { const r = e.target.closest && e.target.closest('.rtip'); if (r) showTip(e, ruleTip(r.dataset.rule)); });
+document.addEventListener('mouseout', e => { const r = e.target.closest && e.target.closest('.rtip'); if (r && !(e.relatedTarget && r.contains(e.relatedTarget))) hideTip(); });
+const _rtSet = new Set(); let _rtQ = false;
+new MutationObserver(ms => { for (const m of ms) { const t = m.target.nodeType === 3 ? m.target.parentElement : m.target; if (t) _rtSet.add(t); }
+  if (_rtQ) return; _rtQ = true;
+  requestAnimationFrame(() => { _rtQ = false; const L = [..._rtSet]; _rtSet.clear(); for (const t of L) if (t.isConnected && !t.closest('.rtip,#tip')) wrapRules(t); }); })
+  .observe(document.body, { childList: true, subtree: true, characterData: true });
+
 // ------------------------------------------------------------------ Kopf, Leiste, Navigation
 function renderRanges() {
   const el = document.getElementById('ranges');
