@@ -871,18 +871,30 @@ function secEinschaetzung(m) {
   const y0 = +SM[0].slice(0, 4), y1 = +SM[SM.length - 1].slice(0, 4);
   const presets = [1990, 2000, 2008, 2010, 2020].filter(y => y > y0 && y < y1);
   st.innerHTML = `<div class="hd"><div><div class="ttl">Was wäre aus 100 geworden?</div><div class="sub">${esc(T.name)}, monatlich angepasst (Entscheidung am letzten Handelstag, gilt ab dem nächsten Monat), nicht investiertes Geld im Geldmarkt. Mit ETF-Gebühr (0,2 % p.a., gehebelt 0,6 % + Finanzierung), ohne Dividenden und Handelskosten, Steuern zuschaltbar. Logarithmisch. Startpunkt wählen oder ins Diagramm klicken.</div></div></div>
-    <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span>${S3[0].eq2 ? '<span class="lev"><span class="mut">ETF:</span><button data-l="1" class="on">normal</button><button data-l="2">2x gehebelt</button>' : '<span class="lev">'}${T.cash_m ? '<span class="mut" style="margin-left:10px">Steuern:</span><button data-x="0" class="on">vor</button><button data-x="1">nach</button>' : ''}</span></div>
+    <div class="sstart"><span class="mut">Start:</span><button data-y="${SM[0]}">${y0}</button>${presets.map(y => `<button data-y="${y}">${y}</button>`).join('')}<input type="month" id="ss-in" min="${SM[0].slice(0, 7)}" max="${SM[SM.length - 13].slice(0, 7)}"><span class="mut" id="ss-lbl"></span>${S3[0].eq2 ? `<span class="lev"><span class="mut">ETF:</span><button data-l="1" class="on">normal</button><button data-l="2">2x gehebelt</button>${T.mix ? '<button data-l="3">Mischung</button>' : ''}` : '<span class="lev">'}${T.cash_m ? '<span class="mut" style="margin-left:10px">Steuern:</span><button data-x="0" class="on">vor</button><button data-x="1">nach</button>' : ''}</span></div>
     <div class="legend" id="slg"></div><div class="chart tall"></div>
     <table class="t" style="margin-top:8px"><tr><th>Regel</th><th>Rendite p.a.</th><th>größter Verlust</th><th>Schwankung</th><th>Ø investiert</th><th>diesen Monat</th></tr>
     ${S3.map((x, j) => `<tr><td style="white-space:normal;min-width:220px"><i style="display:inline-block;width:12px;border-top:2px solid ${SER[j]};vertical-align:middle;margin-right:6px"></i>${esc(x.name)}<div class="mut" style="font-size:11px">${esc(x.desc)}</div></td><td id="sr-c${j}"></td><td id="sr-d${j}"></td><td id="sr-v${j}"></td><td id="sr-e${j}"></td><td>${(() => { const ex = x.ex || []; const v = ex.length ? Math.max(0, Math.min(1, ex[ex.length - 1])) : null; return v == null ? '–' : `<b>${nf(v * 100, 0)} %</b> Aktien<div class="mut" style="font-size:11px">${nf(100 - v * 100, 0)} % Geldmarkt</div>`; })()}</td></tr>`).join('')}</table>
     ${stratExplain(T)}
-    <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge. Ab frei gewähltem Start rechnet die App mit Monatswerten; der größte Verlust berücksichtigt den tiefsten Tageskurs je Monat. „2x gehebelt“: dieselbe Regel, aber investiert wird in einen täglich zurückgesetzten 2x-ETF – doppelte Tagesrendite, Finanzierung zum Geldmarktzins + 0,5 % und 0,6 % Gebühr pro Jahr; nicht investiertes Geld liegt weiter im Geldmarkt. „Nach Steuern“: Wert, wenn man zum jeweiligen Zeitpunkt alles verkauft und versteuert – 26,375 % Abgeltungsteuer inkl. Soli, bei Aktien-ETFs 30 % Teilfreistellung (effektiv 18,5 % auf Kursgewinne; auch für die 2x-ETFs angenommen). Jeder Teilverkauf einer Regel versteuert den anteiligen Gewinn sofort, Verluste gehen in den Verlusttopf und werden mit späteren Gewinnen verrechnet, Geldmarktzinsen voll steuerpflichtig. Nicht berücksichtigt: Sparerpauschbetrag (1.000 €, verheiratet 2.000 € pro Jahr), Kirchensteuer, Vorabpauschale (wird beim Verkauf angerechnet, verschiebt also nur den Zeitpunkt) und die genaue FIFO-Reihenfolge.</div>`;
+    <div class="note">So arbeiten auch viele systematische Fonds: feste Regeln statt Bauchgefühl. Ihr Vorteil liegt meist weniger in höherer Rendite als in kleineren Verlusten – wer weniger investiert ist, verpasst dafür auch Teile der Aufschwünge. Ab frei gewähltem Start rechnet die App mit Monatswerten; der größte Verlust berücksichtigt den tiefsten Tageskurs je Monat. „2x gehebelt“: dieselbe Regel, aber investiert wird in einen täglich zurückgesetzten 2x-ETF – doppelte Tagesrendite, Finanzierung zum Geldmarktzins + 0,5 % und 0,6 % Gebühr pro Jahr; nicht investiertes Geld liegt weiter im Geldmarkt. ${T.mix ? `„Mischung“: das angelegte Geld zu ${nf(T.mix.w.base * 100, 0)} % im normalen ETF, ${nf(T.mix.w.mom * 100, 0)} % in einem Momentum-ETF und ${nf(T.mix.w.lev * 100, 0)} % im 2x-ETF, Anteile monatlich wiederhergestellt. Der 2x-Anteil wird erst gekauft, wenn der Index nach dem Start an einem Monatsende über seiner 10-Monats-Linie liegt; Momentum frühestens 6 Monate nach dem Start und ebenfalls erst über der Linie – bis dahin liegt dieser Teil im Geldmarkt. Momentum = Index plus Vorsprung der großen Aktien mit der stärksten 12-Monats-Rendite (${esc(T.mix.src)}, Kenneth French, ${T.mix.from.slice(0, 4)}–${T.mix.to.slice(0, 7)}; außerhalb dieses Zeitraums ohne Vorsprung), 0,25 % Gebühr. ` : ''}„Nach Steuern“: Wert, wenn man zum jeweiligen Zeitpunkt alles verkauft und versteuert – 26,375 % Abgeltungsteuer inkl. Soli, bei Aktien-ETFs 30 % Teilfreistellung (effektiv 18,5 % auf Kursgewinne; auch für die 2x-ETFs angenommen). Jeder Teilverkauf einer Regel versteuert den anteiligen Gewinn sofort, Verluste gehen in den Verlusttopf und werden mit späteren Gewinnen verrechnet, Geldmarktzinsen voll steuerpflichtig. Nicht berücksichtigt: Sparerpauschbetrag (1.000 €, verheiratet 2.000 € pro Jahr), Kirchensteuer, Vorabpauschale (wird beim Verkauf angerechnet, verschiebt also nur den Zeitpunkt) und die genaue FIFO-Reihenfolge.</div>`;
   m.appendChild(st);
   queueMicrotask(() => {
     const ch = baseChart(st.querySelector('.chart'), { log: true, fmt: p => nf(p, 0) });
     const ds = SM.map(monthDay); const lines = S3.map((x, j) => ch.addLineSeries({ color: SER[j], lineWidth: 2, priceLineVisible: false, priceFormat: pf(0) }));
-    let i0 = 0, L2 = false, TX = false;
-    const EQ0 = x => L2 && x.eq2 ? x.eq2 : x.eq, LO0 = x => L2 && x.lo2 ? x.lo2 : x.lo;
+    let i0 = 0, L2 = false, L3 = false, TX = false, MX = [];
+    // Mischung: angelegtes Geld zu 70 % Basis-ETF, 17 % Momentum, 13 % 2x-ETF (Anteile monatlich wiederhergestellt).
+    // 2x erst ab dem Monat nach dem ersten Monatsende über der 10-Monats-Linie (ab Start), Momentum frühestens 6 Monate nach Start
+    // und ebenfalls erst über der Linie; bis dahin liegt der jeweilige Anteil im Geldmarkt.
+    const mixCurve = (x, i) => { const B = S3[0], W = T.mix.w, mo = T.mix.mom, up = T.mix.up, cm = T.cash_m || [], ex = x.ex || [];
+      const n = B.eq.length, e = new Array(n).fill(1), lo = new Array(n).fill(1); let on2 = false, onM = false;
+      for (let k = i + 1; k < n; k++) { if (up[k - 1] && k - 1 >= i) on2 = true; if (up[k - 1] && k - 1 >= i + 6) onM = true;
+        const c = cm[k] || 0, r1 = B.eq[k] / B.eq[k - 1] - 1, r2 = B.eq2[k] / B.eq2[k - 1] - 1, rm = r1 + (mo[k] || 0) - 0.0005 / 12;
+        const d1 = B.lo ? B.lo[k] / B.eq[k - 1] - 1 : r1, d2 = B.lo2 ? B.lo2[k] / B.eq2[k - 1] - 1 : r2;
+        const s = W.base * r1 + W.lev * (on2 ? r2 : c) + W.mom * (onM ? rm : c), sd = W.base * d1 + W.lev * (on2 ? d2 : 0) + W.mom * (onM ? d1 : 0);
+        const q = Math.max(0, Math.min(1, ex[k] ?? 1)); e[k] = e[k - 1] * (1 + q * s + (1 - q) * c);
+        lo[k] = Math.min(e[k], e[k - 1] * (1 + q * Math.min(sd, 0))); }
+      return { e, lo }; };
+    const EQ0 = x => L3 ? MX[S3.indexOf(x)].e : L2 && x.eq2 ? x.eq2 : x.eq, LO0 = x => L3 ? MX[S3.indexOf(x)].lo : L2 && x.lo2 ? x.lo2 : x.lo;
     // Steuern (Deutschland, vereinfacht): 26,375 % Abgeltungsteuer + Soli, bei Aktien-ETFs 30 % Teilfreistellung;
     // Gewinne werden bei jedem Verkauf fällig (Durchschnittskosten), Verluste in den Verlusttopf, Geldmarktzinsen voll steuerpflichtig.
     // Kurve = Wert, wenn man zu diesem Zeitpunkt alles verkauft und versteuert.
@@ -899,7 +911,7 @@ function secEinschaetzung(m) {
         out[k] = (V + K - tx) / P; }
       return out; };
     let CUR = [];
-    const calc = () => { CUR = S3.map(x => { const e = EQ0(x), lo = LO0(x); if (!TX) return { e, lo };
+    const calc = () => { MX = L3 ? S3.map(x => mixCurve(x, i0)) : []; CUR = S3.map(x => { const e = EQ0(x), lo = LO0(x); if (!TX) return { e, lo };
       const f = taxF(x, i0); return { e: e.map((v, k) => v * f[k]), lo: lo ? lo.map((v, k) => v * f[k]) : null }; }); };
     const EQ = x => CUR[S3.indexOf(x)].e, LO = x => CUR[S3.indexOf(x)].lo;
     const stats = (x, i) => { const e = EQ(x), n = e.length - 1 - i; if (n < 12) return null;
@@ -911,7 +923,7 @@ function secEinschaetzung(m) {
       return { cagr, mdd: mdd * 100, vol, ex }; };
     const lg = st.querySelector('#slg');
     const draw = t => { let i = t == null ? ds.length - 1 : ds.indexOf(t); if (i < i0) i = i0; if (i < 0) return;
-      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${SER[j]}"></i>${esc(x.name)}<b>${nf(EQ(x)[i] / EQ(x)[i0] * 100, 0)}</b></span>`).join('') + `<span class="d">${SM[i]}${L2 ? ' · 2x' : ''}${TX ? ' · nach Steuern' : ''}</span>`; };
+      lg.innerHTML = S3.map((x, j) => `<span><i style="border-color:${SER[j]}"></i>${esc(x.name)}<b>${nf(EQ(x)[i] / EQ(x)[i0] * 100, 0)}</b></span>`).join('') + `<span class="d">${SM[i]}${L2 ? ' · 2x' : ''}${L3 ? ' · Mischung' : ''}${TX ? ' · nach Steuern' : ''}</span>`; };
     const setStart = i => { i0 = Math.max(0, Math.min(ds.length - 13, i)); calc();
       S3.forEach((x, j) => { const e = EQ(x); lines[j].setData(e.slice(i0).map((v, k) => ({ time: ds[i0 + k] * DAY, value: Math.max(v / e[i0] * 100, 0.01) })));
         const r = stats(x, i0); const set = (id, h) => { const el = st.querySelector('#' + id); if (el) el.innerHTML = h; };
@@ -925,7 +937,7 @@ function secEinschaetzung(m) {
     const idxOf = ymOrY => { const k = SM.findIndex(d => d >= String(ymOrY)); return k < 0 ? 0 : k; };
     st.querySelectorAll('.sstart button[data-y]').forEach(b => b.onclick = () => setStart(idxOf(b.dataset.y)));
     st.querySelector('#ss-in').onchange = e => { if (e.target.value) setStart(idxOf(e.target.value)); };
-    st.querySelectorAll('.lev button[data-l]').forEach(b => b.onclick = () => { L2 = b.dataset.l === '2'; st.querySelectorAll('.lev button[data-l]').forEach(x => x.classList.toggle('on', x === b)); setStart(i0); });
+    st.querySelectorAll('.lev button[data-l]').forEach(b => b.onclick = () => { L2 = b.dataset.l === '2'; L3 = b.dataset.l === '3'; st.querySelectorAll('.lev button[data-l]').forEach(x => x.classList.toggle('on', x === b)); setStart(i0); });
     st.querySelectorAll('.lev button[data-x]').forEach(b => b.onclick = () => { TX = b.dataset.x === '1'; st.querySelectorAll('.lev button[data-x]').forEach(x => x.classList.toggle('on', x === b)); setStart(i0); });
     ch.subscribeClick(p => { if (p && p.time) setStart(ds.indexOf(p.time / DAY)); });
     ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));

@@ -54,6 +54,9 @@ STRAT_FREQ = "M"       # Entscheidungsrhythmus der Regeln im Test: letzter Hande
 TREND_N = 210          # Trendlinie in Börsentagen (210 ≈ 10 Monate)
 # Ungefähre Dividendenrendite p.a. für die 2x-Rechnung (Kursindizes); DAX und MSCI World in Euro enthalten Dividenden bereits
 DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut": 0.014, "sx5e": 0.033, "dax": 0.0, "nikkei": 0.018, "em": 0.026}
+# Mischung in den Regeln im Test: Anteile am angelegten Geld (Basis-ETF, Momentum, 2x) und Quelle des Momentum-Vorsprungs
+MIX_W = {"base": 0.70, "mom": 0.17, "lev": 0.13}
+MIX_SRC = {"world": "mom_dev", "world_eur": "mom_dev", "spx": "mom_us"}
 PROB_LAM = 1.0
 FBUY_MODE = "on"      # Auslandskäufe US-Aktien in der Säule Stimmung
 FBUY_ALL = False
@@ -727,6 +730,17 @@ def run(ser, markt, now, quality=None, prev=None):
         _c = cash.reindex(_bi).fillna(0)
         cash_m = [round(float(v), 6) for v in ((1 + _c).groupby(_bi.to_period("M")).prod() - 1)
                   .reindex(_bi[_bi.isin(me)].to_period("M")).fillna(0).values]
+        # Mischung (All Cap + Momentum + 2x): Momentum-Vorsprung je Monat und „über der Trendlinie“ am Monatsende
+        mix = None
+        _msrc = MIX_SRC.get(key)
+        _ms = ser(_msrc) if _msrc else None
+        if _ms is not None and len(_ms) > 24:
+            _mi = _bi[_bi.isin(me)]
+            _sp = (_ms / 100).groupby(_ms.index.to_period("M")).last().reindex(_mi.to_period("M"))
+            _up = (P > sma210).reindex(_mi).fillna(False)
+            mix = {"mom": [None if pd.isna(v) else round(float(v), 5) for v in _sp.values], "up": [int(bool(v)) for v in _up.values],
+                   "src": "USA" if _msrc == "mom_us" else "Industrieländer", "w": MIX_W,
+                   "from": str(_ms.index.min().date()), "to": str(_ms.index.max().date())}
 
         # ---------- Ein-/Ausstiegs-Signale (Parameter nur aus S&P 500 bis 1989)
         signals_out = None
@@ -923,7 +937,7 @@ def run(ser, markt, now, quality=None, prev=None):
             "now": {"score": int(now_score), "day": str(last_i.date()), "month": str(last_i.date())[:7], "label": lab[0], "cls": lab[1],
                     "action": lab[2], "pillars": pil_now, "text": sent, "risk": risk},
             "hist": hist, "bands": bands, "base": base, "rank": rank, "since": str(first.date()), "smap": [round(float(v), 2) for v in smap],
-            "strategies": strategies, "strat_months": strat_months, "cash_m": cash_m, "direction": direction, "episodes": episodes, "analogs": ana,
+            "strategies": strategies, "strat_months": strat_months, "cash_m": cash_m, "mix": mix, "direction": direction, "episodes": episodes, "analogs": ana,
             "prob": {"now": prob_now, "calib": calib, "pooled": bool(use_pool), "brier": None if brier is None else round(brier, 4),
                      "brier_ref": None if brier_ref is None else round(brier_ref, 4), "skill": skill,
                      "oos_from": None if not len(oos) else str(oos.index[0].date())},
