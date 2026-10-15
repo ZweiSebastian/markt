@@ -52,6 +52,8 @@ CRASH = 0.15
 PROB_MODE = "score_fb_g7"  # Score + Auslandskäufe US-Aktien + G7-Zinsanstieg bei hoher Bewertung (beides vorwärts getestet). Richtung (score_dir, …) brachte nichts
 STRAT_FREQ = "M"       # Entscheidungsrhythmus der Regeln im Test: letzter Handelstag des Monats (getestet: besser als wöchentlich)
 TREND_N = 210          # Trendlinie in Börsentagen (210 ≈ 10 Monate)
+SMA_COMP_N = 252       # Linie in der Komponente der Trend-Säule: 12 Monate (getestet 6–15: beste Brier-Werte, Signale besser)
+SIG_TREND_N = TREND_N  # Linie in den Ein-/Ausstiegs-Signalen: 10 Monate (getestet 6–15: 10 am besten)
 # Ungefähre Dividendenrendite p.a. für die 2x-Rechnung (Kursindizes); DAX und MSCI World in Euro enthalten Dividenden bereits
 DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut": 0.014, "sx5e": 0.033, "dax": 0.0, "nikkei": 0.018, "em": 0.026}
 # Mischung in den Regeln im Test: Anteile am angelegten Geld (Basis-ETF, Momentum, 2x) und Quelle des Momentum-Vorsprungs
@@ -511,8 +513,10 @@ def run(ser, markt, now, quality=None, prev=None):
 
         # Preisbasierte Komponenten (live in der App nachgerechnet)
         sma210 = P.rolling(TREND_N, min_periods=TREND_N).mean()
-        d10 = P / sma210 - 1
-        C["sma10"] = ("trend", f"{tname} ggü. 10-Monats-Linie", clip(d10 / 0.05), d10 * 100, lambda v: f"{v:+.1f} %")
+        smaC = P.rolling(SMA_COMP_N, min_periods=SMA_COMP_N).mean()
+        smaS = P.rolling(SIG_TREND_N, min_periods=SIG_TREND_N).mean()
+        d10 = P / smaC - 1
+        C["sma10"] = ("trend", f"{tname} ggü. 12-Monats-Linie", clip(d10 / 0.05), d10 * 100, lambda v: f"{v:+.1f} %")
         mom = P / P.shift(Y) - 1 - tbill.fillna(0) / 100
         C["mom12"] = ("trend", "12-Monats-Momentum (über Geldmarktzins)", clip(mom / 0.15), mom * 100, lambda v: f"{v:+.1f} %")
         sma1000 = P.rolling(1000, min_periods=1000).mean()
@@ -747,13 +751,13 @@ def run(ser, markt, now, quality=None, prev=None):
         if sig is not None:
             try:
                 if key == "spx" and sig_params is None:
-                    above_ = (P > sma210).fillna(False)
+                    above_ = (P > smaS).fillna(False)
                     cache_ = (prev or {}).get("signal_roll") if isinstance(prev, dict) else None
                     sig_params = sig.rolling(score, above_, (P / P.shift(1) - 1).fillna(0), (tbill.ffill() / 100 / Y).fillna(0),
                                              now.year, cache_)
                     sig_cal = sig_params[max(sig_params, key=int)] if sig_params else None
                 if sig_params:
-                    signals_out = sig.evaluate(tname, score, P, sma210, tbill, sig_params)
+                    signals_out = sig.evaluate(tname, score, P, smaS, tbill, sig_params)
             except Exception as e:  # noqa
                 import traceback
                 traceback.print_exc()
