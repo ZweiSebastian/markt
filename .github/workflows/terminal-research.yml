@@ -1,0 +1,57 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - run: pip install -q yfinance pandas requests
+      - run: |
+          set +e; mkdir out && cd out
+          git clone -q --depth 1 https://github.com/fja05680/sp500.git sp500
+          cat > f.py <<'PY'
+          import pandas as pd, yfinance as yf, time, json, sys
+          t = pd.read_csv("sp500/sp500_ticker_start_end.csv")
+          cur = pd.read_csv("sp500/S&P 500 Historical Components & Changes (Updated).csv").iloc[-1].tickers.split(",")
+          ticks = sorted(set(t.ticker) | set(cur))
+          ysym = {x: x.replace(".", "-") for x in ticks}
+          rows = []; meta = {}
+          syms = list(ysym.values())
+          for i in range(0, len(syms), 50):
+              ch = syms[i:i+50]
+              try:
+                  df = yf.download(ch, start="1994-12-01", interval="1d", auto_adjust=True, progress=False, threads=True, group_by="ticker")
+              except Exception as e:
+                  print("err", e); continue
+              for s in ch:
+                  try:
+                      c = df[s]["Close"].dropna()
+                  except Exception:
+                      continue
+                  if len(c) < 5: continue
+                  m = c.resample("ME").last().dropna()
+                  for d, v in m.items(): rows.append((s, d.strftime("%Y-%m-%d"), round(float(v), 6)))
+                  meta[s] = {"first": str(c.index[0].date()), "last": str(c.index[-1].date()), "lastc": float(c.iloc[-1]), "n": len(c)}
+              time.sleep(1)
+          pd.DataFrame(rows, columns=["sym","date","close"]).to_csv("sp_monthly.csv.gz", index=False)
+          json.dump(meta, open("sp_meta.json","w"))
+          print(len(ticks), len(meta))
+          PY
+          python f.py > f.log 2>&1
+          tail -5 f.log
+          UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/124 Safari/537.36"
+          for d in 20091231 20101231 20111230 20121231 20131231 20141231 20151231 20161230 20171229 20181231 20191231 20201231 20211231 20221230 20231229 20241231 20251231; do
+            curl -sSL -m 60 -A "$UA" -o urth_$d.csv "https://www.ishares.com/us/products/239696/ishares-msci-world-etf/1467271812596.ajax?fileType=csv&fileName=URTH_holdings&dataType=fund&asOfDate=$d"
+            curl -sSL -m 60 -A "$UA" -o swda_$d.csv "https://www.ishares.com/uk/individual/en/products/251882/ishares-msci-world-ucits-etf-acc-fund/1506575576011.ajax?fileType=csv&fileName=SWDA_holdings&dataType=fund&asOfDate=$d"
+            sleep 1
+          done
+          rm -rf sp500
+          ls -la > files.txt 2>&1; set -e
+          git init -q -b research-r7
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m r7 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r7
