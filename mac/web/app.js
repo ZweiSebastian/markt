@@ -1099,7 +1099,7 @@ function liveModel(T) {
   const n = series.length, p = series[n - 1];
   const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
   const comps = {};
-  if (n >= 210) comps.sma10 = ['trend', cl1((p / mean(series.slice(n - 210)) - 1) / 0.05)];
+  if (n >= 252) comps.sma10 = ['trend', cl1((p / mean(series.slice(n - 252)) - 1) / 0.05)];
   if (n >= 253) comps.mom12 = ['trend', cl1((p / series[n - 1 - 252] - 1 - (L.tbill || 0) / 100) / 0.15)];
   if (n >= 1000) comps.w200 = ['trend', ip(p / mean(series.slice(n - 1000)) - 1, [-0.05, 0.10, 0.30, 0.50], [1.0, 0.3, 0.0, -0.4])];
   comps.dd = ['stimmung', ip(p / Math.max(...series.slice(Math.max(0, n - 252))) - 1, [-0.25, -0.10, 0.0], [1.0, 0.4, 0.0])];
