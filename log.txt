@@ -1,0 +1,18 @@
+OK   vorheriger Lauf  2026-10-17T01:22:49Z
+OK   Tages-Archiv  89 Reihen
+OK   yahoo  56/56 Ticker (voll)
+OK   quality  aus Cache 2026-10-16T17:20:08Z
+OK   zinsen  y3m:11280, y2:12590, y10:14188, y30:12412
+OK   z1  aus Cache 2026-10-16T20:02:52Z
+OK   g7 aktuell  usa:2026-10, jpn:2026-10, can:2026-10, deu:2026-10, fra:2026-09, gbr:2026-10, ita:2026-09
+OK   gdp  A191RC-Q
+Shiller-Datei: https://img1.wsimg.com/blobby/go/e5e77e0b-59d1-44d9-ab25-4763ac982e53/downloads/1449043e-a1ed-4e2e-8e9c-7b9a2a064493/ie_data.xls?ver=1791297298731
+OK   momentum  aus Cache 2026-10-15T20:19:23Z
+OK   markt.json  2026-10-16
+OK   stress  jetzt 6 Signale
+OK   modell  world: 48 · world_eur: 49 · spx: 47 · ndx: 46 · rut: 43 · sx5e: 54 · dax: 49 · nikkei: 52 · em: 50
+OK   protokoll  9 Einträge
+FEHL rss Yahoo Finance  HTTPError: 404 Client Error: Not Found for url: https://finance.yahoo.com/news/rssindex
+OK   news  127 Meldungen
+OK   Tages-Archiv: 89 Reihen, 5.88 MB
+OK   fertig: 122 Reihen, 5.03 MB
