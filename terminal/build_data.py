@@ -762,7 +762,7 @@ def nfci():
     note("nfci", True, f"{src}, Stand {n.index.max().date()}")
 
 
-slow("nfci", nfci, ["nfci", "anfci"], hours=24)
+slow("nfci_fred", nfci, ["nfci", "anfci"], hours=24)
 
 
 def finra():
