@@ -15,7 +15,9 @@ Quellen
 - NY Fed: effektiver Fed-Funds-Satz (aktuell)
 - EZB: Einlagenzins, 10J-Euro-Zins (AAA), Inflation (HICP), Bilanzsumme
 - BLS: Inflation, Kerninflation, Arbeitslosenquote, Beschäftigung (seit 1948)
-- Chicago Fed: Finanzbedingungen (NFCI) seit 1971
+- Chicago Fed über FRED (Ersatz: CSV der Chicago Fed): Finanzbedingungen (NFCI) seit 1971
+- FINRA: Wertpapierkredite (Margin Debt) seit 1997
+- Kenneth French: Momentum-Faktor USA und Industrieländer
 - OECD: Frühindikator (CLI) USA und OECD gesamt
 - US-Arbeitsministerium: Erstanträge auf Arbeitslosenhilfe (wöchentlich)
 - AAII: Anlegerstimmung (Bullen minus Bären) seit 1987
@@ -345,7 +347,7 @@ def _row(df, names):
 
 def quality():
     import yfinance as yf
-    comps, caps = [], {}
+    comps = []
     for t in QUAL_TICKERS:
         try:
             tk = yf.Ticker(t)
@@ -371,7 +373,7 @@ def quality():
             def yoy(x):
                 x = None if x is None else x.dropna()
                 return None if x is None or len(x) < 5 or not x.iloc[-5] else float(x.iloc[-1] / x.iloc[-5] - 1)
-            n_ttm, o_ttm, c_ttm, r_ttm = ttm(ni), ttm(ocf), ttm(capex), ttm(rev)
+            n_ttm, o_ttm, c_ttm = ttm(ni), ttm(ocf), ttm(capex)
             oi_ttm, pre_ttm = ttm(oi), ttm(pre)
             eq_ttm, dbt_ttm, rep_ttm = ttm(iss_eq) or 0.0, ttm(iss_debt) or 0.0, ttm(rep) or 0.0
             def last(x):
@@ -493,20 +495,15 @@ slow("zinsen", rates, ["y3m", "y2", "y10", "y30", "real10", "tbill_m", "ff_long"
 
 
 def fred(sid, start="1919-01-01"):
-    last = None
-    for t in (40,):
-        try:
-            d = pd.read_csv(io.StringIO(get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={start}", t).text))
-            return pd.Series(pd.to_numeric(d.iloc[:, 1], errors="coerce").values, index=pd.to_datetime(d.iloc[:, 0])).dropna()
-        except Exception as e:  # noqa
-            last = e
-    raise last
+    # FRED antwortet von GitHub aus nur ohne Browser-Kennung (mit ihr läuft die Anfrage ins Leere)
+    r = requests.get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={start}", timeout=60)
+    r.raise_for_status()
+    d = pd.read_csv(io.StringIO(r.text))
+    return pd.Series(pd.to_numeric(d.iloc[:, 1], errors="coerce").values, index=pd.to_datetime(d.iloc[:, 0])).dropna()
 
 
 def y10_monthly():
     # 10J monatlich (Fed H.15 über DBnomics) – Ersatz für die Tagesreihe vor 1962.
-    # Moody's Baa/Aaa gibt es nur über FRED, das von GitHub aus nicht erreichbar ist – Kreditrisiko kommt stattdessen
-    # aus HYG/IEF und dem Hochzinsfonds VWEHX.
     y10m = dbn("FED/H15/RIFLGFCY10_N.M", "1953-01-01")
     put("y10_m", y10m, "US-Zins 10J (monatlich)", "intern", "%", "rate", "Fed H.15", "m", 2)
 
@@ -744,13 +741,41 @@ slow("bls", bls, ["cpi", "core", "unemp", "payrolls", "sahm", "multi_jobs", "u6"
 
 # ------------------------------------------------------------------ Finanzbedingungen, Frühindikatoren, Stimmung
 def nfci():
-    d = pd.read_csv(io.StringIO(get("https://www.chicagofed.org/-/media/publications/nfci/nfci-data-series-csv.csv", 60).text))
-    idx = pd.to_datetime(d.iloc[:, 0], format="%m/%d/%Y")
-    put("nfci", pd.Series(d["NFCI"].values, index=idx), "Finanzbedingungen (NFCI)", "risiko", "", "rate", "Chicago Fed", "w", 3)
-    put("anfci", pd.Series(d["ANFCI"].values, index=idx), "Finanzbedingungen bereinigt (ANFCI)", "risiko", "", "rate", "Chicago Fed", "w", 3)
+    # Die CSV-Datei der Chicago Fed wird seit April 2026 nicht mehr fortgeschrieben – erste Wahl ist FRED,
+    # die Datei bleibt Ersatz. Genommen wird, was aktueller ist.
+    got = {}
+    try:
+        got["FRED (Chicago Fed)"] = (fred("NFCI", "1971-01-01"), fred("ANFCI", "1971-01-01"))
+    except Exception as e:  # noqa
+        note("nfci FRED", False, f"{type(e).__name__}: {e}")
+    try:
+        d = pd.read_csv(io.StringIO(get("https://www.chicagofed.org/-/media/publications/nfci/nfci-data-series-csv.csv", 60).text))
+        idx = pd.to_datetime(d.iloc[:, 0], format="%m/%d/%Y")
+        got["Chicago Fed"] = (pd.Series(d["NFCI"].values, index=idx), pd.Series(d["ANFCI"].values, index=idx))
+    except Exception as e:  # noqa
+        note("nfci Chicago Fed", False, f"{type(e).__name__}: {e}")
+    if not got:
+        raise RuntimeError("keine Quelle erreichbar")
+    src, (n, a) = max(got.items(), key=lambda kv: kv[1][0].index.max())
+    put("nfci", n, "Finanzbedingungen (NFCI)", "risiko", "", "rate", src, "w", 3)
+    put("anfci", a, "Finanzbedingungen bereinigt (ANFCI)", "risiko", "", "rate", src, "w", 3)
+    note("nfci", True, f"{src}, Stand {n.index.max().date()}")
 
 
-slow("nfci", nfci, ["nfci", "anfci"])
+slow("nfci", nfci, ["nfci", "anfci"], hours=24)
+
+
+def finra():
+    # Wertpapierkredite (Debit Balances in Customers' Securities Margin Accounts), Mio. $, monatlich seit 1997
+    r = get("https://www.finra.org/sites/default/files/2021-03/margin-statistics.xlsx", 90)
+    x = pd.read_excel(io.BytesIO(r.content), sheet_name=0, engine="openpyxl")
+    col = next(c for c in x.columns if str(c).lower().startswith("debit"))
+    idx = pd.to_datetime(x.iloc[:, 0].astype(str).str[:7] + "-01", errors="coerce")
+    s = pd.Series(pd.to_numeric(x[col], errors="coerce").values / 1e3, index=idx).dropna()
+    put("margin", s, "Wertpapierkredite USA (FINRA)", "risiko", "Mrd. $", "price", "FINRA", "m", 1)
+
+
+slow("finra", finra, ["margin"], hours=24)
 
 
 def oecd():
@@ -1264,6 +1289,37 @@ try:
 except Exception as e:  # noqa
     note("protokoll", False, f"{type(e).__name__}: {e}")
 
+# ------------------------------------------------------------------ Tagesprotokoll: je Tag und Index der letzte Stand des Tages, frühere Tage werden nie geändert
+daily = list(prev.get("daily") or [])
+try:
+    if model_out and model_out.get("targets"):
+        day_ = NOW.strftime("%Y-%m-%d")
+        daily = [x for x in daily if x.get("d") != day_]
+        for k_, t_ in model_out["targets"].items():
+            n_ = t_.get("now") or {}
+            if n_.get("score") is None:
+                continue
+            sm_ = t_.get("smap")
+            cl_ = (t_.get("live") or {}).get("closes") or []
+            sg_ = t_.get("signals") or {}
+            daily.append({"d": day_, "t": k_, "s": n_["score"],
+                          "r": None if not sm_ else int(round(float(np.interp(n_["score"], sm_, np.arange(101))))),
+                          "p": (n_.get("risk") or {}).get("prob"), "sig": sg_.get("state"), "px": cl_[-1] if cl_ else None})
+        note("tagesprotokoll", True, f"{len({x['d'] for x in daily})} Tage")
+except Exception as e:  # noqa
+    note("tagesprotokoll", False, f"{type(e).__name__}: {e}")
+
+# ------------------------------------------------------------------ Marktphase (nur Anzeige, nicht im Score)
+phase_out = prev.get("phase")
+try:
+    import phase as phs
+    phase_out = phs.build(ser("spx"), ser("vix"), NOW)
+    note("marktphase", True, f"{phase_out['now']['ph']} seit {phase_out['now']['since']}")
+except Exception as e:  # noqa
+    import traceback
+    traceback.print_exc()
+    note("marktphase", False, f"{type(e).__name__}: {e}")
+
 # ------------------------------------------------------------------ Konzentration (nur Anzeige, nicht im Score)
 konz_out = prev.get("konz")
 try:
@@ -1336,6 +1392,8 @@ out = {
     "quality": qual_out,
     "konz": konz_out,
     "protocol": protocol,
+    "daily": daily,
+    "phase": phase_out,
     "news": news[:120],
     "cache": cache_meta,
     "diag": diag,

@@ -51,9 +51,8 @@ BANDS = [(0, 35, "unter 35"), (35, 45, "35–45"), (45, 55, "45–55"), (55, 65,
 CRASH = 0.15
 PROB_MODE = "score_fb_g7"  # Score + Auslandskäufe US-Aktien + G7-Zinsanstieg bei hoher Bewertung (beides vorwärts getestet). Richtung (score_dir, …) brachte nichts
 STRAT_FREQ = "M"       # Entscheidungsrhythmus der Regeln im Test: letzter Handelstag des Monats (getestet: besser als wöchentlich)
-TREND_N = 210          # Trendlinie in Börsentagen (210 ≈ 10 Monate)
 SMA_COMP_N = 252       # Linie in der Komponente der Trend-Säule: 12 Monate (getestet 6–15: beste Brier-Werte, Signale besser)
-SIG_TREND_N = TREND_N  # Linie in den Ein-/Ausstiegs-Signalen: 10 Monate (getestet 6–15: 10 am besten)
+SIG_TREND_N = 210      # Linie in den Ein-/Ausstiegs-Signalen: 10 Monate (getestet 6–15: 10 am besten)
 # Ungefähre Dividendenrendite p.a. für die 2x-Rechnung (Kursindizes); DAX und MSCI World in Euro enthalten Dividenden bereits
 DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut": 0.014, "sx5e": 0.033, "dax": 0.0, "nikkei": 0.018, "em": 0.026}
 # Mischung in den Regeln im Test: Anteile am angelegten Geld (Basis-ETF, Momentum, 2x) und Quelle des Momentum-Vorsprungs
@@ -174,7 +173,7 @@ def run(ser, markt, now, quality=None, prev=None):
     vix = D("vix")
     vix21 = vix.rolling(MON, min_periods=15).mean()
     dxy = D("dxy")
-    gold, copper = D("gold"), D("copper")
+    copper = D("copper")
 
     def cape_daily():
         c_m = place(monthly("cape_long"), 31, 70)
@@ -331,12 +330,6 @@ def run(ser, markt, now, quality=None, prev=None):
                 C["infl_r"] = ("konjunktur", f"Inflationstrend {region_name} (6 M.)", clip(-ci / 1.5) * 0.6, ci, lambda v: f"{v:+.1f} Pp.")
 
     def comp_finance_global(C, us=True):
-        bs = monthly("baa_spread")
-        if bs is not None:
-            b = place(bs, 31, 70)
-            bmed = b.rolling(10 * Y, min_periods=5 * Y).median()
-            C["baa"] = ("finanzen", "Kreditaufschlag Baa − 10J", 0.5 * clip(-(b - bmed) / 1.0) + 0.5 * clip(-(b - b.shift(126)) / 0.5), b,
-                        lambda v: f"{v:.2f} Pp.")
         nf = weekly("nfci")
         if nf is not None:
             n = place(nf, 5, 21)
@@ -404,7 +397,7 @@ def run(ser, markt, now, quality=None, prev=None):
         if not quality or not quality.get("companies"):
             _q_cache["q"] = None
             return None
-        rows, tot_w = [], 0.0
+        rows = []
         agg = {"cc": 0.0, "rec": 0.0, "capex": 0.0, "inv": 0.0, "fin": 0.0, "nonop": 0.0}
         wsum = {k: 0.0 for k in agg}
         flags = []
@@ -512,7 +505,6 @@ def run(ser, markt, now, quality=None, prev=None):
             comp_sentiment(C, us=False)
 
         # Preisbasierte Komponenten (live in der App nachgerechnet)
-        sma210 = P.rolling(TREND_N, min_periods=TREND_N).mean()
         smaC = P.rolling(SMA_COMP_N, min_periods=SMA_COMP_N).mean()
         smaS = P.rolling(SIG_TREND_N, min_periods=SIG_TREND_N).mean()
         d10 = P / smaC - 1
@@ -901,7 +893,7 @@ def run(ser, markt, now, quality=None, prev=None):
             sent.append(("Sie stützt sich auf den Score, die Käufe ausländischer Anleger von US-Aktien (hoch = spätzyklisch)"
                          + (" und – nur bei hoher Bewertung – gleichzeitig steigende Zinsen in den G7" if "g" in Xall.columns else "") + ". "
                          if "f" in Xall.columns else "")
-                        + f"Die Wahrscheinlichkeit wurde Jahr für Jahr nur mit damals bekannten Daten berechnet und ist "
+                        + "Die Wahrscheinlichkeit wurde Jahr für Jahr nur mit damals bekannten Daten berechnet und ist "
                         + ("besser als der bloße Durchschnitt" if skill > 0 else "nicht besser als der bloße Durchschnitt")
                         + f" (Brier-Skill {skill:+.0f} %).")
         if episodes:
@@ -915,7 +907,6 @@ def run(ser, markt, now, quality=None, prev=None):
         risk = {"band": None if not cb_now else cb_now["crash12"], "analog": ana["crash12"], "base": round(crash_base), "prob": prob_now}
 
         # ---------- Live-Parameter für die App (kursabhängige Teile werden dort mit jedem Kurs neu gerechnet)
-        Pl_last = Pl.loc[last_i]
         live_fixed = {c: (fam[c], None if pd.isna(C[c][2].get(last_i)) else round(float(C[c][2][last_i]), 4))
                       for c in cols if c not in ("sma10", "mom12", "w200", "dd", "rv")}
         closes = P.loc[:last_i].dropna().iloc[-1001:]
