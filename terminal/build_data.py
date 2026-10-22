@@ -1314,6 +1314,10 @@ phase_out = prev.get("phase")
 try:
     import phase as phs
     phase_out = phs.build(ser("spx"), ser("vix"), NOW)
+    try:
+        phase_out["credit"] = phs.credit(ser("hyg_ief"), ser("spx"))
+    except Exception as e:  # noqa
+        note("kreditwarnung", False, f"{type(e).__name__}: {e}")
     note("marktphase", True, f"{phase_out['now']['ph']} seit {phase_out['now']['since']}")
 except Exception as e:  # noqa
     import traceback

@@ -5,6 +5,7 @@ Ordnet jeden Börsentag des S&P 500 einer von sechs Phasen zu – nach drei einf
 Abstand zum 12-Monats-Hoch, Abstand zur 200-Tage-Linie und VIX. Danach: Wie ging es früher
 von solchen Tagen aus weiter (Rendite nach 12 Monaten, wie oft es noch einmal mindestens 15 % tiefer ging),
 auch getrennt danach, wie lange die Phase schon läuft. Statistik seit 1990 (ab da gibt es den VIX).
+Dazu die Kreditwarnung (HYG/IEF gegenüber seiner 10-Monats-Linie) mit ihrer Trefferquote seit 2008.
 """
 import numpy as np
 import pandas as pd
@@ -112,3 +113,36 @@ def build(spx, vix, now):
               for r in eps.tail(8).itertuples()]
     return {"now": now_, "stats": stats, "recent": recent, "from": idx[0].strftime("%Y-%m-%d"), "gap": GAP,
             "bins": [[a, b] for a, b in BINS]}
+
+
+def credit(r, spx, n=210, crash=15):
+    """Kreditwarnung: HYG/IEF gegenüber seiner 10-Monats-Linie und wie es früher nach Brüchen nach unten weiterging."""
+    r = r.dropna()
+    r = r[~r.index.duplicated(keep="last")].sort_index()
+    m = r.rolling(n, min_periods=n).mean()
+    below = (r < m) & m.notna()
+    p = spx.dropna()
+    lo = p[::-1].rolling(253, min_periods=253).min()[::-1]
+    mn = (lo / p - 1) * 100
+    ev = []
+    for i in range(20, len(r)):
+        if below.iloc[i] and not below.iloc[i - 20:i].any():
+            d = r.index[i]
+            j = p.index.searchsorted(d)
+            if j >= len(p):
+                continue
+            x = mn.iloc[j]
+            ev.append({"d": d.strftime("%Y-%m-%d"), "hit": None if np.isnan(x) else bool(x <= -crash),
+                       "min": None if np.isnan(x) else round(float(x), 1)})
+    done = [e for e in ev if e["hit"] is not None]
+    base = mn.loc[r.index[n]:].dropna()
+    since = None
+    if below.iloc[-1]:
+        k = len(below) - 1
+        while k > 0 and below.iloc[k - 1]:
+            k -= 1
+        since = r.index[k].strftime("%Y-%m-%d")
+    return {"pct": round(float((r.iloc[-1] / m.iloc[-1] - 1) * 100), 2), "below": bool(below.iloc[-1]), "since": since,
+            "day": r.index[-1].strftime("%Y-%m-%d"), "n": len(done), "hits": sum(e["hit"] for e in done),
+            "base": round(float((base <= -crash).mean() * 100)), "from": r.index[n].strftime("%Y-%m-%d"),
+            "events": ev[-30:], "crash": crash}
