@@ -961,5 +961,4 @@ def run(ser, markt, now, quality=None, prev=None):
     return {"weights": WEIGHTS, "pillar_names": PILLAR_NAMES, "targets": targets, "rule": rule, "quality": q, "g7": None if g7 is None else g7[1],
             "signal_params": (sig_cal or {}).get("p"), "signal_cal": sig_cal, "signal_roll": sig_params,
             "note": "Kursrenditen ohne Dividenden (außer MSCI World in Euro). Monatsdaten mit Veröffentlichungsverzögerung; "
-                    "Stellenaufbau wie damals veröffentlicht (Philadelphia Fed), übrige Konjunkturdaten in heutiger Fassung. "
-                    "Kein Anlagerat – ein Regelmodell."}
+                    "Stellenaufbau wie damals veröffentlicht (Philadelphia Fed), übrige Konjunkturdaten in heutiger Fassung."}

@@ -124,7 +124,6 @@ async function loadData(first) {
 }
 
 // ------------------------------------------------------------------ Hilfen: Zeit & Format
-const todayDay = () => Math.floor(Date.now() / 864e5);
 const dDate = d => new Date(d * 864e5);
 const fmtDate = (d, short) => { const x = dDate(d); return x.toLocaleDateString('de-DE', short ? { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC' } : { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' }); };
 const nf = (v, dec) => v == null || !isFinite(v) ? '–' : v.toLocaleString('de-DE', { minimumFractionDigits: dec, maximumFractionDigits: dec });
@@ -161,7 +160,6 @@ function fmtC(c, withSign = true) {
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ------------------------------------------------------------------ Hilfen: Reihen
-function lastIdx(s) { return s ? s.t.length - 1 : -1; }
 function last(id) { const s = S[id]; return s && s.v.length ? s.v[s.v.length - 1] : null; }
 function lastDay(id) { const s = S[id]; return s && s.t.length ? s.t[s.t.length - 1] : null; }
 function idxAt(s, day) { // letzter Index mit t <= day
@@ -452,8 +450,21 @@ function renderSection() {
   disposeCharts(); hideTip();
   const m = document.getElementById('main'); m.innerHTML = '';
   if (!DATA) return;
+  creditBanner(m);
   ({ einschaetzung: secEinschaetzung, signale: secSignale, lage: secLage, maerkte: secMaerkte, bewertung: secBewertung, zinsen: secZinsen, risiko: secRisiko,
     rohstoffe: secRohstoffe, fx: secFx, konjunktur: secKonjunktur, zusammen: secZusammen, news: secNews }[SECTION] || secEinschaetzung)(m);
+}
+// Kreditwarnung: HYG/IEF unter seiner 10-Monats-Linie (Hinweis schon, wenn der Abstand unter 1 % schrumpft)
+function creditBanner(m) {
+  const K = DATA.phase && DATA.phase.credit; if (!K || K.pct == null) return;
+  const q = K.n ? Math.round(K.hits / K.n * 100) : null;
+  const hist = K.n ? `Seit ${K.from.slice(0, 4)} folgte auf ${K.n} solche Brüche ${K.hits}-mal ein Rückgang des S&P 500 um mindestens ${K.crash} % innerhalb von 12 Monaten (${q} %, an einem beliebigen Tag ${K.base} %).` : '';
+  let cls, txt;
+  if (K.below) { cls = 'crit'; txt = `<b>Kreditstress:</b> Hochzinsanleihen gegenüber Staatsanleihen (HYG/IEF) liegen seit ${fmtDate(monthDay(K.since))} unter ihrer 10-Monats-Linie (${nf(K.pct, 1)} %). ${hist} Allein ist das kein Verkaufssignal – ernst wird es, wenn zusätzlich das Ausstiegssignal kippt.`; }
+  else if (K.pct < 1) { cls = 'warn'; txt = `<b>Kredit knapp über dem Trend:</b> HYG/IEF liegt nur noch ${nf(K.pct, 2)} % über seiner 10-Monats-Linie (Stand ${fmtDate(monthDay(K.day))}). Fällt es darunter, wird hier daraus eine Warnung. ${hist}`; }
+  else return;
+  const d = document.createElement('div'); d.className = 'alert ' + cls; d.innerHTML = txt; d.onclick = () => openCompare('hyg_ief'); d.title = 'Öffnet HYG/IEF im Vergleich';
+  m.appendChild(d);
 }
 function head(m, title, lead) { m.insertAdjacentHTML('beforeend', `<h1>${title}</h1>${lead ? `<p class="lead">${lead}</p>` : ''}`); }
 function grid(m, cls = '') { const g = document.createElement('div'); g.className = 'grid ' + cls; m.appendChild(g); return g; }
@@ -464,8 +475,8 @@ function status(cls, label) { const ic = { good: '✓', warn: '!', serious: '!',
 function tileDefs() {
   const T = [];
   const MT = DATA.model && DATA.model.targets;
-  if (MT && MT.world) { const n = MT.world.now; T.push({ id: '__model', l: 'Einschätzung MSCI World', v: `${n.score} / 100`, s: n.action,
-    b: status(n.cls === 'crit' ? 'crit' : n.cls, n.label), spark: MT.world.hist.score.slice(-60) }); }
+  if (MT && MT.world) { const n = MT.world.now; T.push({ id: '__model', l: 'MSCI World', v: `Rang ${RK(MT.world, n.score)}`, s: n.action,
+    b: status(n.cls === 'crit' ? 'crit' : n.cls, n.label), spark: MT.world.hist.score.slice(-60).map(x => x == null ? null : RK(MT.world, x)) }); }
   const spx = S.spx;
   if (spx) {
     const m200 = sma(spx.v, 200); const r = (last('spx') / m200[m200.length - 1] - 1) * 100;
@@ -485,9 +496,16 @@ function tileDefs() {
     T.push({ id: 'curve10_3m', l: 'Zinskurve 10J − 3M', v: (v > 0 ? '+' : '') + nf(v, 2) + ' Pp.', s: wasInv && v > 0 ? 'war in den letzten 2 J. invertiert' : '10-jährige minus 3-monatige Zinsen',
       b: v < 0 ? status('warn', 'invertiert') : wasInv ? status('serious', 'wieder steil') : v < 0.5 ? status('neutral', 'flach') : status('good', 'normal') });
   }
-  if (S.hyg_ief) { const s = S.hyg_ief; const m = sma(s.v, 200); const r = (last('hyg_ief') / m[m.length - 1] - 1) * 100;
-    T.push({ id: 'hyg_ief', l: 'Kredit (HYG/IEF)', v: (r > 0 ? '+' : '') + nf(r, 1) + ' %', s: 'Hochzins ggü. Staatsanleihen vs. 200-T.-Linie',
-      b: r > 0 ? status('good', 'Risikoappetit') : r > -2 ? status('warn', 'Vorsicht') : status('crit', 'Flucht aus Risiko') }); }
+  if (S.hyg_ief) { const s = S.hyg_ief; const m = sma(s.v, 210); const r = (last('hyg_ief') / m[m.length - 1] - 1) * 100;
+    T.push({ id: 'hyg_ief', l: 'Kredit (HYG/IEF)', v: (r > 0 ? '+' : '') + nf(r, 1) + ' %', s: 'Hochzins ggü. Staatsanleihen vs. 10-Monats-Linie',
+      b: r >= 1 ? status('good', 'Risikoappetit') : r >= 0 ? status('warn', 'knapp') : r > -2 ? status('serious', 'unter Trend') : status('crit', 'Flucht aus Risiko') }); }
+  const PH = DATA.phase && DATA.phase.now && phaseLive();
+  if (PH) T.push({ id: '__phase', l: 'Marktphase', v: PH.name, s: (PH.live ? 'heute live' : `seit ${fmtDate(monthDay(PH.since))}, ${PH.days} Tage`) + (PH.f12 == null ? '' : ` · früher danach ${PH.f12 > 0 ? '+' : ''}${nf(PH.f12, 1)} % in 12 M., ${PH.dd15} % noch ≥ 15 % tiefer`),
+    b: status({ euphorie: 'warn', sorglos: 'neutral', angst: 'warn', panik: 'crit', depression: 'serious', hoffnung: 'good' }[PH.ph] || 'neutral', 'S&P 500'), spark: sparkVals('spx', 365) });
+  if (S.margin) { const ms = S.margin, n = ms.v.length, v = ms.v[n - 1]; let hi = 0, hiI = 0; for (let i = 0; i < n; i++) if (ms.v[i] >= hi) { hi = ms.v[i]; hiI = i; }
+    const yi = idxAt(ms, ms.t[n - 1] - 360), yoy = yi >= 0 ? (v / ms.v[yi] - 1) * 100 : null, off = (v / hi - 1) * 100;
+    T.push({ id: 'margin', l: 'Wertpapierkredite', v: nf(v / 1000, 2) + ' Bio. $', s: `${off > -0.05 ? 'Rekordhoch' : nf(off, 1) + ' % vom Hoch (' + dDate(ms.t[hiI]).toLocaleDateString('de-DE', { month: 'short', year: '2-digit', timeZone: 'UTC' }) + ')'} · ${yoy == null ? '' : (yoy > 0 ? '+' : '') + nf(yoy, 0) + ' % ggü. Vorjahr'} · ${dDate(ms.t[n - 1]).toLocaleDateString('de-DE', { month: 'short', year: '2-digit', timeZone: 'UTC' })}`,
+      b: off <= -10 ? status('serious', 'Abbau') : yoy != null && yoy >= 30 ? status('warn', 'wächst stark') : status('neutral', 'normal') }); }
   if (S.dxy) { const c = chgOver('dxy', 92).v; T.push({ id: 'dxy', l: 'Dollar (3 M.)', v: (c > 0 ? '+' : '') + nf(c, 1) + ' %', s: `Dollar-Index ${nf(last('dxy'), 1)}`,
     b: c > 3 ? status('warn', 'stark') : c < -3 ? status('neutral', 'schwach') : status('neutral', 'stabil') }); }
   if (S.breadth) { const c = chgOver('breadth', 92).v; T.push({ id: 'breadth', l: 'Marktbreite (3 M.)', v: (c > 0 ? '+' : '') + nf(c, 1) + ' %', s: 'gleichgewichtet vs. normaler S&P 500',
@@ -510,7 +528,7 @@ function secLage(m) {
   for (const t of tileDefs()) {
     const d = document.createElement('div'); d.className = 'tile';
     d.innerHTML = `<div class="th"><div class="tl">${t.l}</div>${t.b}</div><div class="tv">${t.v}</div><div class="ts">${t.s}</div><canvas></canvas>`;
-    d.onclick = () => t.id === '__model' ? go('einschaetzung') : openCompare(t.id); g.appendChild(d);
+    d.onclick = () => t.id === '__model' || t.id === '__phase' ? go('einschaetzung') : openCompare(t.id); g.appendChild(d);
     requestAnimationFrame(() => spark(d.querySelector('canvas'), t.spark || sparkVals(t.id, 365), C.s1));
   }
 
@@ -683,9 +701,9 @@ function secRisiko(m) {
   g.appendChild(chartCard({ ids: ['aaii'], title: 'Anlegerstimmung (AAII)', ref: 0, refLabel: '0', sub: 'Bullen minus Bären in Prozentpunkten – Extreme gelten als Kontraindikator' }));
   g.appendChild(chartCard({ ids: ['skew'], title: 'SKEW – Nachfrage nach Crash-Absicherung' }));
   g.appendChild(chartCard({ ids: ['kre', 'xlf'], title: 'Regionalbanken vs. Finanzsektor', norm: true, sub: 'Start = 100 · Regionalbanken reagieren früh auf Kreditstress' }));
-  g.appendChild(chartCard({ ids: ['hyg_ief'], title: 'Kreditappetit (HYG/IEF)', sma: 200, sub: 'Steigt, wenn Anleger riskante Unternehmensanleihen Staatsanleihen vorziehen' }));
-  g.appendChild(chartCard({ ids: ['vwehx'], title: 'Hochzinsanleihen (Fonds seit 1978)', sma: 200, sub: 'Fallen riskante Unternehmensanleihen unter ihren Trend, zogen sich Anleger oft schon vor Aktiencrashs aus Risiken zurück' }));
-  if (S.baa_spread) g.appendChild(chartCard({ ids: ['baa_spread'], title: 'Kreditaufschlag Baa − 10J (seit 1953)', sub: 'Was mittelgute Unternehmen mehr zahlen müssen als der Staat. Steigt vor und in Krisen.', minDays: 3653 }));
+  g.appendChild(chartCard({ ids: ['hyg_ief'], title: 'Kreditappetit (HYG/IEF)', sma: 210, sub: 'Steigt, wenn Anleger riskante Unternehmensanleihen Staatsanleihen vorziehen. Linie: 10 Monate (210 Börsentage) – darunter erscheint oben die Kreditwarnung' }));
+  if (S.margin) g.appendChild(chartCard({ ids: ['margin'], title: 'Wertpapierkredite USA (FINRA, Mrd. $)', minDays: 3653, sub: 'Auf Kredit gekaufte Wertpapiere. Die Hochs von März 2000, Juli 2007, Mai 2018 und Oktober 2021 lagen 0 bis 4 Monate vor dem Hoch des S&P 500; danach fielen die Kredite um 28 bis 52 %.' }));
+  g.appendChild(chartCard({ ids: ['vwehx'], title: 'Hochzinsanleihen (Fonds seit 1978)', sma: 210, sub: 'Fallen riskante Unternehmensanleihen unter ihren Trend, zogen sich Anleger oft schon vor Aktiencrashs aus Risiken zurück' }));
   g.appendChild(chartCard({ ids: ['breadth'], title: 'Marktbreite (RSP/SPY)', sub: 'Fällt, wenn nur wenige große Aktien den Index tragen' }));
   g.appendChild(chartCard({ ids: ['ew_lag'], title: 'Rückstand der vielen (6 Monate)', ref: 0, refLabel: '0', sub: 'Gleichgewichteter S&P 500 minus normaler, Kursentwicklung über 6 Monate in Prozentpunkten – stark negativ heißt: wenige Schwergewichte tragen den Index' }));
   g.appendChild(chartCard({ ids: ['sect_part'], title: 'US-Sektoren im Aufwärtstrend', ref: 50, refLabel: '50 %', sub: 'Anteil der 11 Sektoren über ihrer 200-Tage-Linie – steigt der Index, während dieser Anteil fällt, tragen immer weniger den Markt' }));
@@ -769,11 +787,6 @@ function gaugeHTML(T, raw) {
   return `<div class="gauge">${segs}<i style="left:calc(${Math.max(0, Math.min(100, score))}% - 2px)"></i></div>
     <div class="gscale">${[0, RK(T, 35), RK(T, 45), RK(T, 65), 100].map(v => `<span style="left:${v}%">${v}</span>`).join('')}</div>`;
 }
-function gaugeHTML_old(score) {
-  const segs = BANDC.map(([a, b, c]) => `<div style="left:${a}%;width:${b - a}%;background:${c}"></div>`).join('');
-  return `<div class="gauge">${segs}<i style="left:calc(${Math.max(0, Math.min(100, score))}% - 2px)"></i></div>
-    <div class="gscale">${[0, 35, 45, 65, 100].map(v => `<span style="left:${v}%">${v}</span>`).join('')}</div>`;
-}
 function pillarBar(v) { // 0..100, Mitte 50
   if (v == null) return '<span class="mut">–</span>';
   const x = Math.max(0, Math.min(100, v)); const l = Math.min(50, x), w = Math.abs(x - 50);
@@ -839,6 +852,7 @@ function secEinschaetzung(m) {
   g.appendChild(ruleCard(M));
   if (DATA.konz && (T.region === 'USA' || T.region === 'Welt')) konzSection(m, DATA.konz);
   if (M.quality && (T.region === 'USA' || T.region === 'Welt')) qualitySection(m, M.quality);
+  phaseSection(m);
 
   // Verlauf
   sect(m, 'Verlauf');
@@ -875,6 +889,7 @@ function secEinschaetzung(m) {
   episodeSection(m, T);
   probSection(m, T);
   protocolSection(m, T, TGT);
+  dailySection(m, T, TGT);
   sect(m, 'Was historisch danach kam');
   const g2 = grid(m, 'wide');
   const bt = document.createElement('div'); bt.className = 'card';
@@ -979,7 +994,7 @@ function secEinschaetzung(m) {
     ch.subscribeCrosshairMove(p => draw(p && p.time ? p.time / DAY : null));
     setStart(0);
   });
-  m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">${esc(M.note)} Das Modell fasst Daten nach festen Regeln zusammen, es kennt deine persönliche Lage nicht und garantiert nichts. Rückblicke zeigen, was war – nicht, was kommt.</div>`);
+  m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">${esc(M.note)} Das Modell fasst Daten nach festen Regeln zusammen. Rückblicke zeigen, was war – nicht, was kommt.</div>`);
 }
 function konzSection(m, K) {
   const P = K.pe || {}, L = K.lag || {}, Hs = K.hist || {}, st = (Hs.stats || {})['1963'], sa = (Hs.stats || {}).all;
@@ -1075,6 +1090,65 @@ function protocolSection(m, T, key) {
     : '<div class="note">Das Protokoll beginnt mit dem nächsten Datenlauf.</div>'}`;
   m.appendChild(c);
 }
+// Tagesprotokoll: Rang und Wahrscheinlichkeit, je Tag der letzte Stand
+function dailySection(m, T, key) {
+  const all = (DATA.daily || []).filter(p => p.t === key).sort((a, b) => a.d < b.d ? -1 : 1);
+  const c = document.createElement('div'); c.className = 'card full';
+  const rows = all.map((p, i) => ({ p, dr: i && p.r != null && all[i - 1].r != null ? p.r - all[i - 1].r : null, dp: i && p.p != null && all[i - 1].p != null ? p.p - all[i - 1].p : null })).slice(-30).reverse();
+  const sgn = (v, d = 0) => v == null ? '<span class="mut">–</span>' : `<span class="${v > 0 ? 'up' : v < 0 ? 'down' : 'flat'}">${v > 0 ? '+' : ''}${nf(v, d)}</span>`;
+  const sgnP = v => v == null ? '<span class="mut">–</span>' : `<span class="${v < 0 ? 'up' : v > 0 ? 'down' : 'flat'}">${v > 0 ? '+' : ''}${nf(v, 0)}</span>`;
+  c.innerHTML = `<div class="hd"><div><div class="ttl">Tagesprotokoll ${esc(T.name)} – die letzten 30 Tage</div><div class="sub">Jeder Tag wird mit dem letzten Stand des Tages festgehalten und danach nie mehr geändert – so sieht man, wie sich Rang und Wahrscheinlichkeit wirklich bewegt haben, nicht nachträglich gerechnet.${all.length ? ` Aufzeichnung seit ${fmtDate(monthDay(all[0].d))}.` : ''}</div></div></div>
+    ${rows.length ? `<table class="t" style="margin-top:6px"><tr><th>Tag</th><th>Rang</th><th>ggü. Vortag</th><th>Wahrscheinlichkeit</th><th>ggü. Vortag</th><th>Signal</th><th>Kurs</th></tr>
+    ${rows.map(({ p, dr, dp }) => `<tr><td>${fmtDate(monthDay(p.d))}</td><td>${p.r ?? '–'}</td><td>${sgn(dr)}</td><td>${p.p == null ? '–' : nf(p.p, 0) + ' %'}</td><td>${sgnP(dp)}</td><td style="font-family:inherit">${p.sig == null ? '–' : p.sig ? '<span class="badge good">investiert</span>' : '<span class="badge crit">draußen</span>'}</td><td>${p.px == null ? '–' : nf(p.px, 0)}</td></tr>`).join('')}</table>`
+    : '<div class="note">Die Aufzeichnung beginnt mit dem nächsten Datenlauf.</div>'}`;
+  m.appendChild(c);
+}
+// Marktphase (S&P 500): nur Orientierung, kein Einfluss auf Rang, Wahrscheinlichkeit oder Einstiegsplan
+function phaseOf(dd, d200, vix) {
+  if (dd <= -20 && vix >= 35) return 'panik';
+  if (dd <= -20) return d200 < 0 ? 'depression' : 'hoffnung';
+  if (dd <= -10) return d200 < 0 ? 'angst' : 'hoffnung';
+  if (d200 < 0) return 'angst';
+  if (dd > -5 && vix < 15 && d200 > 8) return 'euphorie';
+  return 'sorglos';
+}
+function phaseLive() {
+  const P = DATA.phase; if (!P || !P.now || !P.stats) return null;
+  let ph = P.now.ph, live = false, dd = P.now.dd, d200 = P.now.d200, vix = P.now.vix;
+  const s = S.spx, vx = last('vix');
+  if (s && s.v.length > 260 && vx != null) {
+    const v = s.v, n = v.length, px = v[n - 1]; let hi = 0, sum = 0;
+    for (let i = n - 252; i < n; i++) hi = Math.max(hi, v[i]);
+    for (let i = n - 200; i < n; i++) sum += v[i];
+    dd = (px / hi - 1) * 100; d200 = (px / (sum / 200) - 1) * 100; vix = vx;
+    const q = phaseOf(dd, d200, vix); if (q !== ph) { ph = q; live = true; }
+  }
+  const st = P.stats.find(x => x.id === ph), days = live ? 1 : P.now.days;
+  const bin = st && st.bins.find(b => days >= b.lo && (b.hi == null || days <= b.hi));
+  const ok = bin && bin.f12 != null;
+  return { ph, name: st ? st.name : ph, live, since: P.now.since, days, st, bin, dd, d200, vix, f12: ok ? bin.f12 : st && st.f12, dd15: ok ? bin.dd15 : st && st.dd15 };
+}
+function phaseSection(m) {
+  const P = DATA.phase; const L = phaseLive(); if (!L) return;
+  sect(m, 'Marktphase');
+  const c = document.createElement('div'); c.className = 'card full';
+  const cell = b => b.f12 == null ? `<td class="mut">–</td>` : `<td style="${b.n < 60 ? 'opacity:.55' : ''}" title="${b.n} Börsentage">${fmtPct(b.f12, 1)} · <span style="color:${b.dd15 >= 40 ? C.crit : b.dd15 >= 25 ? C.serious : b.dd15 >= 15 ? C.warn : C.sec}">${b.dd15} %</span></td>`;
+  const binLbl = b => b.hi == null ? `ab Tag ${b.lo}` : `Tag ${b.lo}–${b.hi}`;
+  const curBin = L.bin;
+  c.innerHTML = `<div class="hd"><div><div class="ttl">S&P 500 in der Phase „${esc(L.name)}“${L.live ? ' <small>(heute live)</small>' : ''}</div>
+      <div class="sub">${L.live ? `Mit dem heutigen Kurs fällt der Tag unter „${esc(L.name)}“; als Wechsel zählt das erst, wenn es länger als ${P.gap} Börsentage anhält. Bisher: ${esc((P.stats.find(x => x.id === P.now.ph) || {}).name || '')} seit ${fmtDate(monthDay(P.now.since))}.` : `Seit ${fmtDate(monthDay(L.since))} · ${L.days} Börsentage · ${P.now.longer} von ${P.now.of} früheren Episoden dieser Phase dauerten länger.`}
+      Abstand zum 12-Monats-Hoch ${nf(L.dd, 1)} % · zur 200-Tage-Linie ${L.d200 > 0 ? '+' : ''}${nf(L.d200, 1)} % · VIX ${nf(L.vix, 1)}.</div></div></div>
+    ${L.st && L.st.f12 != null ? `<div class="probbox" style="margin:8px 0"><div class="lbl">So ging es früher von hier weiter${curBin ? ` (${esc(L.name)}, ${binLbl(curBin)})` : ''}</div>
+      <div><span class="big" style="font-size:26px">${fmtPct(L.f12, 1)}</span> <span class="mut">S&P 500 nach 12 Monaten (Median)</span> &nbsp; <span class="big" style="font-size:26px">${L.dd15} %</span> <span class="mut">ging es zwischendurch noch einmal mindestens 15 % tiefer</span></div></div>` : ''}
+    <table class="t" style="margin-top:6px"><tr><th>Phase</th><th style="text-align:left">Regel</th><th>Anteil der Tage</th><th>Episoden</th><th>Dauer (Median)</th><th>12 M. später</th><th>im Plus</th><th>noch einmal ≥ 15 % tiefer</th></tr>
+    ${P.stats.map(s => `<tr style="${s.id === L.ph ? 'background:var(--panel2);font-weight:600' : ''}"><td>${esc(s.name)}</td><td class="mut" style="text-align:left;font-family:inherit;white-space:normal;max-width:360px">${esc(s.desc)}</td><td>${s.share} %</td><td>${s.ep}</td><td>${s.dur == null ? '–' : s.dur + ' Tage'}</td><td>${fmtPct(s.f12, 1)}</td><td>${s.pos == null ? '–' : s.pos + ' %'}</td><td>${s.dd15 == null ? '–' : s.dd15 + ' %'}</td></tr>`).join('')}
+    ${P.all && P.all.f12 != null ? `<tr><td class="mut">alle Tage</td><td></td><td>100 %</td><td></td><td></td><td>${fmtPct(P.all.f12, 1)}</td><td>${P.all.pos} %</td><td>${P.all.dd15} %</td></tr>` : ''}</table>
+    <div class="lbl" style="margin-top:14px">Je nachdem, wie lange die Phase schon läuft <span class="mut">– 12 Monate später (Median) · wie oft es noch einmal mindestens 15 % tiefer ging</span></div>
+    <table class="t" style="margin-top:4px"><tr><th>Phase</th>${P.bins.map(([a, b]) => `<th>${binLbl({ lo: a, hi: b })}</th>`).join('')}</tr>
+    ${P.stats.map(s => `<tr><td>${esc(s.name)}</td>${s.bins.map(b => s.id === L.ph && curBin && b.lo === curBin.lo ? cell(b).replace('<td', '<td class="cur" ') : cell(b)).join('')}</tr>`).join('')}</table>
+    <div class="note">S&P 500 seit ${P.from.slice(0, 4)} (ab da gibt es den VIX), jeder Börsentag einer Phase zugeordnet; kurze Ausreißer bis ${P.gap} Börsentage unterbrechen eine Phase nicht. Blass = weniger als 60 Börsentage Grundlage; Panik gab es nur in ${(P.stats.find(x => x.id === 'panik') || {}).ep ?? '–'} Episoden. Nur Orientierung – fließt nicht in Rang, Wahrscheinlichkeit oder Einstiegsplan ein.</div>`;
+  m.appendChild(c);
+}
 function probSection(m, T) {
   const Pq = T.prob; if (!Pq || !Pq.calib || !Pq.calib.length) return;
   sect(m, 'Wie verlässlich ist die Wahrscheinlichkeit?');
@@ -1138,8 +1212,17 @@ function updateLive() {
 }
 // ---------- Einstiegsplan: einen größeren Betrag regelbasiert anlegen (Score + Ausstiegssignal)
 let PLAN; // undefined = noch nicht geladen, null = keiner angelegt
-const PLAN_DEF = { amount: 460000, reserve: 0, target: 'world_eur', start: null, base: 12, max: 24, linePct: 0, lineMax: 36, lineBand: 5, buys: [] };
+const PLAN_DEF = { amount: 465429.31, reserve: 50000, target: 'world_eur', start: null, base: 12, max: 24, linePct: 0, lineMax: 36, lineBand: 5,
+  momPct: 17, levPct: 13, baseName: 'Vanguard FTSE Global All Cap (IE000VAHT5T0)', momName: 'Xtrackers MSCI World Momentum (IE00BL25JP72)', levName: 'Amundi MSCI World 2x (FR0014010HV4)', buys: [] };
 const eur = v => nf(Math.round(v), 0) + ' €';
+const eur2 = v => nf(v, 2) + ' €';
+// Aufteilung des angelegten Geldes: Basis-ETF (davon ggf. Linien-Anteil), Momentum, 2x
+function planParts(P) {
+  const invAll = Math.max(0, P.amount - (P.reserve || 0));
+  const mom = invAll * (P.momPct || 0) / 100, lev = invAll * (P.levPct || 0) / 100, base = invAll - mom - lev;
+  const line = base * (P.linePct || 0) / 100;
+  return { invAll, mom, lev, base, line, main: base - line };
+}
 const ymd = d => d.toISOString().slice(0, 10);
 function monthsBetween(a, b) { return (b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth(); }
 async function planLoad() { if (PLAN !== undefined) return; try { const t = await bigLoad('einstiegsplan'); PLAN = t ? JSON.parse(t) : null; } catch (e) { PLAN = null; } }
@@ -1156,8 +1239,8 @@ function monthsOut(S, start, today) {
 function planState(P, M, liveScore) {
   const T = M.targets[P.target] || M.targets.world; const today = new Date();
   const start = P.start ? new Date(P.start + 'T12:00:00') : today;
-  const invAll = Math.max(0, P.amount - (P.reserve || 0)), invLine = Math.round(invAll * (P.linePct || 0) / 100), inv = invAll - invLine;
-  const nb = (P.buys || []).filter(b => b.t !== 'l'), done = nb.reduce((x, b) => x + b.a, 0), rest = Math.max(0, inv - done);
+  const inv = planParts(P).main;
+  const nb = (P.buys || []).filter(b => !b.t || b.t === 'n'), done = nb.reduce((x, b) => x + b.a, 0), rest = Math.max(0, inv - done);
   const curM = ymd(today).slice(0, 7), boughtM = nb.filter(b => b.d.slice(0, 7) === curM).reduce((x, b) => x + b.a, 0);
   const sig = T.signals && !T.signals.error ? T.signals.state : 1;
   const mOut = monthsOut(T.signals, start, today);
@@ -1179,8 +1262,8 @@ function planState(P, M, liveScore) {
 // Linien-Anteil: wartet auf die 200-Wochen-Linie (≈ 1000 Börsentage), höchstens lineMax Monate, danach in Raten
 function lineState(P, M) {
   const T = M.targets[P.target] || M.targets.world; const today = new Date();
-  const invAll = Math.max(0, P.amount - (P.reserve || 0)), inv = Math.round(invAll * (P.linePct || 0) / 100);
-  if (!inv) return null;
+  const inv = planParts(P).line;
+  if (!(inv > 0)) return null;
   const lb = (P.buys || []).filter(b => b.t === 'l'), done = lb.reduce((x, b) => x + b.a, 0), rest = Math.max(0, inv - done);
   const s = S[T.sid]; let px = null, line = null;
   if (s && s.v.length >= 1000) { px = s.v[s.v.length - 1]; let sum = 0; for (let i = s.v.length - 1000; i < s.v.length; i++) sum += s.v[i]; line = sum / 1000; }
@@ -1197,6 +1280,35 @@ function lineState(P, M) {
     r.head = 'Wartezeit abgelaufen – in Raten anlegen'; r.why = `Die Linie kam in ${maxM} Monaten nicht. Damit der Teil nicht ewig draußen bleibt, geht er jetzt über 12 Monate in Raten rein.`; return r; }
   r.kind = 'pause'; r.head = 'Wartet auf die 200-Wochen-Linie';
   r.why = dist == null ? 'Zu wenig Kursdaten für die 200-Wochen-Linie.' : `${esc(T.name)} liegt ${nf(dist * 100, 0)} % über der Linie (${nf(line, 0)}). Angelegt wird, sobald der Abstand unter ${nf(band * 100, 0)} % fällt – spätestens nach ${maxM} Monaten (noch ${Math.max(0, maxM - elapsed)}).`;
+  return r;
+}
+// Stufe 2: Momentum und 2x warten auf die 12-Monats-Linie (Momentum zusätzlich mindestens 6 Monate ab Start)
+const SLV = { m: { pct: 'momPct', name: 'momName', label: 'Momentum', months: 6 }, x: { pct: 'levPct', name: 'levName', label: '2x gehebelt', months: 0 } };
+function trendLine(T, n = 252) {
+  const s = S[T.sid]; if (!s || s.v.length < n) return null;
+  let sum = 0; for (let i = s.v.length - n; i < s.v.length; i++) sum += s.v[i];
+  const px = s.v[s.v.length - 1], line = sum / n; return { px, line, dist: px / line - 1 };
+}
+function sleeveState(P, M, k) {
+  const D = SLV[k], parts = planParts(P), inv = k === 'm' ? parts.mom : parts.lev;
+  if (!(inv > 0)) return null;
+  const T = M.targets[P.target] || M.targets.world; const today = new Date();
+  const start = P.start ? new Date(P.start + 'T12:00:00') : today;
+  const done = (P.buys || []).filter(b => b.t === k).reduce((x, b) => x + b.a, 0), rest = Math.max(0, inv - done);
+  const r = { k, label: D.label, name: P[D.name] || PLAN_DEF[D.name], inv, done, rest, due: 0, kind: '', head: '', why: '' };
+  if (rest <= 1) { r.kind = 'done'; r.head = `${D.label} vollständig angelegt`; return r; }
+  const sig = T.signals && !T.signals.error ? T.signals.state : 1;
+  if (sig === 0) { r.kind = 'pause'; r.head = 'Pause: Ausstiegssignal aktiv'; r.why = `Solange der Signale-Reiter für ${esc(T.name)} auf „draußen“ steht, wird auch dieser Teil nicht gekauft.`; return r; }
+  if (D.months) { const from = new Date(start.getFullYear(), start.getMonth() + D.months, start.getDate());
+    if (today < from) { r.kind = 'pause'; r.head = `Wartet bis ${from.toLocaleDateString('de-DE')}`;
+      r.why = `Momentum frühestens ${D.months} Monate nach dem Start: Gleich nach einem Einbruch hält der Faktor noch die alten Gewinner und hinkt hinterher – 2009 brachte er +32,1 %, der Markt +55,5 %.`; return r; } }
+  const L = trendLine(T);
+  if (!L) { r.kind = 'pause'; r.head = 'Zu wenig Kursdaten'; r.why = 'Für die 12-Monats-Linie fehlen Kurse.'; return r; }
+  if (L.dist <= 0) { r.kind = 'pause'; r.head = 'Wartet auf die 12-Monats-Linie';
+    r.why = `${esc(T.name)} liegt ${nf(-L.dist * 100, 1)} % unter seiner 12-Monats-Linie (${nf(L.line, 0)}). Gekauft wird erst, wenn der Kurs wieder darüber schließt.` +
+      (k === 'x' ? ' Nach Einbrüchen ab 25 % sofort gekauft, lag 2x in 3 von 7 Fällen hinten; mit dieser Wartelinie nach 5 Jahren im Median +151 %, schlimmster Rückgang danach −14 %.' : ''); return r; }
+  r.kind = 'all'; r.due = rest; r.head = `${D.label} jetzt anlegen`;
+  r.why = `${esc(T.name)} schließt ${nf(L.dist * 100, 1)} % über seiner 12-Monats-Linie (${nf(L.line, 0)}) – der Aufwärtstrend ist bestätigt${D.months ? ` und die ${D.months} Monate seit Start sind vorbei` : ''}. Entschieden wird mit dem Schlusswert.`;
   return r;
 }
 function planLiveHint(P, M, liveScore, st) {
@@ -1220,8 +1332,8 @@ function drawPlan(c, M) {
     c.innerHTML = `<div class="hd"><div><div class="ttl">${PLAN ? 'Plan bearbeiten' : 'Einstiegsplan anlegen'}</div>
       <div class="sub">Für einen größeren Betrag, der nach und nach in den Markt soll. Die Regel kommt aus dem Test seit 1953: günstige Lage (Rang ab ${RK(Object.values(M.targets)[0], 55)}) → Rest sofort, mittlere Lage → Monatsraten, erhöhtes Risiko (Rang unter ${RK(Object.values(M.targets)[0], 45)}) → Pause, Ausstiegssignal aktiv → Pause; spätestens nach der Frist ist alles angelegt.</div></div></div>
       <div class="pform">
-        <label>Gesamtbetrag (€)<input id="pf-a" type="number" step="1000" value="${P.amount}"></label>
-        <label>davon Reserve, wird nicht angelegt (€)<input id="pf-r" type="number" step="1000" value="${P.reserve || 0}"></label>
+        <label>Gesamtbetrag (€)<input id="pf-a" type="number" step="any" value="${P.amount}"></label>
+        <label>davon Reserve, wird nicht angelegt (€)<input id="pf-r" type="number" step="any" value="${P.reserve || 0}"></label>
         <label>Richtwert (Rang und Signal von)<select id="pf-t">${opts}</select></label>
         <label>Start<input id="pf-s" type="date" value="${P.start || ymd(new Date())}"></label>
         <label>Raten (Monate)<input id="pf-b" type="number" min="1" max="60" value="${P.base || 12}"></label>
@@ -1229,13 +1341,21 @@ function drawPlan(c, M) {
         <label>Linien-Anteil: wartet auf die 200-Wochen-Linie (%)<input id="pf-lp" type="number" min="0" max="100" step="5" value="${P.linePct || 0}"></label>
         <label>Linien-Anteil: höchstens warten (Monate)<input id="pf-lm" type="number" min="1" max="120" value="${P.lineMax || 36}"></label>
         <label>Linie gilt als erreicht bei Abstand unter (%)<input id="pf-lb" type="number" min="0" max="20" step="1" value="${P.lineBand ?? 5}"></label>
+        <label>Momentum-Anteil (% des angelegten Geldes)<input id="pf-mp" type="number" min="0" max="100" step="1" value="${P.momPct ?? PLAN_DEF.momPct}"></label>
+        <label>2x-Anteil (% des angelegten Geldes)<input id="pf-xp" type="number" min="0" max="100" step="1" value="${P.levPct ?? PLAN_DEF.levPct}"></label>
+        <label>Basis-ETF<input id="pf-bn" type="text" value="${esc(P.baseName || PLAN_DEF.baseName)}"></label>
+        <label>Momentum-ETF<input id="pf-mn" type="text" value="${esc(P.momName || PLAN_DEF.momName)}"></label>
+        <label>2x-ETF<input id="pf-xn" type="text" value="${esc(P.levName || PLAN_DEF.levName)}"></label>
       </div>
       <div class="pbtn"><button id="pf-save" class="pri">Speichern</button>${PLAN ? '<button id="pf-cancel">Abbrechen</button><button id="pf-del" class="danger">Plan löschen</button>' : ''}</div>
-      <div class="note">Die Reserve ist das, was du in den nächsten Jahren für den Haushalt brauchen könntest – sie gehört aufs Tagesgeld oder in einen Geldmarktfonds, nicht in Aktien. Der Plan wird nur auf diesem Mac gespeichert.</div>`;
+      <div class="note">Die Reserve ist das, was du in den nächsten Jahren für den Haushalt brauchen könntest – sie gehört aufs Tagesgeld oder in einen Geldmarktfonds, nicht in Aktien. Der Basis-ETF folgt den Regeln oben (ein Linien-Anteil ist ein Teil davon). Momentum und 2x werden gekauft, sobald der Richtwert über seiner 12-Monats-Linie schließt, Momentum frühestens 6 Monate nach dem Start. Der Plan wird nur auf diesem Mac gespeichert.</div>`;
     c.querySelector('#pf-t').value = P.target in M.targets ? P.target : 'world';
     c.querySelector('#pf-save').onclick = () => {
       const v = id => c.querySelector(id).value;
-      PLAN = Object.assign({}, P, { amount: +v('#pf-a') || 0, reserve: +v('#pf-r') || 0, target: v('#pf-t'), start: v('#pf-s'), base: Math.max(1, +v('#pf-b') || 12), max: Math.max(1, +v('#pf-m') || 24), linePct: Math.max(0, Math.min(100, +v('#pf-lp') || 0)), lineMax: Math.max(1, +v('#pf-lm') || 36), lineBand: Math.max(0, +v('#pf-lb')), buys: P.buys || [] });
+      PLAN = Object.assign({}, P, { amount: +v('#pf-a') || 0, reserve: +v('#pf-r') || 0, target: v('#pf-t'), start: v('#pf-s'), base: Math.max(1, +v('#pf-b') || 12), max: Math.max(1, +v('#pf-m') || 24), linePct: Math.max(0, Math.min(100, +v('#pf-lp') || 0)), lineMax: Math.max(1, +v('#pf-lm') || 36), lineBand: Math.max(0, +v('#pf-lb')),
+        momPct: Math.max(0, Math.min(100, +v('#pf-mp') || 0)), levPct: Math.max(0, Math.min(100, +v('#pf-xp') || 0)),
+        baseName: v('#pf-bn').trim(), momName: v('#pf-mn').trim(), levName: v('#pf-xn').trim(), buys: P.buys || [] });
+      if (PLAN.momPct + PLAN.levPct > 100) { PLAN.levPct = Math.max(0, 100 - PLAN.momPct); }
       planSave(); c.dataset.edit = '0'; drawPlan(c, M);
     };
     if (PLAN) { c.querySelector('#pf-cancel').onclick = () => { c.dataset.edit = '0'; drawPlan(c, M); };
@@ -1244,32 +1364,44 @@ function drawPlan(c, M) {
   }
   const P = PLAN; const live = liveModel(M.targets[P.target] || M.targets.world); const st = planState(P, M, live && live.score);
   const ls = lineState(P, M);
-  const totInv = st.inv + (ls ? ls.inv : 0), totDone = st.done + (ls ? ls.done : 0);
+  const sv = ['m', 'x'].map(k => sleeveState(P, M, k)).filter(Boolean);
+  const parts = planParts(P);
+  const totInv = parts.invAll, totDone = (P.buys || []).reduce((x, b) => x + b.a, 0);
+  const pctOf = v => parts.invAll ? v / parts.invAll * 100 : 0;
+  const PARTS = [{ t: 'n', short: ls ? 'Basis (Raten)' : 'Basis', label: ls ? 'Basis-ETF, Raten' : 'Basis-ETF', name: P.baseName || PLAN_DEF.baseName, inv: st.inv, done: st.done, due: st.due, kind: st.kind, head: st.head, pct: pctOf(st.inv) }]
+    .concat(ls ? [{ t: 'l', short: 'Basis (Linie)', label: 'Basis-ETF, Linien-Anteil', name: P.baseName || PLAN_DEF.baseName, inv: ls.inv, done: ls.done, due: ls.due, kind: ls.kind, head: ls.head, pct: pctOf(ls.inv) }] : [])
+    .concat(sv.map(x => ({ t: x.k, short: x.label, label: x.label, name: x.name, inv: x.inv, done: x.done, due: x.due, kind: x.kind, head: x.head, pct: pctOf(x.inv) })));
+  const multi = PARTS.length > 1, firstDue = PARTS.find(p => p.due > 1);
   const pct = totInv ? totDone / totInv * 100 : 0;
   const colOf = k => ({ all: C.up, rate: C.s1, wait: C.sec, pause: C.warn, done: C.up }[k]);
   const col = colOf(st.kind);
-  c.innerHTML = `<div class="hd"><div><div class="ttl">Einstiegsplan · ${eur(P.amount)}${P.reserve ? ` <small>(${eur(P.reserve)} Reserve)</small>` : ''}</div>
+  c.innerHTML = `<div class="hd"><div><div class="ttl">Einstiegsplan · ${eur2(P.amount)}${P.reserve ? ` <small>(${eur2(P.reserve)} Reserve)</small>` : ''}</div>
       <div class="sub">Richtwert ${esc(st.T.name)} · Start ${fmtDate(monthDay(P.start))} · Monat ${st.elapsed + 1} · noch ${st.left} Monat(e) bis zur Frist${st.mOut ? ` (um ${st.mOut} verlängert wegen Ausstiegssignal)` : ''}</div></div>
       <button id="pl-edit" class="ghost">Bearbeiten</button></div>
     <div class="plan">
       <div class="pnow" style="border-color:${col}">
-        <div class="lbl">Heute${ls ? ` · Hauptteil ${eur(st.inv)}` : ''}</div>
+        <div class="lbl">Heute${ls || sv.length ? ` · Basis-ETF${ls ? ', Raten' : ''} ${eur(st.inv)}` : ''}</div>
         <div class="phead" style="color:${col}">${st.head}</div>
-        ${st.due > 1 ? `<div class="big" style="font-size:30px">${eur(st.due)}</div>` : ''}
+        ${st.due > 1 ? `<div class="big" style="font-size:30px">${eur2(st.due)}</div>` : ''}
         <div class="pwhy">${st.why}</div>
         <div class="plive" id="pl-live">${planLiveHint(P, M, live && live.score, st)}</div>
         ${ls ? `<div class="pline" style="border-color:${colOf(ls.kind)}"><div class="lbl">Linien-Anteil · ${eur(ls.inv)} · angelegt ${eur(ls.done)}</div>
           <div class="phead" style="color:${colOf(ls.kind)};font-size:15px">${ls.head}</div>${ls.due > 1 ? `<div class="big" style="font-size:22px">${eur(ls.due)}</div>` : ''}<div class="pwhy">${ls.why}</div></div>` : ''}
+        ${sv.map(x => `<div class="pline" style="border-color:${colOf(x.kind)}"><div class="lbl">${x.label} · ${eur(x.inv)} · angelegt ${eur(x.done)}</div>
+          <div class="phead" style="color:${colOf(x.kind)};font-size:15px">${x.head}</div>${x.due > 1 ? `<div class="big" style="font-size:22px">${eur2(x.due)}</div><div class="mut" style="font-size:12px">${esc(x.name)}</div>` : ''}<div class="pwhy">${x.why}</div></div>`).join('')}
       </div>
       <div>
         <div class="lbl">Fortschritt</div>
         <div class="pprog"><i style="width:${Math.min(100, pct).toFixed(1)}%"></i></div>
         <div class="pnums"><span>angelegt <b>${eur(totDone)}</b></span><span>offen <b>${eur(totInv - totDone)}</b></span><span>${nf(pct, 0)} %</span></div>
-        <div class="paddr"><input id="pl-amt" type="number" step="100" value="${Math.round(st.due || (ls && ls.due) || 0) || ''}" placeholder="Betrag"><input id="pl-d" type="date" value="${ymd(new Date())}">${ls ? `<select id="pl-t"><option value="n">Hauptteil</option><option value="l"${!(st.due > 1) && ls.due > 1 ? ' selected' : ''}>Linien-Anteil</option></select>` : ''}<button id="pl-add" class="pri">Als gekauft eintragen</button></div>
-        ${(P.buys || []).length ? `<table class="t" style="margin-top:8px"><tr><th>Datum</th><th>Betrag</th>${ls ? '<th>Teil</th>' : ''}<th></th></tr>${P.buys.slice().reverse().map((b, i) => `<tr><td>${fmtDate(monthDay(b.d))}</td><td>${eur(b.a)}</td>${ls ? `<td class="mut">${b.t === 'l' ? 'Linie' : 'Haupt'}</td>` : ''}<td><button class="x" data-i="${P.buys.length - 1 - i}" title="Eintrag entfernen">×</button></td></tr>`).join('')}</table>` : '<div class="note">Noch nichts eingetragen. Trag jede Ausführung ein – daraus rechnet der Plan, was noch offen ist.</div>'}
+        <div class="paddr"><input id="pl-amt" type="number" step="any" value="${firstDue ? Math.round(firstDue.due * 100) / 100 : ''}" placeholder="Betrag"><input id="pl-d" type="date" value="${ymd(new Date())}">${multi ? `<select id="pl-t">${PARTS.map(p => `<option value="${p.t}"${firstDue && firstDue.t === p.t ? ' selected' : ''}>${p.short}</option>`).join('')}</select>` : ''}<button id="pl-add" class="pri">Als gekauft eintragen</button></div>
+        ${(P.buys || []).length ? `<table class="t" style="margin-top:8px"><tr><th>Datum</th><th>Betrag</th>${multi ? '<th>Teil</th>' : ''}<th></th></tr>${P.buys.slice().reverse().map((b, i) => `<tr><td>${fmtDate(monthDay(b.d))}</td><td>${eur2(b.a)}</td>${multi ? `<td class="mut" style="font-family:inherit">${({ l: 'Linie', m: 'Momentum', x: '2x' })[b.t] || 'Basis'}</td>` : ''}<td><button class="x" data-i="${P.buys.length - 1 - i}" title="Eintrag entfernen">×</button></td></tr>`).join('')}</table>` : '<div class="note">Noch nichts eingetragen. Trag jede Ausführung ein – daraus rechnet der Plan, was noch offen ist.</div>'}
       </div>
     </div>
-    <div class="note">Regel (getestet für jeden Startmonat seit 1953, 10 Jahre Horizont): Endwert im Median wie „sofort alles“ oder leicht besser, aber nur halb so oft mehr als 20 % Buchverlust in den ersten drei Jahren. Vor einem Crash <i>nach</i> dem Einstieg schützt keine Einstiegsregel – dafür ist der Ausstieg im Signale-Reiter da. Entschieden wird mit dem Schlusswert; der Live-Rang zeigt nur, was sich anbahnt. ${ls ? 'Linien-Anteil: Bei hohem CAPE (über +1,5 σ) kam der Kurs seit 1900 in 8 von 9 Phasen nach 16–43 Monaten an die 200-Wochen-Linie zurück; die Ausnahme (1989–2001) dauerte 11 Jahre – deshalb die Höchstwartezeit. ' : ''}Kein Anlagerat.</div>`;
+    ${sv.length ? `<table class="t" style="margin-top:12px"><tr><th>Teil</th><th>ETF</th><th>Anteil</th><th>Betrag</th><th>angelegt</th><th>offen</th><th>Stand</th></tr>
+      ${PARTS.map(p => `<tr><td style="font-family:inherit">${p.label}</td><td class="mut" style="font-family:inherit">${esc(p.name)}</td><td>${nf(p.pct, p.pct % 1 ? 1 : 0)} %</td><td>${eur2(p.inv)}</td><td>${eur2(p.done)}</td><td>${eur2(Math.max(0, p.inv - p.done))}</td><td style="font-family:inherit;color:${colOf(p.kind)}">${p.head}</td></tr>`).join('')}
+      <tr><td style="font-family:inherit">Reserve</td><td class="mut" style="font-family:inherit">Tagesgeld</td><td></td><td>${eur2(P.reserve || 0)}</td><td></td><td></td><td></td></tr></table>` : ''}
+    <div class="note">Regel (getestet für jeden Startmonat seit 1953, 10 Jahre Horizont): Endwert im Median wie „sofort alles“ oder leicht besser, aber nur halb so oft mehr als 20 % Buchverlust in den ersten drei Jahren. Vor einem Crash <i>nach</i> dem Einstieg schützt keine Einstiegsregel – dafür ist der Ausstieg im Signale-Reiter da. Entschieden wird mit dem Schlusswert; der Live-Rang zeigt nur, was sich anbahnt.${ls ? ' Linien-Anteil: Bei hohem CAPE (über +1,5 σ) kam der Kurs seit 1900 in 8 von 9 Phasen nach 16–43 Monaten an die 200-Wochen-Linie zurück; die Ausnahme (1989–2001) dauerte 11 Jahre – deshalb die Höchstwartezeit.' : ''}${sv.length ? ' Wie sich diese Aufteilung in der Vergangenheit geschlagen hätte, zeigt der Schalter „Mischung“ in den Regeln im Test.' : ''}</div>`;
   c.querySelector('#pl-edit').onclick = () => { c.dataset.edit = '1'; drawPlan(c, M); };
   c.querySelector('#pl-add').onclick = () => { const a = +c.querySelector('#pl-amt').value, d = c.querySelector('#pl-d').value; if (!(a > 0) || !d) return;
     const tSel = c.querySelector('#pl-t'); const t = tSel ? tSel.value : 'n';
@@ -1463,7 +1595,7 @@ function secSignale(m) {
       <td>${x.chg == null ? '–' : `<span class="${x.chg < 0 ? 'up' : 'down'}">${x.chg > 0 ? '+' : ''}${nf(x.chg, 1)} %</span>`}</td>
       <td>${fmtPct(x.low)}</td><td style="font-family:inherit">${x.chg == null ? '–' : x.chg < 0 ? '<span class="badge good">lohnte sich</span>' : '<span class="badge warn">kostete</span>'}</td></tr>`).join('')}</table>`;
   m.appendChild(tr);
-  m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">Vergleich zur Einschätzung: Dort gibt es eine stufenlose Lagebewertung und eine Wahrscheinlichkeit, hier eine Ja/Nein-Entscheidung mit Bestätigungsregeln. Beide nutzen denselben Score. Kein Anlagerat – ein Regelwerk, getestet an der Vergangenheit.</div>`);
+  m.insertAdjacentHTML('beforeend', `<div class="note" style="margin-top:14px;max-width:900px">Vergleich zur Einschätzung: Dort gibt es eine stufenlose Lagebewertung und eine Wahrscheinlichkeit, hier eine Ja/Nein-Entscheidung mit Bestätigungsregeln. Beide nutzen denselben Score.</div>`);
 }
 // ---------- Zusammenhänge
 let MX = { f: load('mx_f') || 'w', d: +(load('mx_d') || 730) };

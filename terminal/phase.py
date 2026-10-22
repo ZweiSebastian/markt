@@ -111,7 +111,7 @@ def build(spx, vix, now):
             "day": p.index[-1].strftime("%Y-%m-%d")}
     recent = [{"ph": r.ph, "from": idx[int(r.a)].strftime("%Y-%m-%d"), "to": idx[int(r.b)].strftime("%Y-%m-%d"), "len": int(r.len)}
               for r in eps.tail(8).itertuples()]
-    return {"now": now_, "stats": stats, "recent": recent, "from": idx[0].strftime("%Y-%m-%d"), "gap": GAP,
+    return {"now": now_, "stats": stats, "all": st(np.ones(len(codes), dtype=bool)), "recent": recent, "from": idx[0].strftime("%Y-%m-%d"), "gap": GAP,
             "bins": [[a, b] for a, b in BINS]}
 
 

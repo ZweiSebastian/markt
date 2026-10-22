@@ -1348,7 +1348,6 @@ except Exception as e:  # noqa
 FEEDS = [
     ("CNBC", "https://www.cnbc.com/id/20910258/device/rss/rss.html", "us"),
     ("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories", "us"),
-    ("Yahoo Finance", "https://finance.yahoo.com/news/rssindex", "us"),
     ("FT Markets", "https://www.ft.com/markets?format=rss", "us"),
     ("Investing.com", "https://www.investing.com/rss/news_25.rss", "us"),
     ("Federal Reserve", "https://www.federalreserve.gov/feeds/press_monetary.xml", "fed"),
