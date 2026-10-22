@@ -1,0 +1,29 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e; mkdir out && cd out
+          UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
+          curl -sSL -m 90 -A "$UA" -o cf_csv.csv -w "%{http_code} %{url_effective}\n" "https://www.chicagofed.org/-/media/publications/nfci/nfci-data-series-csv.csv" >> codes.txt
+          curl -sSL -m 90 -A "$UA" -o cf_page.html -w "%{http_code} %{url_effective}\n" "https://www.chicagofed.org/research/data/nfci/current-data" >> codes.txt
+          curl -sSL -m 90 -A "$UA" -o cf_page2.html -w "%{http_code} %{url_effective}\n" "https://www.chicagofed.org/publications/nfci/index" >> codes.txt
+          curl -sSL -m 90 -A "$UA" -o fred.csv -w "%{http_code} %{url_effective}\n" "https://fred.stlouisfed.org/graph/fredgraph.csv?id=NFCI,ANFCI" >> codes.txt
+          curl -sSL -m 90 -o fred_noua.csv -w "%{http_code} %{url_effective}\n" "https://fred.stlouisfed.org/graph/fredgraph.csv?id=NFCI" >> codes.txt
+          curl -sSL -m 90 -A "$UA" -o fred_txt.txt -w "%{http_code} %{url_effective}\n" "https://fred.stlouisfed.org/data/NFCI.txt" >> codes.txt
+          curl -sSL -m 90 -A "$UA" -o alfred.csv -w "%{http_code} %{url_effective}\n" "https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=NFCI" >> codes.txt
+          curl -sSL -m 90 -o dbn_search.json -w "%{http_code} %{url_effective}\n" "https://api.db.nomics.world/v22/search?q=NFCI&limit=20" >> codes.txt
+          curl -sSL -m 90 -o dbn_search2.json -w "%{http_code} %{url_effective}\n" "https://api.db.nomics.world/v22/search?q=national%20financial%20conditions&limit=20" >> codes.txt
+          curl -sSL -m 90 -A "$UA" -o finra.xlsx -w "%{http_code} %{url_effective}\n" "https://www.finra.org/sites/default/files/2021-03/margin-statistics.xlsx" >> codes.txt
+          for f in *; do echo "== $f"; head -c 400 "$f"; echo; tail -c 300 "$f"; echo; done > heads.txt 2>&1
+          ls -la > files.txt 2>&1; set -e
+          git init -q -b research-r8
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m r8 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r8
