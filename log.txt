@@ -1,0 +1,34 @@
+OK   vorheriger Lauf  2026-10-22T21:49:03Z
+OK   Tages-Archiv  89 Reihen
+OK   yahoo  56/56 Ticker (Ergänzung)
+OK   quality  aus Cache 2026-10-22T21:46:23Z
+OK   zinsen  aus Cache 2026-10-22T21:46:23Z
+OK   y10m  aus Cache 2026-10-22T21:46:23Z
+OK   z1  aus Cache 2026-10-22T21:46:23Z
+OK   g7  aus Cache 2026-10-22T21:46:23Z
+OK   fedfunds  aus Cache 2026-10-22T21:46:23Z
+OK   ezb  aus Cache 2026-10-22T21:46:23Z
+OK   eurostat_unemp  aus Cache 2026-10-22T21:46:23Z
+OK   bls  aus Cache 2026-10-22T21:46:23Z
+OK   nfci_fred  aus Cache 2026-10-22T21:49:03Z
+OK   finra  aus Cache 2026-10-22T21:46:23Z
+OK   oecd  aus Cache 2026-10-22T21:46:23Z
+OK   payrolls_rt  aus Cache 2026-10-22T21:46:23Z
+OK   claims  aus Cache 2026-10-22T21:46:23Z
+OK   aaii2  aus Cache 2026-10-22T21:46:23Z
+OK   msci_eur  aus Cache 2026-10-22T21:46:23Z
+OK   gdp  aus Cache 2026-10-22T21:46:23Z
+OK   freddie  aus Cache 2026-10-22T21:46:23Z
+OK   eia  aus Cache 2026-10-22T21:46:23Z
+OK   h41  aus Cache 2026-10-22T21:46:23Z
+OK   shiller  aus Cache 2026-10-22T21:46:23Z
+OK   momentum  aus Cache 2026-10-22T21:46:23Z
+OK   markt.json  2026-10-02
+OK   stress  jetzt 6 Signale
+OK   modell  world: 50 · world_eur: 51 · spx: 49 · ndx: 48 · rut: 48 · sx5e: 52 · dax: 48 · nikkei: 50 · em: 50
+OK   protokoll  9 Einträge
+OK   tagesprotokoll  1 Tage
+OK   marktphase  sorglos seit 2026-04-08
+OK   news  130 Meldungen
+OK   Tages-Archiv: 89 Reihen, 5.89 MB
+OK   fertig: 123 Reihen, 5.03 MB
