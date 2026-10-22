@@ -1,0 +1,13 @@
+total 416
+drwxr-xr-x 2 runner runner   4096 Oct 22 21:42 .
+drwxr-xr-x 3 runner runner   4096 Oct 22 21:42 ..
+-rw-r--r-- 1 runner runner 147619 Oct 22 21:42 cf_csv.csv
+-rw-r--r-- 1 runner runner  80205 Oct 22 21:42 cf_page.html
+-rw-r--r-- 1 runner runner  80205 Oct 22 21:42 cf_page2.html
+-rw-r--r-- 1 runner runner    668 Oct 22 21:42 codes.txt
+-rw-r--r-- 1 runner runner    670 Oct 22 21:42 dbn_search.json
+-rw-r--r-- 1 runner runner   6772 Oct 22 21:42 dbn_search2.json
+-rw-r--r-- 1 runner runner      0 Oct 22 21:42 files.txt
+-rw-r--r-- 1 runner runner  20499 Oct 22 21:42 finra.xlsx
+-rw-r--r-- 1 runner runner  51565 Oct 22 21:42 fred_noua.csv
+-rw-r--r-- 1 runner runner   6461 Oct 22 21:42 heads.txt

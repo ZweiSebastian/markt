@@ -1,0 +1,10 @@
+200 https://www.chicagofed.org/-/media/publications/nfci/nfci-data-series-csv.csv
+200 https://www.chicagofed.org/research/data/nfci/current-data
+200 https://www.chicagofed.org/research/data/nfci/current-data
+000 https://fred.stlouisfed.org/graph/fredgraph.csv?id=NFCI,ANFCI
+200 https://fred.stlouisfed.org/graph/fredgraph.csv?id=NFCI
+000 https://fred.stlouisfed.org/data/NFCI.txt
+000 https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=NFCI
+200 https://api.db.nomics.world/v22/search?q=NFCI&limit=20
+200 https://api.db.nomics.world/v22/search?q=national%20financial%20conditions&limit=20
+200 https://www.finra.org/sites/default/files/2021-03/margin-statistics.xlsx
