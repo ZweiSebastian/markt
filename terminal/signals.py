@@ -17,7 +17,6 @@ jüngeren Marktgeschichte, und jedes Jahr ab 1990 ist ein echter Vorwärtstest. 
 (dort also nicht vorwärts getestet).
 """
 import itertools
-import math
 
 import numpy as np
 import pandas as pd

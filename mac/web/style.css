@@ -283,3 +283,10 @@ details.roll { margin-top: 8px; font-size: 12.5px; } details.roll summary { curs
 
 .sstart .lev { margin-left: auto; display: flex; gap: 6px; align-items: center; }
 .rtip { border-bottom: 1px dotted currentColor; cursor: help; }
+
+/* ---------- Kreditwarnung (oben in jedem Abschnitt) */
+.alert { border: 1px solid; border-radius: 10px; padding: 9px 12px; margin: 0 0 14px; font-size: 12.5px; line-height: 1.45; cursor: pointer; }
+.alert.crit { border-color: var(--crit); background: rgba(208, 59, 59, .12); }
+.alert.warn { border-color: var(--warn); background: rgba(250, 178, 25, .09); }
+.alert b { color: var(--txt); }
+table.t td.cur { outline: 1px solid var(--amber); outline-offset: -1px; background: var(--panel2); }
