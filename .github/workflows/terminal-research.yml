@@ -1,0 +1,25 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e; mkdir out && cd out
+          UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
+          for s in WCESTUS1w WCSSTUS1w WCRSTUS1w MCESTUS1m MCSSTUS1m WTTSTUS1w; do
+            curl -sSL -m 90 -A "$UA" -o "eia_$s.xls" -w "$s %{http_code}\n" "https://www.eia.gov/dnav/pet/hist_xls/$s.xls" >> codes.txt
+          done
+          for s in WCESTUS1 WCSSTUS1 WTTSTUS1 MCRSTUS1; do
+            curl -sSL -m 60 -o "fred_$s.csv" -w "fred $s %{http_code}\n" "https://fred.stlouisfed.org/graph/fredgraph.csv?id=$s" >> codes.txt
+          done
+          ls -la >> codes.txt
+          set -e
+          git init -q -b research-r10
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m r10 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r10
