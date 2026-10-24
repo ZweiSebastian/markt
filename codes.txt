@@ -1,0 +1,24 @@
+WCESTUS1w 200
+WCSSTUS1w 200
+WCRSTUS1w 200
+MCESTUS1m 200
+MCSSTUS1m 200
+WTTSTUS1w 200
+fred WCESTUS1 404
+fred WCSSTUS1 404
+fred WTTSTUS1 404
+fred MCRSTUS1 404
+total 728
+drwxr-xr-x 2 runner runner   4096 Oct 24 21:04 .
+drwxr-xr-x 3 runner runner   4096 Oct 24 21:04 ..
+-rw-r--r-- 1 runner runner    156 Oct 24 21:04 codes.txt
+-rw-r--r-- 1 runner runner  38912 Oct 24 21:04 eia_MCESTUS1m.xls
+-rw-r--r-- 1 runner runner  53248 Oct 24 21:04 eia_MCSSTUS1m.xls
+-rw-r--r-- 1 runner runner 130048 Oct 24 21:04 eia_WCESTUS1w.xls
+-rw-r--r-- 1 runner runner 130048 Oct 24 21:04 eia_WCRSTUS1w.xls
+-rw-r--r-- 1 runner runner 130048 Oct 24 21:04 eia_WCSSTUS1w.xls
+-rw-r--r-- 1 runner runner 113152 Oct 24 21:04 eia_WTTSTUS1w.xls
+-rw-r--r-- 1 runner runner  29496 Oct 24 21:04 fred_MCRSTUS1.csv
+-rw-r--r-- 1 runner runner  29496 Oct 24 21:04 fred_WCESTUS1.csv
+-rw-r--r-- 1 runner runner  29496 Oct 24 21:04 fred_WCSSTUS1.csv
+-rw-r--r-- 1 runner runner  29496 Oct 24 21:04 fred_WTTSTUS1.csv
