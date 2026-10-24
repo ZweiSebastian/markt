@@ -1,0 +1,20 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          set +e; mkdir out && cd out
+          for s in PCU33443344 PCU334413334413 PCU3344133344131 PCU334413334413A WPU1178 PCU33441333441312; do
+            curl -sSL -m 60 -o "fred_$s.csv" -w "fred $s %{http_code}\n" "https://fred.stlouisfed.org/graph/fredgraph.csv?id=$s" >> codes.txt
+          done
+          set -e
+          git init -q -b research-r11
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m r11 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r11
