@@ -155,8 +155,9 @@ def schedule(index, roll):
     return [roll[str(min(max(d.year, first), last))]["p"] for d in index]
 
 
-def evaluate(name, score, P, sma210, cash_rate, params, episodes_min=0.20):
-    """Signale für einen Index mit festen Parametern; Kennzahlen vor/nach 1990, Bilanz je Einbruch."""
+def evaluate(name, score, P, sma210, cash_rate, params, episodes_min=0.20, div=0.0, lag=0, cost=0.0):
+    """Signale für einen Index mit festen Parametern; Kennzahlen vor/nach 1990, Bilanz je Einbruch.
+    div: Dividendenrendite p.a. (für Kursindizes), lag: Tage bis zur Umschichtung, cost: Kosten je Wechsel."""
     days = score.index
     above = (P > sma210).fillna(False)
     r = (P / P.shift(1) - 1).fillna(0)
@@ -174,15 +175,20 @@ def evaluate(name, score, P, sma210, cash_rate, params, episodes_min=0.20):
     else:
         plist, pcur = params, params
     pos, sw = simulate(s_, ab_, r_, c_, plist)
-    eq, cagr, mdd = perf(pos, r_, c_)
+    r_ = r_ + div / Y
     eqbh, bcagr, bmdd = perf(np.ones(len(pos)), r_, c_)
+    if lag:
+        pos = np.concatenate([np.full(lag, pos[0]), pos[:-lag]])
+    dpos = np.abs(np.diff(np.concatenate([[pos[0]], pos]))) * cost
+    rs_, cs_ = r_ - dpos, c_ - dpos   # Kosten nur an Wechseltagen und nur für die Regel
+    eq, cagr, mdd = perf(pos, rs_, cs_)
     pos_s = pd.Series(pos, index=d)
     Pd = P[sel]
 
     def block(mask):
         if mask.sum() < Y:
             return None
-        e1, c1, m1 = perf(pos[mask], r_[mask], c_[mask])
+        e1, c1, m1 = perf(pos[mask], rs_[mask], cs_[mask])
         e0, c0, m0 = perf(np.ones(mask.sum()), r_[mask], c_[mask])
         yrs = mask.sum() / Y
         dmask = d[mask]
