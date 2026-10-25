@@ -1,0 +1,46 @@
+{
+ "t_DAILY_19691231": {
+  "raw": "{\"timestamp\":\"Oct 25, 2026, 10:22:53\u202fPM\",\"user\":\"sys_x_bmapip01\",\"error_code\":\" 100\",\"error_message\":\" null Invalid Parameter start_date : '19691231. Calculation date cannot be earlier than 19970101'\"}"
+ },
+ "t_DAILY_19781229": {
+  "raw": "{\"timestamp\":\"Oct 25, 2026, 10:22:54\u202fPM\",\"user\":\"sys_x_bmapip01\",\"error_code\":\" 100\",\"error_message\":\" null Invalid Parameter start_date : '19781229. Calculation date cannot be earlier than 19970101'\"}"
+ },
+ "t_DAILY_19981231": {
+  "n": 6736,
+  "first": "20001229",
+  "last": "20261023"
+ },
+ "t_DAILY_20001229": {
+  "n": 6736,
+  "first": "20001229",
+  "last": "20261023"
+ },
+ "t_MONTHLY_19691231": {
+  "raw": "{\"timestamp\":\"Oct 25, 2026, 10:22:55\u202fPM\",\"user\":\"sys_x_bmapip01\",\"error_code\":\" 100  300\",\"error_message\":\" null Invalid Parameter start_date : '19691231. Calculation date cannot be earlier than 19970101'  Invalid Parameter data_frequency : 'MONTHLY'\"}"
+ },
+ "t_MONTHLY_19781229": {
+  "raw": "{\"timestamp\":\"Oct 25, 2026, 10:22:56\u202fPM\",\"user\":\"sys_x_bmapip01\",\"error_code\":\" 100  300\",\"error_message\":\" null Invalid Parameter start_date : '19781229. Calculation date cannot be earlier than 19970101'  Invalid Parameter data_frequency : 'MONTHLY'\"}"
+ },
+ "t_MONTHLY_19981231": {
+  "raw": "{\"timestamp\":\"Oct 25, 2026, 10:22:56\u202fPM\",\"user\":\"sys_x_bmapip01\",\"error_code\":\"  300\",\"error_message\":\"  Invalid Parameter data_frequency : 'MONTHLY'\"}"
+ },
+ "t_MONTHLY_20001229": {
+  "raw": "{\"timestamp\":\"Oct 25, 2026, 10:22:56\u202fPM\",\"user\":\"sys_x_bmapip01\",\"error_code\":\"  300\",\"error_message\":\"  Invalid Parameter data_frequency : 'MONTHLY'\"}"
+ },
+ "t_END_OF_MONTH_19691231": {
+  "raw": "{\"timestamp\":\"Oct 25, 2026, 10:22:56\u202fPM\",\"user\":\"sys_x_bmapip01\",\"error_code\":\" 100\",\"error_message\":\" null Invalid Parameter start_date : '19691231. Calculation date cannot be earlier than 19970101'\"}"
+ },
+ "t_END_OF_MONTH_19781229": {
+  "raw": "{\"timestamp\":\"Oct 25, 2026, 10:22:57\u202fPM\",\"user\":\"sys_x_bmapip01\",\"error_code\":\" 100\",\"error_message\":\" null Invalid Parameter start_date : '19781229. Calculation date cannot be earlier than 19970101'\"}"
+ },
+ "t_END_OF_MONTH_19981231": {
+  "n": 310,
+  "first": "20001229",
+  "last": "20260930"
+ },
+ "t_END_OF_MONTH_20001229": {
+  "n": 310,
+  "first": "20001229",
+  "last": "20260930"
+ }
+}
