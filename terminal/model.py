@@ -67,6 +67,9 @@ MIX_SRC = {"world": "mom_dev", "world_eur": "mom_dev", "spx": "mom_us"}
 # wirkt jede Regel mit Geldmarktphasen besser, als sie ist), Umschichtung erst am Tag nach der Entscheidung, 0,1 % Kosten je
 # umgeschichtetem Betrag. Getestet: Dividenden kosten die Regeln 0,4–1,0 Pp. Vorsprung p.a., Verzug und Kosten je höchstens 0,2 Pp.
 BT_COST = 0.001
+# Stand des Scores: Ändert sich der Score (Gewichte, Komponenten, Linien), müssen die jährlich festgelegten Signal-Parameter
+# neu berechnet werden – sonst würden Parameter, die auf einem alten Score gewählt wurden, auf den neuen angewandt.
+SCORE_VERSION = "2026-10-25"
 BT_LAG = 1
 PROB_LAM = 1.0
 FBUY_MODE = "on"      # Auslandskäufe US-Aktien in der Säule Stimmung
@@ -789,7 +792,7 @@ def run(ser, markt, now, quality=None, prev=None):
             try:
                 if key == "spx" and sig_params is None:
                     above_ = (P > smaS).fillna(False)
-                    cache_ = (prev or {}).get("signal_roll") if isinstance(prev, dict) else None
+                    cache_ = (prev or {}).get("signal_roll") if isinstance(prev, dict) and prev.get("score_version") == SCORE_VERSION else None
                     sig_params = sig.rolling(score, above_, (P / P.shift(1) - 1).fillna(0), (tbill.ffill() / 100 / Y).fillna(0),
                                              now.year, cache_)
                     sig_cal = sig_params[max(sig_params, key=int)] if sig_params else None
@@ -1004,7 +1007,7 @@ def run(ser, markt, now, quality=None, prev=None):
         rule["signalScore"] = markt.get("score")
     q = quality_score()
     return {"weights": WEIGHTS, "pillar_names": PILLAR_NAMES, "targets": targets, "rule": rule, "quality": q, "g7": None if g7 is None else g7[1],
-            "signal_params": (sig_cal or {}).get("p"), "signal_cal": sig_cal, "signal_roll": sig_params,
+            "signal_params": (sig_cal or {}).get("p"), "signal_cal": sig_cal, "signal_roll": sig_params, "score_version": SCORE_VERSION,
             "note": "Kursrenditen ohne Dividenden (außer MSCI World in Euro). Monatsdaten mit Veröffentlichungsverzögerung; "
                     "Stellenaufbau wie damals veröffentlicht (Philadelphia Fed), übrige Konjunkturdaten in heutiger Fassung. "
                     "Regeln im Test und Signale mit gemessenen Dividenden (Quelle je Index angegeben), Umschichtung am Tag nach der Entscheidung und 0,1 % Kosten je Umschichtung."}
