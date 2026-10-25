@@ -54,7 +54,11 @@ STRAT_FREQ = "M"       # Entscheidungsrhythmus der Regeln im Test: letzter Hande
 SMA_COMP_N = 252       # Linie in der Komponente der Trend-Säule: 12 Monate (getestet 6–15: beste Brier-Werte, Signale besser)
 SIG_TREND_N = 210      # Linie in den Ein-/Ausstiegs-Signalen: 10 Monate (getestet 6–15: 10 am besten)
 # Ungefähre Dividendenrendite p.a. für die 2x-Rechnung (Kursindizes); DAX und MSCI World in Euro enthalten Dividenden bereits
-DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut": 0.014, "sx5e": 0.033, "dax": 0.0, "nikkei": 0.018, "em": 0.026}
+# Dividenden je Index (Kursindizes enthalten keine): gemessene Monatswerte, für Jahre davor eine Ersatzreihe
+#   world: MSCI World brutto ab 2001, davor S&P 500 (Shiller, gemessen)   spx: Shiller-Dividenden (gemessen, seit 1871)
+#   em/nikkei/sx5e: MSCI Schwellenländer/Japan/Europa ab 2001   ndx: Nasdaq-100 Total Return ab 1999   rut: Russell 2000 TR ab 1995
+#   vor Beginn der Messung (außer world): der Durchschnitt der ersten 5 gemessenen Jahre   world_eur/dax: enthalten Dividenden schon
+DIV_SRC = {"world": "dvd_world", "em": "dvd_em", "nikkei": "dvd_japan", "sx5e": "dvd_europe", "ndx": "dvd_ndx", "rut": "dvd_rut"}
 # Mischung in den Regeln im Test: Anteile am angelegten Geld (Basis-ETF, Momentum, 2x) und Quelle des Momentum-Vorsprungs
 MIX_W = {"base": 0.70, "mom": 0.17, "lev": 0.13}
 MIX_TREND_N = 252   # Wartelinie für 2x und Momentum: 12 Monate (getestet 8/10/12: 12 vermied den Fehlstart 2002)
@@ -154,6 +158,45 @@ def run(ser, markt, now, quality=None, prev=None):
         s.index = pd.to_datetime(s.index) + pd.Timedelta(days=lag)
         s = s[~s.index.duplicated(keep="last")].sort_index()
         return s.reindex(days, method="ffill", tolerance=pd.Timedelta(days=max_age))
+
+    def dividend_daily(key, idx, first=None):
+        """Dividende je Tag (Anteil) für einen Kursindex; 0 für Indizes mit Dividenden. Plus Beschreibung der Quelle."""
+        if key in ("world_eur", "dax"):
+            return pd.Series(0.0, index=idx), "im Index enthalten"
+        dm, pm = ser("div_m"), ser("spx_m")
+        us = None
+        if dm is not None and pm is not None:
+            us = (dm / pm / 12).dropna()
+            us.index = us.index.to_period("M")
+            us = us[~us.index.duplicated(keep="last")]
+        if key == "spx":
+            mm, txt = us, "Shiller-Dividenden (gemessen)"
+        else:
+            x = ser(DIV_SRC.get(key, ""))
+            if x is None or len(x) < 24:
+                mm, txt = us, "S&P-500-Dividenden als Ersatz (keine eigene Reihe)"
+            else:
+                x = (x / 100).copy()
+                x.index = x.index.to_period("M")
+                x = x[~x.index.duplicated(keep="last")]
+                start = x.index.min()
+                early = first is not None and pd.Period(first, "M") < start
+                if key == "world" and us is not None:
+                    mm = pd.concat([us[us.index < start], x])
+                    txt = f"gemessen ab {start.year}" + (", davor S&P-500-Dividenden (gemessen) als Ersatz" if early else "")
+                else:
+                    mm = x
+                    txt = f"gemessen ab {start.year}" + (", davor Durchschnitt der ersten 5 gemessenen Jahre" if early else "")
+                    pre = pd.period_range(pd.Period(idx.min(), "M"), start - 1, freq="M")
+                    if len(pre):
+                        mm = pd.concat([pd.Series(float(x.iloc[:60].mean()), index=pre), x])
+        if mm is None:
+            return pd.Series(0.0, index=idx), "keine Dividendendaten"
+        per = idx.to_period("M")
+        cnt = pd.Series(1, index=idx).groupby(per).transform("size")
+        last = float(mm.iloc[-12:].mean())
+        vals = pd.Series(mm.reindex(per).values, index=idx).fillna(last)   # laufender Monat: Schnitt der letzten 12
+        return vals / cnt, txt
 
     def monthly(sid, how="last"):
         s = ser(sid)
@@ -678,6 +721,8 @@ def run(ser, markt, now, quality=None, prev=None):
         cash = (tbill.ffill() / 100 / Y)
         sidx = score.dropna().index
 
+        divd, div_txt = dividend_daily(key, days, score.first_valid_index())
+
         def weekly_hold(expo):
             e = expo.copy()
             # Entscheidung am letzten Handelstag der Periode, gilt die ganze folgende Periode
@@ -687,13 +732,8 @@ def run(ser, markt, now, quality=None, prev=None):
         def strat(expo):
             e = weekly_hold(expo).reindex(sidx).fillna(0)
             c_ = cash.reindex(sidx).fillna(0)
-            # Die Kursreihen enthalten (außer DAX und MSCI World in Euro) keine Dividenden: geschätzte Dividendenrendite addieren
-            dy = DIV_YIELD.get(key, 0.02)
-            if key == "spx":
-                dm, pm = ser("div_m"), ser("spx_m")
-                if dm is not None and pm is not None:
-                    dy = (dm / pm).reindex(sidx, method="ffill").fillna(dy)
-            rt = r.reindex(sidx) + dy / Y
+            # Die Kursreihen enthalten (außer DAX und MSCI World in Euro) keine Dividenden: gemessene Dividenden addieren
+            rt = r.reindex(sidx) + divd.reindex(sidx).fillna(0)
             turn = e.diff().abs().fillna(0) * BT_COST          # Kosten je umgeschichtetem Anteil
             ret = (e * (rt - 0.002 / Y) + (1 - e) * c_ - turn).dropna()   # 0,2 % ETF-Gebühr p.a.
             eq = (1 + ret).cumprod()
@@ -754,7 +794,7 @@ def run(ser, markt, now, quality=None, prev=None):
                                              now.year, cache_)
                     sig_cal = sig_params[max(sig_params, key=int)] if sig_params else None
                 if sig_params:
-                    signals_out = sig.evaluate(tname, score, P, smaS, tbill, sig_params, div=DIV_YIELD.get(key, 0.02), lag=BT_LAG, cost=BT_COST)
+                    signals_out = sig.evaluate(tname, score, P, smaS, tbill, sig_params, div=divd, lag=BT_LAG, cost=BT_COST)
             except Exception as e:  # noqa
                 import traceback
                 traceback.print_exc()
@@ -937,7 +977,7 @@ def run(ser, markt, now, quality=None, prev=None):
             "now": {"score": int(now_score), "day": str(last_i.date()), "month": str(last_i.date())[:7], "label": lab[0], "cls": lab[1],
                     "action": lab[2], "pillars": pil_now, "text": sent, "risk": risk},
             "hist": hist, "bands": bands, "base": base, "rank": rank, "since": str(first.date()), "smap": [round(float(v), 2) for v in smap],
-            "strategies": strategies, "strat_months": strat_months, "cash_m": cash_m, "mix": mix, "direction": direction, "episodes": episodes, "analogs": ana,
+            "strategies": strategies, "div_src": div_txt, "strat_months": strat_months, "cash_m": cash_m, "mix": mix, "direction": direction, "episodes": episodes, "analogs": ana,
             "prob": {"now": prob_now, "calib": calib, "pooled": bool(use_pool), "brier": None if brier is None else round(brier, 4),
                      "brier_ref": None if brier_ref is None else round(brier_ref, 4), "skill": skill,
                      "oos_from": None if not len(oos) else str(oos.index[0].date())},
@@ -967,4 +1007,4 @@ def run(ser, markt, now, quality=None, prev=None):
             "signal_params": (sig_cal or {}).get("p"), "signal_cal": sig_cal, "signal_roll": sig_params,
             "note": "Kursrenditen ohne Dividenden (außer MSCI World in Euro). Monatsdaten mit Veröffentlichungsverzögerung; "
                     "Stellenaufbau wie damals veröffentlicht (Philadelphia Fed), übrige Konjunkturdaten in heutiger Fassung. "
-                    "Regeln im Test und Signale mit geschätzten Dividenden, Umschichtung am Tag nach der Entscheidung und 0,1 % Kosten je Umschichtung."}
+                    "Regeln im Test und Signale mit gemessenen Dividenden (Quelle je Index angegeben), Umschichtung am Tag nach der Entscheidung und 0,1 % Kosten je Umschichtung."}

@@ -916,6 +916,41 @@ def msci_eur():
 slow("msci_eur", msci_eur, ["msci_eur"])
 
 
+def dividends():
+    """Dividendenrendite je Monat (Rendite mit Dividenden minus Kursrendite, in %) für die Regeln im Test.
+    MSCI Brutto- gegen Kursindex (ab 2001), Nasdaq-100 Total Return (ab 1999), Russell 2000 Total Return (ab 1995)."""
+    def mo(s):
+        s = s.dropna().sort_index()
+        return s.groupby(s.index.to_period("M")).last()
+
+    def put_m(sid, tr, pr, name, src):
+        j = pd.concat([mo(tr), mo(pr)], axis=1, sort=True).dropna()
+        m = (j.iloc[:, 0].pct_change() - j.iloc[:, 1].pct_change()).dropna() * 100
+        m.index = m.index.to_timestamp()
+        put(sid, m, name, "intern", "%", "rate", src, "m", 4)
+
+    def msci_m(code, var):
+        u = ("https://app2.msci.com/products/service/index/indexmaster/getLevelDataForGraph?currency_symbol=USD"
+             f"&index_variant={var}&start_date=19981231&end_date={NOW.strftime('%Y%m%d')}&data_frequency=END_OF_MONTH&index_codes={code}")
+        lv = get(u, 90).json()["indexes"]["INDEX_LEVELS"]
+        return pd.Series([x["level_eod"] for x in lv], index=pd.to_datetime([str(x["calc_date"]) for x in lv], format="%Y%m%d"))
+    for code, sid, nm in (("990100", "dvd_world", "MSCI World"), ("891800", "dvd_em", "MSCI Schwellenländer"),
+                          ("939200", "dvd_japan", "MSCI Japan"), ("990500", "dvd_europe", "MSCI Europa")):
+        put_m(sid, msci_m(code, "GRTR"), msci_m(code, "STRD"), f"Dividendenrendite {nm} je Monat", "MSCI")
+
+    def nasdaq(sym):
+        x = pd.read_excel(io.BytesIO(get(f"https://indexes.nasdaqomx.com/Index/ExportHistory/{sym}?startDate=1985-01-01T00:00:00.000"
+                                         f"&endDate={NOW.strftime('%Y-%m-%d')}T00:00:00.000&timeOfDay=EOD", 90).content))
+        return pd.Series(pd.to_numeric(x["Index Value"], errors="coerce").values, index=pd.to_datetime(x["Trade Date"]))
+    put_m("dvd_ndx", nasdaq("XNDX"), nasdaq("NDX"), "Dividendenrendite Nasdaq 100 je Monat", "Nasdaq")
+    import yfinance as yf
+    hist = lambda t: yf.Ticker(t).history(period="max", interval="1d", auto_adjust=False)["Close"].tz_localize(None)
+    put_m("dvd_rut", hist("^RUTTR"), hist("^RUT"), "Dividendenrendite Russell 2000 je Monat", "Yahoo Finance")
+
+
+slow("dividends", dividends, ["dvd_world", "dvd_em", "dvd_japan", "dvd_europe", "dvd_ndx", "dvd_rut"], hours=24 * 7)
+
+
 def gdp():
     j = get("https://api.db.nomics.world/v22/series/BEA/NIPA-T10105?q=gross%20domestic%20product&limit=20&observations=0&format=json", 60).json()
     docs = j["series"]["docs"]
