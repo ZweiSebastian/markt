@@ -157,7 +157,7 @@ def schedule(index, roll):
 
 def evaluate(name, score, P, sma210, cash_rate, params, episodes_min=0.20, div=0.0, lag=0, cost=0.0):
     """Signale für einen Index mit festen Parametern; Kennzahlen vor/nach 1990, Bilanz je Einbruch.
-    div: Dividendenrendite p.a. (für Kursindizes), lag: Tage bis zur Umschichtung, cost: Kosten je Wechsel."""
+    div: Dividende je Tag als Reihe (für Kursindizes) oder Rendite p.a., lag: Tage bis zur Umschichtung, cost: Kosten je Wechsel."""
     days = score.index
     above = (P > sma210).fillna(False)
     r = (P / P.shift(1) - 1).fillna(0)
@@ -175,7 +175,7 @@ def evaluate(name, score, P, sma210, cash_rate, params, episodes_min=0.20, div=0
     else:
         plist, pcur = params, params
     pos, sw = simulate(s_, ab_, r_, c_, plist)
-    r_ = r_ + div / Y
+    r_ = r_ + (div.reindex(d).fillna(0).values if hasattr(div, 'reindex') else div / Y)
     eqbh, bcagr, bmdd = perf(np.ones(len(pos)), r_, c_)
     if lag:
         pos = np.concatenate([np.full(lag, pos[0]), pos[:-lag]])
