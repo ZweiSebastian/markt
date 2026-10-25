@@ -1,0 +1,20 @@
+name: terminal-research
+on:
+  push:
+    branches: [terminal-dev]
+    paths: ['.github/workflows/terminal-research.yml', 'research/r13.py']
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -q yfinance requests pandas
+      - run: |
+          mkdir out && python research/r13.py | tee out/log.txt
+          cd out && git init -q -b research-r13
+          git config user.name "markt-bot"; git config user.email "actions@users.noreply.github.com"
+          git add . && git commit -q -m r13 && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" research-r13
