@@ -59,6 +59,11 @@ DIV_YIELD = {"world": 0.023, "world_eur": 0.0, "spx": 0.02, "ndx": 0.009, "rut":
 MIX_W = {"base": 0.70, "mom": 0.17, "lev": 0.13}
 MIX_TREND_N = 252   # Wartelinie für 2x und Momentum: 12 Monate (getestet 8/10/12: 12 vermied den Fehlstart 2002)
 MIX_SRC = {"world": "mom_dev", "world_eur": "mom_dev", "spx": "mom_us"}
+# Regeln im Test und Signale realistisch: geschätzte Dividenden auf investiertes Geld (Kursindizes enthalten keine; ohne sie
+# wirkt jede Regel mit Geldmarktphasen besser, als sie ist), Umschichtung erst am Tag nach der Entscheidung, 0,1 % Kosten je
+# umgeschichtetem Betrag. Getestet: Dividenden kosten die Regeln 0,4–1,0 Pp. Vorsprung p.a., Verzug und Kosten je höchstens 0,2 Pp.
+BT_COST = 0.001
+BT_LAG = 1
 PROB_LAM = 1.0
 FBUY_MODE = "on"      # Auslandskäufe US-Aktien in der Säule Stimmung
 FBUY_ALL = False
@@ -677,25 +682,25 @@ def run(ser, markt, now, quality=None, prev=None):
             e = expo.copy()
             # Entscheidung am letzten Handelstag der Periode, gilt die ganze folgende Periode
             wk = e.where(e.index.isin(e.groupby(e.index.to_period(STRAT_FREQ)).tail(1).index)).ffill()
-            return wk.shift(1)
+            return wk.shift(1 + BT_LAG)
 
         def strat(expo):
             e = weekly_hold(expo).reindex(sidx).fillna(0)
-            ret = (e * (r.reindex(sidx) - 0.002 / Y) + (1 - e) * cash.reindex(sidx).fillna(0)).dropna()   # 0,2 % ETF-Gebühr p.a.
-            eq = (1 + ret).cumprod()
-            yrs = len(ret) / Y
-            # gleiche Regel mit einem 2x-ETF (täglich zurückgesetzt): 2 × Tagesrendite, Finanzierung Geldmarkt + 0,5 %, Gebühr 0,6 % p.a.
             c_ = cash.reindex(sidx).fillna(0)
-            # Die Kursreihen enthalten (außer DAX und MSCI World in Euro) keine Dividenden. Ein echter 2x-ETF bekommt die doppelte
-            # Dividende; damit der Vergleich zur 1x-Linie (ohne Dividende) fair bleibt, wird eine Dividendenrendite einmal addiert.
+            # Die Kursreihen enthalten (außer DAX und MSCI World in Euro) keine Dividenden: geschätzte Dividendenrendite addieren
             dy = DIV_YIELD.get(key, 0.02)
             if key == "spx":
                 dm, pm = ser("div_m"), ser("spx_m")
                 if dm is not None and pm is not None:
-                    dy_s = (dm / pm).reindex(sidx, method="ffill").fillna(dy)
-                    dy = dy_s
-            r2 = (2 * r.reindex(sidx) + dy / Y - c_ - 0.005 / Y - 0.006 / Y).clip(lower=-1)
-            ret2 = (e * r2 + (1 - e) * c_).dropna()
+                    dy = (dm / pm).reindex(sidx, method="ffill").fillna(dy)
+            rt = r.reindex(sidx) + dy / Y
+            turn = e.diff().abs().fillna(0) * BT_COST          # Kosten je umgeschichtetem Anteil
+            ret = (e * (rt - 0.002 / Y) + (1 - e) * c_ - turn).dropna()   # 0,2 % ETF-Gebühr p.a.
+            eq = (1 + ret).cumprod()
+            yrs = len(ret) / Y
+            # gleiche Regel mit einem 2x-ETF (täglich zurückgesetzt): 2 × Tagesrendite mit Dividende, Finanzierung Geldmarkt + 0,5 %, Gebühr 0,6 % p.a.
+            r2 = (2 * rt - c_ - 0.005 / Y - 0.006 / Y).clip(lower=-1)
+            ret2 = (e * r2 + (1 - e) * c_ - turn).dropna()
             eq2 = (1 + ret2).cumprod()
             return {"cagr": round((eq.iloc[-1] ** (1 / yrs) - 1) * 100, 1), "mdd": round(float((eq / eq.cummax() - 1).min()) * 100, 0),
                     "vol": round(float(ret.std() * math.sqrt(Y)) * 100, 1), "expo": round(float(e.mean() * 100), 0), "eq": eq,
@@ -749,7 +754,7 @@ def run(ser, markt, now, quality=None, prev=None):
                                              now.year, cache_)
                     sig_cal = sig_params[max(sig_params, key=int)] if sig_params else None
                 if sig_params:
-                    signals_out = sig.evaluate(tname, score, P, smaS, tbill, sig_params)
+                    signals_out = sig.evaluate(tname, score, P, smaS, tbill, sig_params, div=DIV_YIELD.get(key, 0.02), lag=BT_LAG, cost=BT_COST)
             except Exception as e:  # noqa
                 import traceback
                 traceback.print_exc()
@@ -961,4 +966,5 @@ def run(ser, markt, now, quality=None, prev=None):
     return {"weights": WEIGHTS, "pillar_names": PILLAR_NAMES, "targets": targets, "rule": rule, "quality": q, "g7": None if g7 is None else g7[1],
             "signal_params": (sig_cal or {}).get("p"), "signal_cal": sig_cal, "signal_roll": sig_params,
             "note": "Kursrenditen ohne Dividenden (außer MSCI World in Euro). Monatsdaten mit Veröffentlichungsverzögerung; "
-                    "Stellenaufbau wie damals veröffentlicht (Philadelphia Fed), übrige Konjunkturdaten in heutiger Fassung."}
+                    "Stellenaufbau wie damals veröffentlicht (Philadelphia Fed), übrige Konjunkturdaten in heutiger Fassung. "
+                    "Regeln im Test und Signale mit geschätzten Dividenden, Umschichtung am Tag nach der Entscheidung und 0,1 % Kosten je Umschichtung."}
