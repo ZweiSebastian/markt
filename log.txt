@@ -1,0 +1,32 @@
+OK   vorheriger Lauf  2026-10-31T02:33:15Z
+OK   Tages-Archiv  89 Reihen
+OK   yahoo  56/56 Ticker (voll)
+OK   quality  aus Cache 2026-10-30T18:32:43Z
+OK   zinsen  aus Cache 2026-10-31T02:33:15Z
+OK   y10m  aus Cache 2026-10-31T02:33:15Z
+OK   g7  aus Cache 2026-10-31T02:33:15Z
+OK   fedfunds  aus Cache 2026-10-31T02:33:15Z
+OK   ezb  aus Cache 2026-10-31T02:33:15Z
+OK   eurostat_unemp  aus Cache 2026-10-31T02:33:15Z
+OK   bls  aus Cache 2026-10-31T02:33:15Z
+OK   nfci  FRED (Chicago Fed), Stand 2026-10-23
+OK   oecd  aus Cache 2026-10-31T02:33:15Z
+OK   claims  aus Cache 2026-10-31T02:33:15Z
+OK   aaii2  aus Cache 2026-10-31T02:33:15Z
+OK   msci_eur  aus Cache 2026-10-31T02:33:15Z
+OK   dividends  aus Cache 2026-10-25T22:31:07Z
+OK   gdp  aus Cache 2026-10-31T02:33:15Z
+OK   freddie  aus Cache 2026-10-31T02:33:15Z
+OK   eia  aus Cache 2026-10-31T02:33:15Z
+OK   h41  aus Cache 2026-10-31T02:33:15Z
+Shiller-Datei: https://img1.wsimg.com/blobby/go/e5e77e0b-59d1-44d9-ab25-4763ac982e53/downloads/1449043e-a1ed-4e2e-8e9c-7b9a2a064493/ie_data.xls?ver=1791297298731
+OK   momentum  aus Cache 2026-10-29T23:13:54Z
+OK   markt.json  2026-10-30
+OK   stress  jetzt 6 Signale
+OK   modell  world: 51 · world_eur: 52 · spx: 51 · ndx: 48 · rut: 50 · sx5e: 54 · dax: 51 · nikkei: 54 · em: 50
+OK   protokoll  9 Einträge
+OK   tagesprotokoll  10 Tage
+OK   marktphase  sorglos seit 2026-04-08
+OK   news  130 Meldungen
+OK   Tages-Archiv: 89 Reihen, 5.89 MB
+OK   fertig: 123 Reihen, 5.07 MB
