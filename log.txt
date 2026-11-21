@@ -1,0 +1,23 @@
+OK   vorheriger Lauf  2026-11-21T04:05:21Z
+OK   Tages-Archiv  89 Reihen
+OK   yahoo  56/56 Ticker (voll)
+OK   quality  aus Cache 2026-11-21T02:06:20Z
+OK   zinsen  y3m:11297, y2:12607, y10:14205, y30:12429
+OK   z1  aus Cache 2026-11-20T21:00:27Z
+OK   g7 aktuell  usa:2026-11, jpn:2026-11, can:2026-11, deu:2026-11, fra:2026-10, gbr:2026-11, ita:2026-10
+OK   nfci_fred  aus Cache 2026-11-20T21:00:27Z
+OK   finra  aus Cache 2026-11-20T21:00:27Z
+FEHL payrolls_rt  TypeError: expected <class 'datetime.datetime'>
+OK   dividends  aus Cache 2026-11-16T02:53:19Z
+OK   gdp  A191RC-Q
+Shiller-Datei: https://img1.wsimg.com/blobby/go/e5e77e0b-59d1-44d9-ab25-4763ac982e53/downloads/249997aa-1eef-4237-93ec-2d319f7881ab/ie_data.xls?ver=1794837439406
+OK   momentum  aus Cache 2026-11-20T02:32:38Z
+OK   markt.json  2026-11-20
+OK   stress  jetzt 5 Signale
+OK   modell  world: 31 · world_eur: 39 · spx: 29 · ndx: 29 · rut: 34 · sx5e: 41 · dax: 36 · nikkei: 33 · em: 35
+OK   protokoll  18 Einträge
+OK   tagesprotokoll  31 Tage
+OK   marktphase  angst seit 2026-11-17
+OK   news  130 Meldungen
+OK   Tages-Archiv: 89 Reihen, 5.90 MB
+OK   fertig: 123 Reihen, 5.10 MB
