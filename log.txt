@@ -1,0 +1,21 @@
+OK   vorheriger Lauf  2026-11-28T04:47:49Z
+OK   Tages-Archiv  89 Reihen
+OK   yahoo  56/56 Ticker (Ergänzung)
+OK   quality  aus Cache 2026-11-27T21:54:37Z
+OK   zinsen  aus Cache 2026-11-28T04:47:49Z
+OK   g7 aktuell  usa:2026-11, jpn:2026-11, can:2026-11, deu:2026-11, fra:2026-10, gbr:2026-11, ita:2026-10
+OK   nfci  FRED (Chicago Fed), Stand 2026-11-20
+FEHL payrolls_rt  TypeError: expected <class 'datetime.datetime'>
+OK   dividends  aus Cache 2026-11-23T03:49:52Z
+OK   gdp  A191RC-Q
+OK   shiller  aus Cache 2026-11-27T21:54:37Z
+OK   momentum  aus Cache 2026-11-27T05:11:25Z
+OK   markt.json  2026-11-27
+OK   stress  jetzt 5 Signale
+OK   modell  world: 41 · world_eur: 48 · spx: 41 · ndx: 37 · rut: 43 · sx5e: 40 · dax: 36 · nikkei: 34 · em: 35
+OK   protokoll  18 Einträge
+OK   tagesprotokoll  38 Tage
+OK   marktphase  angst seit 2026-11-17
+OK   news  130 Meldungen
+OK   Tages-Archiv: 89 Reihen, 5.91 MB
+OK   fertig: 123 Reihen, 5.10 MB
